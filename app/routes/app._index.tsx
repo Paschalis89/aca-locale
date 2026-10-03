@@ -131,6 +131,30 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
+  const testShopifyIdToken = async () => {
+  try {
+    const token = await shopify.idToken();
+
+    console.log(
+      "[ACA Locale] Shopify ID token:",
+      token,
+    );
+
+    await navigator.clipboard.writeText(
+      token,
+    );
+
+    shopify.toast.show(
+      "Shopify ID token copied to clipboard",
+    );
+  } catch (error) {
+    console.error(
+      "[ACA Locale] Unable to get Shopify ID token:",
+      error,
+    );
+  }
+};
+
   const isLoading =
     ["loading", "submitting"].includes(fetcher.state) &&
     fetcher.formMethod === "POST";
@@ -147,6 +171,12 @@ export default function Index() {
     <s-page heading="Shopify app template">
       <s-button slot="primary-action" onClick={generateProduct}>
         Generate a product
+      </s-button>
+
+      <s-button
+        onClick={testShopifyIdToken}
+      >
+        Test Shopify ID Token
       </s-button>
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">

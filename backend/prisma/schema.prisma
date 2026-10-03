@@ -28,7 +28,7 @@ model Shop {
 
   status ShopStatus @default(ACTIVE)
 
-  sourceLocale String @default("it")
+  sourceLocale String?
 
   installedAt   DateTime  @default(now())
   uninstalledAt DateTime?

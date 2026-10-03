@@ -78,4 +78,33 @@ export class ShopsService {
       },
     });
   }
+
+  ensureShop(
+    shopifyDomain: string,
+    ) {
+    return this.prisma.shop.upsert({
+        where: {
+        shopifyDomain,
+        },
+
+        update: {},
+
+        create: {
+        shopifyDomain,
+
+        settings: {
+            create: {},
+        },
+
+        aiConfiguration: {
+            create: {},
+        },
+        },
+
+        include: {
+        settings: true,
+        aiConfiguration: true,
+        },
+    });
+    }
 }

@@ -30,44 +30,24 @@
         ]
       }
     },
-    "/api/v1/shops": {
+    "/api/v1/shops/current": {
       "get": {
-        "description": "Returns the shops currently registered in ACA Locale.",
-        "operationId": "ShopsController_findAll",
+        "operationId": "ShopsController_getCurrentShop",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Registered shops returned successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": [
-                    {
-                      "id": "cm123...",
-                      "shopifyDomain": "aca-locale-dev-cfoxunuo.myshopify.com",
-                      "name": "ACA Locale Dev",
-                      "status": "ACTIVE",
-                      "sourceLocale": "it",
-                      "settings": {
-                        "autoTranslate": false,
-                        "autoPublish": false,
-                        "requireHumanReview": true,
-                        "enableAiReview": true
-                      },
-                      "aiConfiguration": {
-                        "translationProvider": "OPENAI",
-                        "translationModel": null,
-                        "reviewProvider": "OPENAI",
-                        "reviewModel": null
-                      }
-                    }
-                  ]
-                }
-              }
-            }
+            "description": "Returns the tenant identified by the Shopify ID token."
+          },
+          "401": {
+            "description": "Shopify ID token is missing, invalid or expired."
           }
         },
-        "summary": "List registered shops",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current authenticated shop",
         "tags": [
           "Shops"
         ]
@@ -117,6 +97,21 @@
           }
         },
         "summary": "Bootstrap ACA Locale development shop",
+        "tags": [
+          "Demo"
+        ]
+      }
+    },
+    "/api/v1/demo/shops": {
+      "get": {
+        "operationId": "DemoController_listShops",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns all registered shops. Development/demo only."
+          }
+        },
+        "summary": "List all demo shops",
         "tags": [
           "Demo"
         ]

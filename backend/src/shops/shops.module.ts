@@ -3,6 +3,10 @@ import {
 } from '@nestjs/common';
 
 import {
+  ShopifyAuthModule,
+} from '../shopify-auth/shopify-auth.module.js';
+
+import {
   ShopsController,
 } from './shops.controller.js';
 
@@ -11,6 +15,10 @@ import {
 } from './shops.service.js';
 
 @Module({
+  imports: [
+    ShopifyAuthModule,
+  ],
+
   controllers: [
     ShopsController,
   ],

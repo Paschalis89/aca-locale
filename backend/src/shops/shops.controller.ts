@@ -1,19 +1,35 @@
 import {
   Controller,
   Get,
+  UseGuards,
 } from '@nestjs/common';
 
 import {
+  ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+
+import {
+  CurrentShop,
+} from '../shopify-auth/current-shop.decorator.js';
+
+import {
+  ShopifyAuthGuard,
+} from '../shopify-auth/shopify-auth.guard.js';
+
+import type {
+  ShopifyAuthContext,
+} from '../shopify-auth/shopify-auth.types.js';
 
 import {
   ShopsService,
 } from './shops.service.js';
 
 @ApiTags('Shops')
+@ApiBearerAuth()
 @Controller('shops')
 export class ShopsController {
   constructor(
@@ -21,48 +37,30 @@ export class ShopsController {
       ShopsService,
   ) {}
 
-  @Get()
+  @Get('current')
+  @UseGuards(
+    ShopifyAuthGuard,
+  )
   @ApiOperation({
     summary:
-      'List registered shops',
-
-    description:
-      'Returns the shops currently registered in ACA Locale.',
+      'Get current authenticated shop',
   })
   @ApiOkResponse({
     description:
-      'Registered shops returned successfully.',
-
-    schema: {
-      example: [
-        {
-          id: 'cm123...',
-          shopifyDomain:
-            'aca-locale-dev-cfoxunuo.myshopify.com',
-          name: 'ACA Locale Dev',
-          status: 'ACTIVE',
-          sourceLocale: 'it',
-          settings: {
-            autoTranslate: false,
-            autoPublish: false,
-            requireHumanReview: true,
-            enableAiReview: true,
-          },
-          aiConfiguration: {
-            translationProvider:
-              'OPENAI',
-            translationModel:
-              null,
-            reviewProvider:
-              'OPENAI',
-            reviewModel:
-              null,
-          },
-        },
-      ],
-    },
+      'Returns the tenant identified by the Shopify ID token.',
   })
-  findAll() {
-    return this.shopsService.findAll();
+  @ApiUnauthorizedResponse({
+    description:
+      'Shopify ID token is missing, invalid or expired.',
+  })
+  getCurrentShop(
+    @CurrentShop()
+    context:
+      ShopifyAuthContext,
+  ) {
+    return this.shopsService
+      .ensureShop(
+        context.shopDomain,
+      );
   }
 }

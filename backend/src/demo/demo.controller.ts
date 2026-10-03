@@ -105,4 +105,19 @@ export class DemoController {
     return this.shopsService
       .bootstrapAcaLocaleDev();
   }
+
+  @Get('shops')
+  @ApiOperation({
+    summary:
+        'List all demo shops',
+  })
+  @ApiOkResponse({
+    description:
+        'Returns all registered shops. Development/demo only.',
+  })
+  listShops() {
+    this.ensureDemoEnabled();
+
+    return this.shopsService.findAll();
+  }
 }
