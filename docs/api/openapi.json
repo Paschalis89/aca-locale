@@ -1,0 +1,144 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "description": "Checks whether the ACA Locale backend is running.",
+        "operationId": "HealthController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Backend is healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "ok",
+                    "service": "aca-locale-backend",
+                    "version": "0.1.0",
+                    "environment": "development",
+                    "timestamp": "2026-10-03T21:00:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Backend health check",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/v1/shops": {
+      "get": {
+        "description": "Returns the shops currently registered in ACA Locale.",
+        "operationId": "ShopsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Registered shops returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": [
+                    {
+                      "id": "cm123...",
+                      "shopifyDomain": "aca-locale-dev-cfoxunuo.myshopify.com",
+                      "name": "ACA Locale Dev",
+                      "status": "ACTIVE",
+                      "sourceLocale": "it",
+                      "settings": {
+                        "autoTranslate": false,
+                        "autoPublish": false,
+                        "requireHumanReview": true,
+                        "enableAiReview": true
+                      },
+                      "aiConfiguration": {
+                        "translationProvider": "OPENAI",
+                        "translationModel": null,
+                        "reviewProvider": "OPENAI",
+                        "reviewModel": null
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "List registered shops",
+        "tags": [
+          "Shops"
+        ]
+      }
+    },
+    "/api/v1/demo/ping": {
+      "get": {
+        "description": "Development endpoint used to verify Swagger, OpenAPI and API connectivity.",
+        "operationId": "DemoController_ping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Demo API is reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "ok",
+                    "message": "ACA Locale demo API is reachable.",
+                    "timestamp": "2026-10-03T21:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Demo endpoints are disabled."
+          }
+        },
+        "summary": "Demo API ping",
+        "tags": [
+          "Demo"
+        ]
+      }
+    },
+    "/api/v1/demo/bootstrap-shop": {
+      "post": {
+        "description": "Creates or updates the ACA Locale development Shopify store together with its default settings and AI configuration. Development/demo only.",
+        "operationId": "DemoController_bootstrapShop",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Development shop successfully bootstrapped."
+          },
+          "404": {
+            "description": "Demo endpoints are disabled."
+          }
+        },
+        "summary": "Bootstrap ACA Locale development shop",
+        "tags": [
+          "Demo"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "ACA Locale API",
+    "description": "Technical API documentation for ACA Locale.\n\nACA Locale is an AI-powered localization management platform.\n\nThis specification is generated automatically from the NestJS backend.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {}
+  }
+}

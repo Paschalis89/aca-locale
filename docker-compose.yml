@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aca-locale-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: aca_locale
+      POSTGRES_USER: aca_locale
+      POSTGRES_PASSWORD: aca_locale_dev
+
+    ports:
+      - "5434:5432"
+
+    volumes:
+      - aca_locale_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U aca_locale -d aca_locale"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  aca_locale_postgres_data:

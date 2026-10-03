@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ShopStatus {
+  ACTIVE
+  INACTIVE
+  UNINSTALLED
+  SUSPENDED
+}
+
+enum AiProvider {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+}
+
+model Shop {
+  id String @id @default(cuid())
+
+  shopifyDomain String  @unique
+  name          String?
+
+  status ShopStatus @default(ACTIVE)
+
+  sourceLocale String @default("it")
+
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings        ShopSettings?
+  aiConfiguration AiConfiguration?
+
+  @@index([status])
+}
+
+model ShopSettings {
+  id String @id @default(cuid())
+
+  shopId String @unique
+
+  autoTranslate      Boolean @default(false)
+  autoPublish        Boolean @default(false)
+  requireHumanReview Boolean @default(true)
+  enableAiReview     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+model AiConfiguration {
+  id String @id @default(cuid())
+
+  shopId String @unique
+
+  translationProvider AiProvider @default(OPENAI)
+  translationModel    String?
+
+  reviewProvider AiProvider @default(OPENAI)
+  reviewModel    String?
+
+  fallbackProvider AiProvider @default(OPENAI)
+  fallbackModel    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}

@@ -81,7 +81,8 @@ database.sqlite
 
 backend/prisma/dev.sqlite
 backend/prisma/dev.sqlite-journal
-
+# Prisma generated client
+backend/src/generated/
 
 # ============================================================
 # Shopify local files
@@ -121,3 +122,5 @@ temp/
 
 *.local
 .local/
+
+
