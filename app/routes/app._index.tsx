@@ -131,29 +131,63 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
-  const testShopifyIdToken = async () => {
-  try {
-    const token = await shopify.idToken();
+  const testNestBackend = async () => {
+    try {
+      const token =
+        await shopify.idToken();
 
-    console.log(
-      "[ACA Locale] Shopify ID token:",
-      token,
-    );
+      const response =
+        await fetch(
+          "/api/backend/shops/current",
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          },
+        );
 
-    await navigator.clipboard.writeText(
-      token,
-    );
+      const data =
+        await response.json();
 
-    shopify.toast.show(
-      "Shopify ID token copied to clipboard",
-    );
-  } catch (error) {
-    console.error(
-      "[ACA Locale] Unable to get Shopify ID token:",
-      error,
-    );
-  }
-};
+      if (!response.ok) {
+        console.error(
+          "[ACA Locale] Backend error:",
+          data,
+        );
+
+        shopify.toast.show(
+          `Backend error: ${response.status}`,
+          {
+            isError: true,
+          },
+        );
+
+        return;
+      }
+
+      console.log(
+        "[ACA Locale] Current shop:",
+        data,
+      );
+
+      shopify.toast.show(
+        `Connected: ${data.shopifyDomain}`,
+      );
+    } catch (error) {
+      console.error(
+        "[ACA Locale] Backend connection failed:",
+        error,
+      );
+
+      shopify.toast.show(
+        "Backend connection failed",
+        {
+          isError: true,
+        },
+      );
+    }
+  };
 
   const isLoading =
     ["loading", "submitting"].includes(fetcher.state) &&
@@ -174,9 +208,9 @@ export default function Index() {
       </s-button>
 
       <s-button
-        onClick={testShopifyIdToken}
+        onClick={testNestBackend}
       >
-        Test Shopify ID Token
+        Test NestJS connection
       </s-button>
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">
