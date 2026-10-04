@@ -131,7 +131,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
-  const syncShopifyMarkets =
+  const syncShopifyConfiguration =
   async () => {
     try {
       const token =
@@ -139,7 +139,7 @@ export default function Index() {
 
       const response =
         await fetch(
-          "/api/shopify/markets",
+          "/api/shopify/sync",
           {
             method:
               "POST",
@@ -155,13 +155,13 @@ export default function Index() {
         await response.json();
 
       console.log(
-        "[ACA Locale] Market sync:",
+        "[ACA Locale] Shopify configuration:",
         data,
       );
 
       if (!response.ok) {
         shopify.toast.show(
-          `Market sync error: ${response.status}`,
+          `Sync error: ${response.status}`,
           {
             isError: true,
           },
@@ -171,16 +171,16 @@ export default function Index() {
       }
 
       shopify.toast.show(
-        "Shopify Markets synchronized",
+        "Shopify configuration synchronized",
       );
     } catch (error) {
       console.error(
-        "[ACA Locale] Market sync failed:",
+        "[ACA Locale] Shopify configuration sync failed:",
         error,
       );
 
       shopify.toast.show(
-        "Market sync failed",
+        "Configuration sync failed",
         {
           isError: true,
         },
@@ -207,9 +207,9 @@ export default function Index() {
       </s-button>
 
       <s-button
-        onClick={syncShopifyMarkets}
+        onClick={syncShopifyConfiguration}
       >
-        Sync Shopify Markets
+        Sync Shopify configuration
       </s-button>
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">

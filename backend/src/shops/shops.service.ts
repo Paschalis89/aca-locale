@@ -107,4 +107,120 @@ export class ShopsService {
         },
     });
     }
+
+    syncIdentity(
+  shopifyDomain: string,
+  identity: {
+    id: string;
+    name: string;
+    currencyCode: string;
+    ianaTimezone: string;
+
+    primaryDomain: {
+      host: string;
+      url: string;
+    };
+  },
+) {
+  return this.prisma.shop.upsert({
+    where: {
+      shopifyDomain,
+    },
+
+    update: {
+      shopifyShopId:
+        identity.id,
+
+      name:
+        identity.name,
+
+      currencyCode:
+        identity.currencyCode,
+
+      ianaTimezone:
+        identity.ianaTimezone,
+
+      primaryDomainHost:
+        identity.primaryDomain.host,
+
+      primaryDomainUrl:
+        identity.primaryDomain.url,
+
+      status:
+        'ACTIVE',
+
+      uninstalledAt:
+        null,
+    },
+
+    create: {
+      shopifyDomain,
+
+      shopifyShopId:
+        identity.id,
+
+      name:
+        identity.name,
+
+      currencyCode:
+        identity.currencyCode,
+
+      ianaTimezone:
+        identity.ianaTimezone,
+
+      primaryDomainHost:
+        identity.primaryDomain.host,
+
+      primaryDomainUrl:
+        identity.primaryDomain.url,
+
+      settings: {
+        create: {},
+      },
+
+      aiConfiguration: {
+        create: {},
+      },
+    },
+  });
+}
+
+findConfiguration(
+    shopifyDomain: string,
+  ) {
+    return this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
+
+      include: {
+        settings:
+          true,
+
+        aiConfiguration:
+          true,
+
+        languages: {
+          include: {
+            language:
+              true,
+          },
+
+          orderBy: {
+            language: {
+              locale:
+                'asc',
+            },
+          },
+        },
+
+        markets: {
+          orderBy: {
+            name:
+              'asc',
+          },
+        },
+      },
+    });
+  }
 }

@@ -34,6 +34,10 @@ import {
   MarketsModule,
 } from './markets/markets.module.js';
 
+import {
+  ShopifySyncModule,
+} from './shopify-sync/shopify-sync.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -47,6 +51,7 @@ import {
     AiModule,
     LanguagesModule,
     MarketsModule,
+    ShopifySyncModule,
   ],
 })
 export class AppModule {}

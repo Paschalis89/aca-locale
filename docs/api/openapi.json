@@ -223,6 +223,40 @@
           "Markets"
         ]
       }
+    },
+    "/api/v1/shopify/configuration/sync": {
+      "post": {
+        "description": "Synchronizes the authenticated Shopify store identity, locales and markets with ACA Locale.",
+        "operationId": "ShopifySyncController_sync",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncShopifyConfigurationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shopify configuration synchronized successfully."
+          },
+          "401": {
+            "description": "Shopify ID token is missing, invalid or expired."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize Shopify configuration",
+        "tags": [
+          "Shopify Configuration"
+        ]
+      }
     }
   },
   "info": {
@@ -249,6 +283,87 @@
       "SyncShopifyMarketsDto": {
         "type": "object",
         "properties": {}
+      },
+      "ShopifyPrimaryDomainDto": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://aca-locale-dev-cfoxunuo.myshopify.com"
+          }
+        },
+        "required": [
+          "host",
+          "url"
+        ]
+      },
+      "ShopifyShopIdentityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "gid://shopify/Shop/78982250633"
+          },
+          "name": {
+            "type": "string",
+            "example": "ACA Locale Dev"
+          },
+          "currencyCode": {
+            "type": "string",
+            "example": "USD"
+          },
+          "ianaTimezone": {
+            "type": "string",
+            "example": "America/New_York"
+          },
+          "primaryDomain": {
+            "$ref": "#/components/schemas/ShopifyPrimaryDomainDto"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "currencyCode",
+          "ianaTimezone",
+          "primaryDomain"
+        ]
+      },
+      "ShopifyLocaleDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ShopifyMarketDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SyncShopifyConfigurationDto": {
+        "type": "object",
+        "properties": {
+          "shop": {
+            "$ref": "#/components/schemas/ShopifyShopIdentityDto"
+          },
+          "locales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShopifyLocaleDto"
+            }
+          },
+          "markets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShopifyMarketDto"
+            }
+          }
+        },
+        "required": [
+          "shop",
+          "locales",
+          "markets"
+        ]
       }
     }
   }

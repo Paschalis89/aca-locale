@@ -24,11 +24,19 @@ model Shop {
   id String @id @default(cuid())
 
   shopifyDomain String  @unique
-  name          String?
+  shopifyShopId String? @unique
+
+  name String?
 
   status ShopStatus @default(ACTIVE)
 
   sourceLocale String?
+
+  currencyCode String?
+  ianaTimezone String?
+
+  primaryDomainHost String?
+  primaryDomainUrl  String?
 
   installedAt   DateTime  @default(now())
   uninstalledAt DateTime?
@@ -40,8 +48,7 @@ model Shop {
   aiConfiguration AiConfiguration?
 
   languages ShopLanguage[]
-
-  markets ShopMarket[]
+  markets   ShopMarket[]
 
   @@index([status])
 }
