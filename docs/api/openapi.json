@@ -384,13 +384,103 @@
       }
     },
     "schemas": {
+      "ShopifyLocaleDto": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "description": "Shopify locale code.",
+            "example": "en"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable language name.",
+            "example": "English"
+          },
+          "primary": {
+            "type": "boolean",
+            "description": "Whether this is the primary Shopify language.",
+            "example": true
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether this language is published on Shopify.",
+            "example": true
+          }
+        },
+        "required": [
+          "locale",
+          "name",
+          "primary",
+          "published"
+        ]
+      },
       "SyncShopifyLocalesDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "locales": {
+            "description": "Locales returned by Shopify.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShopifyLocaleDto"
+            }
+          }
+        },
+        "required": [
+          "locales"
+        ]
+      },
+      "ShopifyMarketDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Shopify GraphQL Market ID.",
+            "example": "gid://shopify/Market/58632306825"
+          },
+          "name": {
+            "type": "string",
+            "description": "Market display name.",
+            "example": "Canada"
+          },
+          "handle": {
+            "type": "string",
+            "description": "Shopify market handle.",
+            "example": "canada"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current Shopify market status.",
+            "example": "ACTIVE"
+          },
+          "type": {
+            "type": "string",
+            "description": "Shopify market type.",
+            "example": "REGION"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "handle",
+          "status",
+          "type"
+        ]
       },
       "SyncShopifyMarketsDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "markets": {
+            "description": "Markets returned by Shopify.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShopifyMarketDto"
+            }
+          }
+        },
+        "required": [
+          "markets"
+        ]
       },
       "ShopifyPrimaryDomainDto": {
         "type": "object",
@@ -439,14 +529,6 @@
           "ianaTimezone",
           "primaryDomain"
         ]
-      },
-      "ShopifyLocaleDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "ShopifyMarketDto": {
-        "type": "object",
-        "properties": {}
       },
       "SyncShopifyConfigurationDto": {
         "type": "object",
@@ -577,6 +659,12 @@
             "items": {
               "$ref": "#/components/schemas/TranslationResourceScanDto"
             }
+          },
+          "completeScan": {
+            "type": "boolean",
+            "description": "Indicates that the payload contains the complete Shopify result set for this resource type. When true, stale local resources are removed.",
+            "example": true,
+            "default": false
           }
         },
         "required": [

@@ -7,122 +7,20 @@ import {
   authenticate,
 } from "../shopify.server";
 
-const SUPPORTED_RESOURCE_TYPES = [
-  "PRODUCT",
-  "COLLECTION",
-  "PAGE",
-  "BLOG",
-  "ARTICLE",
-  "SHOP",
-] as const;
+import {
+  isShopifyTranslatableResourceType,
+} from "../lib/shopify-translatable-resource-types";
+
+import {
+  fetchAllTranslationResources,
+  fetchTranslationPage,
+} from "../lib/shopify-translation-scanner.server";
 
 type ScannerStatus =
   | "EMPTY_SOURCE"
   | "MISSING"
   | "TRANSLATED"
   | "OUTDATED";
-
-function isSupportedResourceType(
-  value: string,
-): value is (
-  typeof SUPPORTED_RESOURCE_TYPES
-)[number] {
-  return SUPPORTED_RESOURCE_TYPES.includes(
-    value as (
-      typeof SUPPORTED_RESOURCE_TYPES
-    )[number],
-  );
-}
-
-async function fetchTranslationPage(
-  admin: any,
-  resourceType: string,
-  targetLocale: string,
-  after: string | null,
-) {
-  const response =
-    await admin.graphql(
-      `#graphql
-        query AcaLocaleTranslationScanner(
-          $resourceType: TranslatableResourceType!
-          $targetLocale: String!
-          $after: String
-        ) {
-          translatableResources(
-            first: 50
-            resourceType: $resourceType
-            after: $after
-          ) {
-            nodes {
-              resourceId
-
-              translatableContent {
-                key
-                value
-                locale
-                digest
-                type
-              }
-
-              translations(
-                locale: $targetLocale
-              ) {
-                key
-                locale
-                value
-                outdated
-                updatedAt
-
-                market {
-                  id
-                  name
-                }
-              }
-            }
-
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-          }
-        }
-      `,
-      {
-        variables: {
-          resourceType,
-          targetLocale,
-          after,
-        },
-      },
-    );
-
-  const result =
-    await response.json() as any;
-
-  if (result.errors) {
-    throw new Error(
-      JSON.stringify(
-        result.errors,
-      ),
-    );
-  }
-
-  return {
-    resources:
-      result.data
-        ?.translatableResources
-        ?.nodes ??
-      [],
-
-    pageInfo:
-      result.data
-        ?.translatableResources
-        ?.pageInfo ?? {
-        hasNextPage: false,
-        endCursor: null,
-      },
-  };
-}
 
 function buildScannerView(
   resources: any[],
@@ -172,6 +70,10 @@ function buildScannerView(
               } else {
                 actionableFields++;
 
+                /*
+                 * Ignore market-specific
+                 * translations for now.
+                 */
                 translation =
                   translations.find(
                     (
@@ -295,8 +197,16 @@ function buildScannerView(
 /*
  * GET
  *
- * Live scanner preview.
- * Does not persist anything.
+ * Reads a single Shopify page.
+ * Useful as live/debug preview.
+ *
+ * Nothing is persisted.
+ *
+ * Example:
+ *
+ * /api/shopify/translatable-resources
+ *   ?resourceType=PRODUCT
+ *   &locale=it
  */
 export async function loader({
   request,
@@ -342,7 +252,7 @@ export async function loader({
   }
 
   if (
-    !isSupportedResourceType(
+    !isShopifyTranslatableResourceType(
       resourceType,
     )
   ) {
@@ -409,8 +319,21 @@ export async function loader({
 /*
  * POST
  *
- * Performs a complete Shopify scan
- * and persists it in the ACA Locale backend.
+ * Performs a COMPLETE scan for one
+ * Shopify resource type.
+ *
+ * Pagination is handled automatically.
+ *
+ * The raw Shopify data is sent to NestJS,
+ * where the persistent scanner projection
+ * is updated.
+ *
+ * Example:
+ *
+ * POST
+ * /api/shopify/translatable-resources
+ *   ?resourceType=PRODUCT
+ *   &locale=it
  */
 export async function action({
   request,
@@ -451,7 +374,7 @@ export async function action({
   }
 
   if (
-    !isSupportedResourceType(
+    !isShopifyTranslatableResourceType(
       resourceType,
     )
   ) {
@@ -485,52 +408,15 @@ export async function action({
 
   try {
     /*
-     * Read ALL Shopify pages.
-     *
-     * The dev store currently has only
-     * 17 products, but production stores
-     * can easily exceed 50 resources.
+     * Read ALL Shopify pages for
+     * the selected resource type.
      */
-    const resources:
-      any[] = [];
-
-    let after:
-      string | null = null;
-
-    let hasNextPage =
-      true;
-
-    while (hasNextPage) {
-      const page =
-        await fetchTranslationPage(
-          admin,
-          resourceType,
-          targetLocale,
-          after,
-        );
-
-      resources.push(
-        ...page.resources,
+    const resources =
+      await fetchAllTranslationResources(
+        admin,
+        resourceType,
+        targetLocale,
       );
-
-      hasNextPage =
-        page.pageInfo
-          .hasNextPage;
-
-      after =
-        page.pageInfo
-          .endCursor ??
-        null;
-
-      if (
-        hasNextPage &&
-        !after
-      ) {
-        throw new Error(
-          "Shopify returned hasNextPage=true without an endCursor.",
-        );
-      }
-    }
 
     const backendUrl =
       process.env
@@ -538,11 +424,17 @@ export async function action({
       "http://127.0.0.1:3001";
 
     /*
-     * Send RAW Shopify scan data
+     * Send the raw Shopify state
      * to NestJS.
      *
-     * NestJS owns persistence and
-     * recalculates state server-side.
+     * NestJS remains responsible for:
+     *
+     * - persistence
+     * - MISSING calculation
+     * - TRANSLATED calculation
+     * - OUTDATED calculation
+     * - EMPTY_SOURCE calculation
+     * - stale resource cleanup
      */
     const backendResponse =
       await fetch(
@@ -564,6 +456,17 @@ export async function action({
               resourceType,
 
               targetLocale,
+
+              /*
+               * fetchAllTranslationResources()
+               * fetched every Shopify page.
+               *
+               * NestJS can therefore safely
+               * remove resources that are no
+               * longer present on Shopify.
+               */
+              completeScan:
+                true,
 
               resources:
                 resources.map(

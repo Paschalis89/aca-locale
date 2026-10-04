@@ -10,6 +10,10 @@ import {
   NestFactory,
 } from '@nestjs/core';
 
+import type {
+  NestExpressApplication,
+} from '@nestjs/platform-express';
+
 import {
   SwaggerModule,
 } from '@nestjs/swagger';
@@ -24,9 +28,33 @@ import {
 
 async function bootstrap() {
   const app =
-    await NestFactory.create(
+    await NestFactory.create<NestExpressApplication>(
       AppModule,
     );
+
+  /*
+   * Shopify theme translation resources
+   * can contain large JSON / HTML payloads.
+   *
+   * Express defaults to roughly 100 KB.
+   * 5 MB gives ACA Locale enough room
+   * without allowing unnecessarily large
+   * request bodies.
+   */
+  app.useBodyParser(
+    'json',
+    {
+      limit: '5mb',
+    },
+  );
+
+  app.useBodyParser(
+    'urlencoded',
+    {
+      limit: '5mb',
+      extended: true,
+    },
+  );
 
   const configService =
     app.get(ConfigService);

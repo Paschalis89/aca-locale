@@ -149,4 +149,14 @@ export class SyncTranslationScanDto {
     () => TranslationResourceScanDto,
   )
   resources!: TranslationResourceScanDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Indicates that the payload contains the complete Shopify result set for this resource type. When true, stale local resources are removed.',
+    example: true,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  completeScan?: boolean;
 }

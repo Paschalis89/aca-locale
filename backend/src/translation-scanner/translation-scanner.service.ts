@@ -40,10 +40,24 @@ export class TranslationScannerService {
 
     await this.prisma.$transaction(
       async (tx) => {
+        /*
+         * Used only when completeScan=true.
+         *
+         * At the end of the scan we remove
+         * resources that no longer exist
+         * in Shopify.
+         */
+        const seenShopifyResourceIds:
+          string[] = [];
+
         for (
           const resource
           of scan.resources
         ) {
+          seenShopifyResourceIds.push(
+            resource.resourceId,
+          );
+
           const savedResource =
             await tx.translationResource.upsert({
               where: {
@@ -82,6 +96,10 @@ export class TranslationScannerService {
               },
             });
 
+          /*
+           * Keep track of the fields Shopify
+           * returned for this resource.
+           */
           const seenFieldKeys:
             string[] = [];
 
@@ -140,9 +158,20 @@ export class TranslationScannerService {
                 },
               });
 
+            /*
+             * Empty source values should not
+             * affect translation coverage.
+             */
             const sourceIsEmpty =
               !content.value.trim();
 
+            /*
+             * Market-specific translations
+             * are deliberately excluded here.
+             *
+             * For now we are tracking the
+             * generic locale translation.
+             */
             const translation =
               sourceIsEmpty
                 ? null
@@ -232,20 +261,78 @@ export class TranslationScannerService {
           }
 
           /*
-           * If a Shopify field disappeared,
-           * remove it from our local projection.
+           * Remove fields that no longer exist
+           * in Shopify for this resource.
+           *
+           * We handle the zero-field case
+           * explicitly because SHOP and other
+           * resource types can legitimately
+           * return no translatable fields.
            */
-          await tx.translationField.deleteMany({
-            where: {
-              resourceId:
-                savedResource.id,
-
-              key: {
-                notIn:
-                  seenFieldKeys,
+          if (
+            seenFieldKeys.length ===
+            0
+          ) {
+            await tx.translationField.deleteMany({
+              where: {
+                resourceId:
+                  savedResource.id,
               },
-            },
-          });
+            });
+          } else {
+            await tx.translationField.deleteMany({
+              where: {
+                resourceId:
+                  savedResource.id,
+
+                key: {
+                  notIn:
+                    seenFieldKeys,
+                },
+              },
+            });
+          }
+        }
+
+        /*
+         * A complete scan represents Shopify's
+         * entire current dataset for this
+         * resource type.
+         *
+         * Therefore resources that disappeared
+         * from Shopify must also disappear from
+         * our local projection.
+         */
+        if (scan.completeScan) {
+          if (
+            seenShopifyResourceIds.length ===
+            0
+          ) {
+            await tx.translationResource.deleteMany({
+              where: {
+                shopId:
+                  shop.id,
+
+                resourceType:
+                  scan.resourceType,
+              },
+            });
+          } else {
+            await tx.translationResource.deleteMany({
+              where: {
+                shopId:
+                  shop.id,
+
+                resourceType:
+                  scan.resourceType,
+
+                shopifyResourceId: {
+                  notIn:
+                    seenShopifyResourceIds,
+                },
+              },
+            });
+          }
         }
       },
     );

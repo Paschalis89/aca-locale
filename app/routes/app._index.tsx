@@ -131,7 +131,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
-  const syncTranslationScanner =
+  const scanEntireStore =
   async () => {
     try {
       const token =
@@ -139,7 +139,7 @@ export default function Index() {
 
       const response =
         await fetch(
-          "/api/shopify/translatable-resources?resourceType=PRODUCT&locale=it",
+          "/api/shopify/translation-scan-all?locale=it",
           {
             method:
               "POST",
@@ -155,13 +155,13 @@ export default function Index() {
         await response.json();
 
       console.log(
-        "[ACA Locale] Persisted translation scan:",
+        "[ACA Locale] Whole store scan:",
         data,
       );
 
       if (!response.ok) {
         shopify.toast.show(
-          `Scanner sync error: ${response.status}`,
+          `Store scan error: ${response.status}`,
           {
             isError: true,
           },
@@ -171,16 +171,16 @@ export default function Index() {
       }
 
       shopify.toast.show(
-        `${data.missing} missing translations`,
+        `Store scan completed: ${data.summary.missing} missing`,
       );
     } catch (error) {
       console.error(
-        "[ACA Locale] Scanner synchronization failed:",
+        "[ACA Locale] Whole store scan failed:",
         error,
       );
 
       shopify.toast.show(
-        "Scanner synchronization failed",
+        "Whole store scan failed",
         {
           isError: true,
         },
@@ -207,10 +207,10 @@ export default function Index() {
       </s-button>
 
       <s-button
-        onClick={syncTranslationScanner}
-      >
-        Sync Translation Scanner
-      </s-button>
+  onClick={scanEntireStore}
+>
+  Scan Entire Store
+</s-button>
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">
         <s-paragraph>
