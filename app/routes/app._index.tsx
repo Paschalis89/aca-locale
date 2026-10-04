@@ -131,7 +131,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
-  const syncShopifyConfiguration =
+  const syncTranslationScanner =
   async () => {
     try {
       const token =
@@ -139,7 +139,7 @@ export default function Index() {
 
       const response =
         await fetch(
-          "/api/shopify/sync",
+          "/api/shopify/translatable-resources?resourceType=PRODUCT&locale=it",
           {
             method:
               "POST",
@@ -155,13 +155,13 @@ export default function Index() {
         await response.json();
 
       console.log(
-        "[ACA Locale] Shopify configuration:",
+        "[ACA Locale] Persisted translation scan:",
         data,
       );
 
       if (!response.ok) {
         shopify.toast.show(
-          `Sync error: ${response.status}`,
+          `Scanner sync error: ${response.status}`,
           {
             isError: true,
           },
@@ -171,16 +171,16 @@ export default function Index() {
       }
 
       shopify.toast.show(
-        "Shopify configuration synchronized",
+        `${data.missing} missing translations`,
       );
     } catch (error) {
       console.error(
-        "[ACA Locale] Shopify configuration sync failed:",
+        "[ACA Locale] Scanner synchronization failed:",
         error,
       );
 
       shopify.toast.show(
-        "Configuration sync failed",
+        "Scanner synchronization failed",
         {
           isError: true,
         },
@@ -207,9 +207,9 @@ export default function Index() {
       </s-button>
 
       <s-button
-        onClick={syncShopifyConfiguration}
+        onClick={syncTranslationScanner}
       >
-        Sync Shopify configuration
+        Sync Translation Scanner
       </s-button>
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">

@@ -257,6 +257,114 @@
           "Shopify Configuration"
         ]
       }
+    },
+    "/api/v1/translations/scanner/sync": {
+      "post": {
+        "operationId": "TranslationScannerController_sync",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncTranslationScanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Translation scan synchronized successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize a Shopify translation scan",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/summary": {
+      "get": {
+        "operationId": "TranslationScannerController_summary",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "PRODUCT",
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get translation scan summary",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/resources": {
+      "get": {
+        "operationId": "TranslationScannerController_resources",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "PRODUCT",
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List scanned translation resources",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
     }
   },
   "info": {
@@ -363,6 +471,118 @@
           "shop",
           "locales",
           "markets"
+        ]
+      },
+      "TranslationSourceDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "title"
+          },
+          "type": {
+            "type": "string",
+            "example": "SINGLE_LINE_TEXT_FIELD"
+          },
+          "locale": {
+            "type": "string",
+            "example": "en"
+          },
+          "value": {
+            "type": "string",
+            "example": "Gift Card"
+          },
+          "digest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "locale",
+          "value",
+          "digest"
+        ]
+      },
+      "ExistingTranslationDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "title"
+          },
+          "locale": {
+            "type": "string",
+            "example": "it"
+          },
+          "value": {
+            "type": "string"
+          },
+          "outdated": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "market": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "locale",
+          "value",
+          "outdated"
+        ]
+      },
+      "TranslationResourceScanDto": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "example": "gid://shopify/Product/8882758975625"
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationSourceDto"
+            }
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExistingTranslationDto"
+            }
+          }
+        },
+        "required": [
+          "resourceId",
+          "content",
+          "translations"
+        ]
+      },
+      "SyncTranslationScanDto": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "example": "PRODUCT"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationResourceScanDto"
+            }
+          }
+        },
+        "required": [
+          "resourceType",
+          "targetLocale",
+          "resources"
         ]
       }
     }

@@ -38,6 +38,12 @@ import {
   ShopifySyncModule,
 } from './shopify-sync/shopify-sync.module.js';
 
+import {
+  TranslationScannerModule,
+} from './translation-scanner/translation-scanner.module.js';
+
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -52,6 +58,7 @@ import {
     LanguagesModule,
     MarketsModule,
     ShopifySyncModule,
+    TranslationScannerModule,
   ],
 })
 export class AppModule {}

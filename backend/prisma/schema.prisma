@@ -50,6 +50,8 @@ model Shop {
   languages ShopLanguage[]
   markets   ShopMarket[]
 
+  translationResources TranslationResource[]
+
   @@index([status])
 }
 
@@ -144,4 +146,79 @@ model ShopMarket {
   @@unique([shopId, handle])
   @@index([shopId])
   @@index([status])
+}
+
+enum TranslationStateStatus {
+  EMPTY_SOURCE
+  MISSING
+  TRANSLATED
+  OUTDATED
+}
+
+model TranslationResource {
+  id String @id @default(cuid())
+
+  shopId String
+
+  shopifyResourceId String
+  resourceType      String
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  fields TranslationField[]
+
+  @@unique([shopId, resourceType, shopifyResourceId])
+  @@index([shopId, resourceType])
+}
+
+model TranslationField {
+  id String @id @default(cuid())
+
+  resourceId String
+
+  key  String
+  type String
+
+  sourceLocale String
+  sourceValue  String @db.Text
+  sourceDigest String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  resource TranslationResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  states TranslationState[]
+
+  @@unique([resourceId, key])
+  @@index([resourceId])
+}
+
+model TranslationState {
+  id String @id @default(cuid())
+
+  fieldId String
+
+  targetLocale String
+
+  status TranslationStateStatus
+
+  translatedValue      String?   @db.Text
+  translationUpdatedAt DateTime?
+
+  scannedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  field TranslationField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, targetLocale])
+  @@index([targetLocale, status])
 }
