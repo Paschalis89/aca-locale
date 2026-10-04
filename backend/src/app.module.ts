@@ -26,6 +26,14 @@ import {
   ShopsModule,
 } from './shops/shops.module.js';
 
+import {
+  LanguagesModule,
+} from './languages/languages.module.js';
+
+import {
+  MarketsModule,
+} from './markets/markets.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -37,6 +45,8 @@ import {
     ShopsModule,
     DemoModule,
     AiModule,
+    LanguagesModule,
+    MarketsModule,
   ],
 })
 export class AppModule {}

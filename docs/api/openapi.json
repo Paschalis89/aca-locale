@@ -116,6 +116,113 @@
           "Demo"
         ]
       }
+    },
+    "/api/v1/languages": {
+      "get": {
+        "operationId": "LanguagesController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Shop languages returned successfully."
+          },
+          "401": {
+            "description": "Shopify ID token is missing or invalid."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List languages for the authenticated shop",
+        "tags": [
+          "Languages"
+        ]
+      }
+    },
+    "/api/v1/languages/sync/shopify": {
+      "post": {
+        "description": "Synchronizes Shopify locales with ACA Locale and updates the shop source locale from the Shopify primary locale.",
+        "operationId": "LanguagesController_syncShopify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncShopifyLocalesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shopify locales synchronized successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize Shopify locales",
+        "tags": [
+          "Languages"
+        ]
+      }
+    },
+    "/api/v1/markets": {
+      "get": {
+        "operationId": "MarketsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Shop markets returned successfully."
+          },
+          "401": {
+            "description": "Shopify ID token is missing or invalid."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List markets for the authenticated shop",
+        "tags": [
+          "Markets"
+        ]
+      }
+    },
+    "/api/v1/markets/sync/shopify": {
+      "post": {
+        "operationId": "MarketsController_syncShopify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncShopifyMarketsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shopify Markets synchronized successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize Shopify Markets",
+        "tags": [
+          "Markets"
+        ]
+      }
     }
   },
   "info": {
@@ -134,6 +241,15 @@
         "type": "http"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "SyncShopifyLocalesDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SyncShopifyMarketsDto": {
+        "type": "object",
+        "properties": {}
+      }
+    }
   }
 }

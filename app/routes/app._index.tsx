@@ -131,15 +131,19 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
-  const testNestBackend = async () => {
+  const syncShopifyMarkets =
+  async () => {
     try {
       const token =
         await shopify.idToken();
 
       const response =
         await fetch(
-          "/api/backend/shops/current",
+          "/api/shopify/markets",
           {
+            method:
+              "POST",
+
             headers: {
               Authorization:
                 `Bearer ${token}`,
@@ -150,14 +154,14 @@ export default function Index() {
       const data =
         await response.json();
 
-      if (!response.ok) {
-        console.error(
-          "[ACA Locale] Backend error:",
-          data,
-        );
+      console.log(
+        "[ACA Locale] Market sync:",
+        data,
+      );
 
+      if (!response.ok) {
         shopify.toast.show(
-          `Backend error: ${response.status}`,
+          `Market sync error: ${response.status}`,
           {
             isError: true,
           },
@@ -166,22 +170,17 @@ export default function Index() {
         return;
       }
 
-      console.log(
-        "[ACA Locale] Current shop:",
-        data,
-      );
-
       shopify.toast.show(
-        `Connected: ${data.shopifyDomain}`,
+        "Shopify Markets synchronized",
       );
     } catch (error) {
       console.error(
-        "[ACA Locale] Backend connection failed:",
+        "[ACA Locale] Market sync failed:",
         error,
       );
 
       shopify.toast.show(
-        "Backend connection failed",
+        "Market sync failed",
         {
           isError: true,
         },
@@ -208,9 +207,9 @@ export default function Index() {
       </s-button>
 
       <s-button
-        onClick={testNestBackend}
+        onClick={syncShopifyMarkets}
       >
-        Test NestJS connection
+        Sync Shopify Markets
       </s-button>
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">
