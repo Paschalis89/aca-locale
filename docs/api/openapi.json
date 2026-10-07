@@ -588,6 +588,7 @@
     },
     "/api/v1/translations/jobs": {
       "post": {
+        "description": "Creates the PostgreSQL translation job and immediately enqueues it for background execution through BullMQ.",
         "operationId": "TranslationJobsController_create",
         "parameters": [],
         "requestBody": {
@@ -602,7 +603,7 @@
         },
         "responses": {
           "201": {
-            "description": "Translation job created successfully.",
+            "description": "Translation job created and queued successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -617,7 +618,7 @@
             "bearer": []
           }
         ],
-        "summary": "Create a translation job",
+        "summary": "Create and enqueue a translation job",
         "tags": [
           "Translation Jobs"
         ]
@@ -646,6 +647,55 @@
           }
         ],
         "summary": "List translation jobs",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/queue/status": {
+      "get": {
+        "operationId": "TranslationJobsController_queueStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get translation queue status",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}/queue": {
+      "get": {
+        "operationId": "TranslationJobsController_queueJobStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get BullMQ status for a translation job",
         "tags": [
           "Translation Jobs"
         ]
@@ -689,7 +739,7 @@
     },
     "/api/v1/translations/jobs/{id}/execute": {
       "post": {
-        "description": "Executes pending translation items and deterministic validation. Duplicate execution is protected by an atomic job claim.",
+        "description": "Development/manual execution endpoint. Production jobs are normally executed by the BullMQ background worker. Duplicate execution is protected by the atomic database claim.",
         "operationId": "TranslationJobsController_execute",
         "parameters": [
           {
@@ -711,7 +761,7 @@
             "bearer": []
           }
         ],
-        "summary": "Execute a queued translation job",
+        "summary": "Execute a queued translation job immediately",
         "tags": [
           "Translation Jobs"
         ]
@@ -719,7 +769,7 @@
     },
     "/api/v1/translations/jobs/{id}/cancel": {
       "post": {
-        "description": "Cancellation is cooperative. A translation provider request already in flight may finish, but no additional pending items will be started.",
+        "description": "Cancels the database lifecycle and removes a waiting BullMQ job when possible. Active work is cancelled cooperatively by the translation executor.",
         "operationId": "TranslationJobsController_cancel",
         "parameters": [
           {
@@ -749,7 +799,7 @@
     },
     "/api/v1/translations/jobs/{id}/retry-failed": {
       "post": {
-        "description": "Requeues only FAILED items in a FAILED or PARTIAL job. Successfully translated items are preserved.",
+        "description": "Requeues only FAILED items in PostgreSQL and automatically schedules the job again in BullMQ.",
         "operationId": "TranslationJobsController_retryFailed",
         "parameters": [
           {
@@ -779,7 +829,7 @@
     },
     "/api/v1/translations/jobs/{id}/resume": {
       "post": {
-        "description": "Requeues interrupted GENERATING items. RUNNING jobs can only be recovered after they have been stale for at least five minutes.",
+        "description": "Requeues interrupted GENERATING items in PostgreSQL and schedules the resumed job in BullMQ. RUNNING jobs must be stale for at least five minutes.",
         "operationId": "TranslationJobsController_resume",
         "parameters": [
           {

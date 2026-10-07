@@ -175,7 +175,7 @@ export default function Index() {
                   "PRODUCT",
                 ],
                 maxItems:
-                  1,
+                  10,
               }),
           },
         );

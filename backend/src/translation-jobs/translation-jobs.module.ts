@@ -30,6 +30,10 @@ import {
   TranslationJobsService,
 } from './translation-jobs.service.js';
 
+import {
+  TranslationQueueService,
+} from './translation-queue.service.js';
+
 @Module({
   imports: [
     DatabaseModule,
@@ -45,10 +49,12 @@ import {
 
   providers: [
     TranslationJobsService,
+    TranslationQueueService,
   ],
 
   exports: [
     TranslationJobsService,
+    TranslationQueueService,
   ],
 })
 export class TranslationJobsModule {}

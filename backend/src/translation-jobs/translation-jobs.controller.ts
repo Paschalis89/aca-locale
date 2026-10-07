@@ -65,6 +65,10 @@ import {
   TranslationJobsService,
 } from './translation-jobs.service.js';
 
+import {
+  TranslationQueueService,
+} from './translation-queue.service.js';
+
 @ApiTags(
   'Translation Jobs',
 )
@@ -91,21 +95,27 @@ export class TranslationJobsController {
 
     private readonly translationPublicationService:
       TranslationPublicationService,
+
+    private readonly translationQueueService:
+      TranslationQueueService,
   ) {}
 
   @Post()
   @ApiOperation({
     summary:
-      'Create a translation job',
+      'Create and enqueue a translation job',
+
+    description:
+      'Creates the PostgreSQL translation job and immediately enqueues it for background execution through BullMQ.',
   })
   @ApiCreatedResponse({
     description:
-      'Translation job created successfully.',
+      'Translation job created and queued successfully.',
 
     type:
       TranslationJobDetailDto,
   })
-  create(
+  async create(
     @CurrentShop()
     shop:
       ShopifyAuthContext,
@@ -114,10 +124,22 @@ export class TranslationJobsController {
     body:
       CreateTranslationJobDto,
   ) {
-    return this.translationJobsService.create(
-      shop.shopDomain,
-      body,
-    );
+    const job =
+      await this.translationJobsService.create(
+        shop.shopDomain,
+        body,
+      );
+
+    const queue =
+      await this.translationQueueService.enqueue(
+        job.id,
+        shop.shopDomain,
+      );
+
+    return {
+      ...job,
+      queue,
+    };
   }
 
   @Get()
@@ -137,6 +159,34 @@ export class TranslationJobsController {
   ) {
     return this.translationJobsService.findAll(
       shop.shopDomain,
+    );
+  }
+
+  @Get('queue/status')
+  @ApiOperation({
+    summary:
+      'Get translation queue status',
+  })
+  queueStatus() {
+    return this.translationQueueService.status();
+  }
+
+  @Get(':id/queue')
+  @ApiOperation({
+    summary:
+      'Get BullMQ status for a translation job',
+  })
+  @ApiParam({
+    name:
+      'id',
+  })
+  queueJobStatus(
+    @Param('id')
+    jobId:
+      string,
+  ) {
+    return this.translationQueueService.jobStatus(
+      jobId,
     );
   }
 
@@ -171,10 +221,10 @@ export class TranslationJobsController {
   @Post(':id/execute')
   @ApiOperation({
     summary:
-      'Execute a queued translation job',
+      'Execute a queued translation job immediately',
 
     description:
-      'Executes pending translation items and deterministic validation. Duplicate execution is protected by an atomic job claim.',
+      'Development/manual execution endpoint. Production jobs are normally executed by the BullMQ background worker. Duplicate execution is protected by the atomic database claim.',
   })
   execute(
     @CurrentShop()
@@ -197,9 +247,9 @@ export class TranslationJobsController {
       'Cancel a queued or running translation job',
 
     description:
-      'Cancellation is cooperative. A translation provider request already in flight may finish, but no additional pending items will be started.',
+      'Cancels the database lifecycle and removes a waiting BullMQ job when possible. Active work is cancelled cooperatively by the translation executor.',
   })
-  cancel(
+  async cancel(
     @CurrentShop()
     shop:
       ShopifyAuthContext,
@@ -208,10 +258,21 @@ export class TranslationJobsController {
     jobId:
       string,
   ) {
-    return this.translationJobsService.cancel(
-      shop.shopDomain,
-      jobId,
-    );
+    const job =
+      await this.translationJobsService.cancel(
+        shop.shopDomain,
+        jobId,
+      );
+
+    const queue =
+      await this.translationQueueService.cancel(
+        jobId,
+      );
+
+    return {
+      ...job,
+      queue,
+    };
   }
 
   @Post(':id/retry-failed')
@@ -220,9 +281,9 @@ export class TranslationJobsController {
       'Retry failed translation items',
 
     description:
-      'Requeues only FAILED items in a FAILED or PARTIAL job. Successfully translated items are preserved.',
+      'Requeues only FAILED items in PostgreSQL and automatically schedules the job again in BullMQ.',
   })
-  retryFailed(
+  async retryFailed(
     @CurrentShop()
     shop:
       ShopifyAuthContext,
@@ -231,10 +292,22 @@ export class TranslationJobsController {
     jobId:
       string,
   ) {
-    return this.translationJobsService.retryFailed(
-      shop.shopDomain,
-      jobId,
-    );
+    const job =
+      await this.translationJobsService.retryFailed(
+        shop.shopDomain,
+        jobId,
+      );
+
+    const queue =
+      await this.translationQueueService.enqueue(
+        job.id,
+        shop.shopDomain,
+      );
+
+    return {
+      ...job,
+      queue,
+    };
   }
 
   @Post(':id/resume')
@@ -243,9 +316,9 @@ export class TranslationJobsController {
       'Resume a cancelled or stale running translation job',
 
     description:
-      'Requeues interrupted GENERATING items. RUNNING jobs can only be recovered after they have been stale for at least five minutes.',
+      'Requeues interrupted GENERATING items in PostgreSQL and schedules the resumed job in BullMQ. RUNNING jobs must be stale for at least five minutes.',
   })
-  resume(
+  async resume(
     @CurrentShop()
     shop:
       ShopifyAuthContext,
@@ -254,10 +327,22 @@ export class TranslationJobsController {
     jobId:
       string,
   ) {
-    return this.translationJobsService.resume(
-      shop.shopDomain,
-      jobId,
-    );
+    const job =
+      await this.translationJobsService.resume(
+        shop.shopDomain,
+        jobId,
+      );
+
+    const queue =
+      await this.translationQueueService.enqueue(
+        job.id,
+        shop.shopDomain,
+      );
+
+    return {
+      ...job,
+      queue,
+    };
   }
 
   @Post(':id/review')
@@ -360,7 +445,7 @@ export class TranslationJobsController {
     description:
       'Creates a new one-item translation job while preserving the original translation item and its audit history.',
   })
-  regenerateItem(
+  async regenerateItem(
     @CurrentShop()
     shop:
       ShopifyAuthContext,
@@ -373,11 +458,23 @@ export class TranslationJobsController {
     itemId:
       string,
   ) {
-    return this.translationHumanReviewService.regenerate(
-      shop.shopDomain,
-      jobId,
-      itemId,
-    );
+    const regeneratedJob =
+      await this.translationHumanReviewService.regenerate(
+        shop.shopDomain,
+        jobId,
+        itemId,
+      );
+
+    const queue =
+      await this.translationQueueService.enqueue(
+        regeneratedJob.id,
+        shop.shopDomain,
+      );
+
+    return {
+      ...regeneratedJob,
+      queue,
+    };
   }
 
   @Post(
