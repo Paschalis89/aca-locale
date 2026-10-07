@@ -14,6 +14,9 @@ import type {
 
 @Injectable()
 export class TranslationJobsService {
+  private static readonly STALE_RUNNING_MS =
+    5 * 60 * 1000;
+
   constructor(
     private readonly prisma:
       PrismaService,
@@ -98,13 +101,6 @@ export class TranslationJobsService {
       body.maxItems ??
       100;
 
-    /*
-     * TranslationState represents the
-     * current translation state on Shopify.
-     *
-     * Only MISSING and OUTDATED fields are
-     * eligible for a new translation draft.
-     */
     const states =
       await this.prisma.translationState.findMany({
         where: {
@@ -122,31 +118,14 @@ export class TranslationJobsService {
           ],
 
           field: {
-            /*
-             * Only fields belonging to the
-             * current Shopify source locale.
-             */
             sourceLocale:
               shop.sourceLocale,
 
-            /*
-             * Shopify handles and other URI
-             * fields are deliberately excluded
-             * from automatic translation.
-             *
-             * URL/SEO localization can become
-             * an explicit feature later.
-             */
             type: {
               not:
                 'URI',
             },
 
-            /*
-             * Scope everything to the
-             * authenticated shop and requested
-             * resource types.
-             */
             resource: {
               shopId:
                 shop.id,
@@ -157,12 +136,6 @@ export class TranslationJobsService {
               },
             },
 
-            /*
-             * Prevent the same field from
-             * appearing in more than one
-             * active translation job for the
-             * same target locale.
-             */
             jobItems: {
               none: {
                 job: {
@@ -246,13 +219,6 @@ export class TranslationJobsService {
       );
     }
 
-    /*
-     * Snapshot the translation engine
-     * configuration at job creation time.
-     *
-     * Changing the shop configuration later
-     * must not modify historical jobs.
-     */
     const provider =
       shop.aiConfiguration
         ?.translationProvider ??
@@ -276,17 +242,6 @@ export class TranslationJobsService {
             ?.fallbackModel ??
           null;
 
-    /*
-     * Snapshot the AI review configuration
-     * as well.
-     *
-     * TranslationJob.reviewProvider /
-     * reviewModel represent the reviewer
-     * planned when this job was created.
-     *
-     * The actual reviewer used later will
-     * be stored on each TranslationJobItem.
-     */
     const reviewProvider =
       shop.aiConfiguration
         ?.reviewProvider ??
@@ -297,116 +252,57 @@ export class TranslationJobsService {
         ?.reviewModel ??
       null;
 
-    const job =
-      await this.prisma.translationJob.create({
-        data: {
-          shopId:
-            shop.id,
+    return this.prisma.translationJob.create({
+      data: {
+        shopId:
+          shop.id,
 
-          sourceLocale:
-            shop.sourceLocale,
+        sourceLocale:
+          shop.sourceLocale,
 
-          targetLocale,
+        targetLocale,
 
-          status:
-            'QUEUED',
+        status:
+          'QUEUED',
 
-          /*
-           * Translation engine snapshot.
-           */
-          provider,
+        provider,
+        model,
+        fallbackProvider,
+        fallbackModel,
+        reviewProvider,
+        reviewModel,
 
-          model,
+        totalItems:
+          states.length,
 
-          /*
-           * Translation fallback snapshot.
-           */
-          fallbackProvider,
+        items: {
+          create:
+            states.map(
+              (state) => ({
+                fieldId:
+                  state.field.id,
 
-          fallbackModel,
+                sourceDigest:
+                  state.field
+                    .sourceDigest,
 
-          /*
-           * AI reviewer snapshot.
-           */
-          reviewProvider,
+                sourceValue:
+                  state.field
+                    .sourceValue,
 
-          reviewModel,
+                status:
+                  'PENDING',
 
-          totalItems:
-            states.length,
-
-          items: {
-            create:
-              states.map(
-                (state) => ({
-                  fieldId:
-                    state.field.id,
-
-                  sourceDigest:
-                    state.field
-                      .sourceDigest,
-
-                  sourceValue:
-                    state.field
-                      .sourceValue,
-
-                  status:
-                    'PENDING',
-
-                  /*
-                   * Each item starts with the
-                   * primary translation provider.
-                   *
-                   * If fallback is actually used,
-                   * the executor will replace
-                   * these values with the real
-                   * provider/model that produced
-                   * the translation.
-                   */
-                  provider,
-
-                  model,
-                }),
-              ),
-          },
+                provider,
+                model,
+              }),
+            ),
         },
+      },
 
-        include: {
-          items: {
-            include: {
-              field: {
-                select: {
-                  key:
-                    true,
-
-                  type:
-                    true,
-
-                  sourceLocale:
-                    true,
-
-                  resource: {
-                    select: {
-                      resourceType:
-                        true,
-
-                      shopifyResourceId:
-                        true,
-                    },
-                  },
-                },
-              },
-            },
-
-            orderBy: {
-              createdAt:
-                'asc',
-            },
-          },
-        },
-      });
-
-    return job;
+      include:
+        this.jobInclude(),
+    });
   }
 
   async findAll(
@@ -462,36 +358,411 @@ export class TranslationJobsService {
           },
         },
 
-        include: {
-          items: {
-            include: {
-              field: {
-                select: {
-                  key:
-                    true,
+        include:
+          this.jobInclude(),
+      });
 
-                  type:
-                    true,
+    if (!job) {
+      throw new NotFoundException(
+        'Translation job not found.',
+      );
+    }
 
-                  sourceLocale:
-                    true,
+    return job;
+  }
 
-                  resource: {
-                    select: {
-                      resourceType:
-                        true,
+  async cancel(
+    shopifyDomain:
+      string,
 
-                      shopifyResourceId:
-                        true,
-                    },
-                  },
-                },
+    jobId:
+      string,
+  ) {
+    const job =
+      await this.findLifecycleJob(
+        shopifyDomain,
+        jobId,
+      );
+
+    if (
+      job.status ===
+      'CANCELLED'
+    ) {
+      return this.findOne(
+        shopifyDomain,
+        jobId,
+      );
+    }
+
+    if (
+      job.status !==
+        'QUEUED' &&
+      job.status !==
+        'RUNNING'
+    ) {
+      throw new BadRequestException(
+        `Translation job cannot be cancelled from status "${job.status}".`,
+      );
+    }
+
+    const now =
+      new Date();
+
+    await this.prisma.$transaction(
+      async (
+        tx,
+      ) => {
+        const cancelled =
+          await tx.translationJob.updateMany({
+            where: {
+              id:
+                job.id,
+
+              status: {
+                in: [
+                  'QUEUED',
+                  'RUNNING',
+                ],
               },
             },
 
-            orderBy: {
-              createdAt:
-                'asc',
+            data: {
+              status:
+                'CANCELLED',
+
+              completedAt:
+                now,
+
+              errorMessage:
+                'Cancelled by user.',
+            },
+          });
+
+        if (
+          cancelled.count !==
+          1
+        ) {
+          return;
+        }
+
+        await tx.translationJobItem.updateMany({
+          where: {
+            jobId:
+              job.id,
+
+            status:
+              'GENERATING',
+          },
+
+          data: {
+            status:
+              'PENDING',
+          },
+        });
+      },
+    );
+
+    return this.findOne(
+      shopifyDomain,
+      jobId,
+    );
+  }
+
+  async retryFailed(
+    shopifyDomain:
+      string,
+
+    jobId:
+      string,
+  ) {
+    const job =
+      await this.findLifecycleJob(
+        shopifyDomain,
+        jobId,
+      );
+
+    if (
+      job.status !==
+        'FAILED' &&
+      job.status !==
+        'PARTIAL'
+    ) {
+      throw new BadRequestException(
+        `Failed items cannot be retried from job status "${job.status}".`,
+      );
+    }
+
+    const failedItems =
+      job.items.filter(
+        (item) =>
+          item.status ===
+          'FAILED',
+      );
+
+    if (
+      failedItems.length ===
+      0
+    ) {
+      throw new BadRequestException(
+        'Translation job contains no failed items to retry.',
+      );
+    }
+
+    const failedIds =
+      failedItems.map(
+        (item) =>
+          item.id,
+      );
+
+    const completedItems =
+      job.items.filter(
+        (item) =>
+          this.isTranslationCompletedStatus(
+            item.status,
+          ),
+      ).length;
+
+    await this.prisma.$transaction(
+      async (
+        tx,
+      ) => {
+        await tx.translationJobItem.updateMany({
+          where: {
+            id: {
+              in:
+                failedIds,
+            },
+          },
+
+          data: {
+            status:
+              'PENDING',
+
+            translatedValue:
+              null,
+
+            generatedAt:
+              null,
+
+            validatedAt:
+              null,
+
+            validationPassed:
+              null,
+
+            validationErrors:
+              0,
+
+            validationWarnings:
+              0,
+
+            validationVersion:
+              null,
+
+            fallbackUsed:
+              false,
+
+            primaryErrorMessage:
+              null,
+
+            errorMessage:
+              null,
+
+            provider:
+              job.provider,
+
+            model:
+              job.model,
+          },
+        });
+
+        await tx.translationJob.update({
+          where: {
+            id:
+              job.id,
+          },
+
+          data: {
+            status:
+              'QUEUED',
+
+            completedItems,
+
+            failedItems:
+              0,
+
+            completedAt:
+              null,
+
+            errorMessage:
+              null,
+          },
+        });
+      },
+    );
+
+    return this.findOne(
+      shopifyDomain,
+      jobId,
+    );
+  }
+
+  async resume(
+    shopifyDomain:
+      string,
+
+    jobId:
+      string,
+  ) {
+    const job =
+      await this.findLifecycleJob(
+        shopifyDomain,
+        jobId,
+      );
+
+    if (
+      job.status ===
+      'QUEUED'
+    ) {
+      return this.findOne(
+        shopifyDomain,
+        jobId,
+      );
+    }
+
+    if (
+      job.status !==
+        'CANCELLED' &&
+      job.status !==
+        'RUNNING'
+    ) {
+      throw new BadRequestException(
+        `Translation job cannot be resumed from status "${job.status}".`,
+      );
+    }
+
+    if (
+      job.status ===
+      'RUNNING'
+    ) {
+      const age =
+        Date.now() -
+        job.updatedAt.getTime();
+
+      if (
+        age <
+        TranslationJobsService
+          .STALE_RUNNING_MS
+      ) {
+        const remainingSeconds =
+          Math.ceil(
+            (
+              TranslationJobsService
+                .STALE_RUNNING_MS -
+              age
+            ) /
+              1000,
+          );
+
+        throw new BadRequestException(
+          `Translation job is still active. Retry resume in approximately ${remainingSeconds} seconds if it remains stuck.`,
+        );
+      }
+    }
+
+    const completedItems =
+      job.items.filter(
+        (item) =>
+          this.isTranslationCompletedStatus(
+            item.status,
+          ),
+      ).length;
+
+    const failedItems =
+      job.items.filter(
+        (item) =>
+          item.status ===
+          'FAILED',
+      ).length;
+
+    await this.prisma.$transaction(
+      async (
+        tx,
+      ) => {
+        await tx.translationJobItem.updateMany({
+          where: {
+            jobId:
+              job.id,
+
+            status:
+              'GENERATING',
+          },
+
+          data: {
+            status:
+              'PENDING',
+
+            errorMessage:
+              null,
+          },
+        });
+
+        await tx.translationJob.update({
+          where: {
+            id:
+              job.id,
+          },
+
+          data: {
+            status:
+              'QUEUED',
+
+            completedItems,
+
+            failedItems,
+
+            completedAt:
+              null,
+
+            errorMessage:
+              null,
+          },
+        });
+      },
+    );
+
+    return this.findOne(
+      shopifyDomain,
+      jobId,
+    );
+  }
+
+  private async findLifecycleJob(
+    shopifyDomain:
+      string,
+
+    jobId:
+      string,
+  ) {
+    const job =
+      await this.prisma.translationJob.findFirst({
+        where: {
+          id:
+            jobId,
+
+          shop: {
+            shopifyDomain,
+          },
+        },
+
+        include: {
+          items: {
+            select: {
+              id:
+                true,
+
+              status:
+                true,
             },
           },
         },
@@ -504,5 +775,57 @@ export class TranslationJobsService {
     }
 
     return job;
+  }
+
+  private isTranslationCompletedStatus(
+    status:
+      string,
+  ) {
+    return [
+      'GENERATED',
+      'VALIDATED',
+      'NEEDS_REVIEW',
+      'APPROVED',
+      'REJECTED',
+      'PUBLISHED',
+    ].includes(
+      status,
+    );
+  }
+
+  private jobInclude() {
+    return {
+      items: {
+        include: {
+          field: {
+            select: {
+              key:
+                true,
+
+              type:
+                true,
+
+              sourceLocale:
+                true,
+
+              resource: {
+                select: {
+                  resourceType:
+                    true,
+
+                  shopifyResourceId:
+                    true,
+                },
+              },
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt:
+            'asc',
+        },
+      },
+    } as const;
   }
 }

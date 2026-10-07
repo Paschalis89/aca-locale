@@ -49,6 +49,10 @@ import {
 } from '../translation-human-review/dto/reject-translation-item.dto.js';
 
 import {
+  TranslationPublicationService,
+} from '../translation-publication/translation-publication.service.js';
+
+import {
   CreateTranslationJobDto,
 } from './dto/create-translation-job.dto.js';
 
@@ -60,10 +64,6 @@ import {
 import {
   TranslationJobsService,
 } from './translation-jobs.service.js';
-
-import {
-  TranslationPublicationService,
-} from '../translation-publication/translation-publication.service.js';
 
 @ApiTags(
   'Translation Jobs',
@@ -114,12 +114,10 @@ export class TranslationJobsController {
     body:
       CreateTranslationJobDto,
   ) {
-    return this
-      .translationJobsService
-      .create(
-        shop.shopDomain,
-        body,
-      );
+    return this.translationJobsService.create(
+      shop.shopDomain,
+      body,
+    );
   }
 
   @Get()
@@ -137,11 +135,9 @@ export class TranslationJobsController {
     shop:
       ShopifyAuthContext,
   ) {
-    return this
-      .translationJobsService
-      .findAll(
-        shop.shopDomain,
-      );
+    return this.translationJobsService.findAll(
+      shop.shopDomain,
+    );
   }
 
   @Get(':id')
@@ -166,12 +162,10 @@ export class TranslationJobsController {
     id:
       string,
   ) {
-    return this
-      .translationJobsService
-      .findOne(
-        shop.shopDomain,
-        id,
-      );
+    return this.translationJobsService.findOne(
+      shop.shopDomain,
+      id,
+    );
   }
 
   @Post(':id/execute')
@@ -180,7 +174,7 @@ export class TranslationJobsController {
       'Execute a queued translation job',
 
     description:
-      'Executes translation and deterministic validation. It does not publish to Shopify.',
+      'Executes pending translation items and deterministic validation. Duplicate execution is protected by an atomic job claim.',
   })
   execute(
     @CurrentShop()
@@ -191,12 +185,79 @@ export class TranslationJobsController {
     jobId:
       string,
   ) {
-    return this
-      .translationExecutorService
-      .execute(
-        shop.shopDomain,
-        jobId,
-      );
+    return this.translationExecutorService.execute(
+      shop.shopDomain,
+      jobId,
+    );
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({
+    summary:
+      'Cancel a queued or running translation job',
+
+    description:
+      'Cancellation is cooperative. A translation provider request already in flight may finish, but no additional pending items will be started.',
+  })
+  cancel(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
+
+    @Param('id')
+    jobId:
+      string,
+  ) {
+    return this.translationJobsService.cancel(
+      shop.shopDomain,
+      jobId,
+    );
+  }
+
+  @Post(':id/retry-failed')
+  @ApiOperation({
+    summary:
+      'Retry failed translation items',
+
+    description:
+      'Requeues only FAILED items in a FAILED or PARTIAL job. Successfully translated items are preserved.',
+  })
+  retryFailed(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
+
+    @Param('id')
+    jobId:
+      string,
+  ) {
+    return this.translationJobsService.retryFailed(
+      shop.shopDomain,
+      jobId,
+    );
+  }
+
+  @Post(':id/resume')
+  @ApiOperation({
+    summary:
+      'Resume a cancelled or stale running translation job',
+
+    description:
+      'Requeues interrupted GENERATING items. RUNNING jobs can only be recovered after they have been stale for at least five minutes.',
+  })
+  resume(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
+
+    @Param('id')
+    jobId:
+      string,
+  ) {
+    return this.translationJobsService.resume(
+      shop.shopDomain,
+      jobId,
+    );
   }
 
   @Post(':id/review')
@@ -216,12 +277,10 @@ export class TranslationJobsController {
     jobId:
       string,
   ) {
-    return this
-      .translationReviewExecutorService
-      .reviewJob(
-        shop.shopDomain,
-        jobId,
-      );
+    return this.translationReviewExecutorService.reviewJob(
+      shop.shopDomain,
+      jobId,
+    );
   }
 
   @Post(
@@ -251,14 +310,12 @@ export class TranslationJobsController {
     body:
       ApproveTranslationItemDto,
   ) {
-    return this
-      .translationHumanReviewService
-      .approve(
-        shop.shopDomain,
-        jobId,
-        itemId,
-        body,
-      );
+    return this.translationHumanReviewService.approve(
+      shop.shopDomain,
+      jobId,
+      itemId,
+      body,
+    );
   }
 
   @Post(
@@ -285,14 +342,12 @@ export class TranslationJobsController {
     body:
       RejectTranslationItemDto,
   ) {
-    return this
-      .translationHumanReviewService
-      .reject(
-        shop.shopDomain,
-        jobId,
-        itemId,
-        body,
-      );
+    return this.translationHumanReviewService.reject(
+      shop.shopDomain,
+      jobId,
+      itemId,
+      body,
+    );
   }
 
   @Post(
@@ -318,144 +373,94 @@ export class TranslationJobsController {
     itemId:
       string,
   ) {
-    return this
-      .translationHumanReviewService
-      .regenerate(
-        shop.shopDomain,
-        jobId,
-        itemId,
-      );
+    return this.translationHumanReviewService.regenerate(
+      shop.shopDomain,
+      jobId,
+      itemId,
+    );
   }
 
   @Post(
-  ':jobId/items/:itemId/published',
-)
-@ApiOperation({
-  summary:
-    'Confirm a translation item as published',
+    ':jobId/items/:itemId/publication/prepare',
+  )
+  @ApiOperation({
+    summary:
+      'Prepare an approved translation for Shopify publication',
 
-  description:
-    'Marks an approved translation as published after Shopify translationsRegister succeeds and synchronizes the local TranslationState.',
-})
-@ApiParam({
-  name:
-    'jobId',
-})
-@ApiParam({
-  name:
-    'itemId',
-})
-@ApiOkResponse({
-  description:
-    'Translation publication confirmed.',
-})
-markPublished(
-  @CurrentShop()
-  shop:
-    ShopifyAuthContext,
+    description:
+      'Validates publication eligibility and returns the Shopify resource, key, locale, approved value and source digest required by the React Router Shopify gateway.',
+  })
+  @ApiParam({
+    name:
+      'jobId',
+  })
+  @ApiParam({
+    name:
+      'itemId',
+  })
+  @ApiOkResponse({
+    description:
+      'Translation publication prepared successfully.',
+  })
+  preparePublication(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
 
-  @Param('jobId')
-  jobId:
-    string,
+    @Param('jobId')
+    jobId:
+      string,
 
-  @Param('itemId')
-  itemId:
-    string,
-) {
-  return this
-    .translationHumanReviewService
-    .markPublished(
+    @Param('itemId')
+    itemId:
+      string,
+  ) {
+    return this.translationPublicationService.prepare(
       shop.shopDomain,
       jobId,
       itemId,
     );
-}
+  }
 
-@Post(
-  ':jobId/items/:itemId/publication/prepare',
-)
-@ApiOperation({
-  summary:
-    'Prepare an approved translation for Shopify publication',
+  @Post(
+    ':jobId/items/:itemId/publication/confirm',
+  )
+  @ApiOperation({
+    summary:
+      'Confirm successful Shopify publication',
 
-  description:
-    'Validates publication eligibility and returns the Shopify resource, key, locale, approved value and source digest required by the React Router Shopify gateway.',
-})
-@ApiParam({
-  name:
-    'jobId',
-})
-@ApiParam({
-  name:
-    'itemId',
-})
-@ApiOkResponse({
-  description:
-    'Translation publication prepared successfully.',
-})
-preparePublication(
-  @CurrentShop()
-  shop:
-    ShopifyAuthContext,
+    description:
+      'Marks an approved translation as published only after Shopify translationsRegister succeeds and updates the local TranslationState projection.',
+  })
+  @ApiParam({
+    name:
+      'jobId',
+  })
+  @ApiParam({
+    name:
+      'itemId',
+  })
+  @ApiOkResponse({
+    description:
+      'Translation publication confirmed successfully.',
+  })
+  confirmPublication(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
 
-  @Param('jobId')
-  jobId:
-    string,
+    @Param('jobId')
+    jobId:
+      string,
 
-  @Param('itemId')
-  itemId:
-    string,
-) {
-  return this
-    .translationPublicationService
-    .prepare(
+    @Param('itemId')
+    itemId:
+      string,
+  ) {
+    return this.translationPublicationService.confirmPublished(
       shop.shopDomain,
       jobId,
       itemId,
     );
-}
-
-@Post(
-  ':jobId/items/:itemId/publication/confirm',
-)
-@ApiOperation({
-  summary:
-    'Confirm successful Shopify publication',
-
-  description:
-    'Marks an approved translation as published only after Shopify translationsRegister succeeds and updates the local TranslationState projection.',
-})
-@ApiParam({
-  name:
-    'jobId',
-})
-@ApiParam({
-  name:
-    'itemId',
-})
-@ApiOkResponse({
-  description:
-    'Translation publication confirmed successfully.',
-})
-confirmPublication(
-  @CurrentShop()
-  shop:
-    ShopifyAuthContext,
-
-  @Param('jobId')
-  jobId:
-    string,
-
-  @Param('itemId')
-  itemId:
-    string,
-) {
-  return this
-    .translationPublicationService
-    .confirmPublished(
-      shop.shopDomain,
-      jobId,
-      itemId,
-    );
-}
+  }
 }

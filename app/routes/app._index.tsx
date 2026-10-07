@@ -19,16 +19,15 @@ import {
   authenticate,
 } from "../shopify.server";
 
-export const loader =
-  async ({
+export const loader = async ({
+  request,
+}: LoaderFunctionArgs) => {
+  await authenticate.admin(
     request,
-  }: LoaderFunctionArgs) => {
-    await authenticate.admin(
-      request,
-    );
+  );
 
-    return null;
-  };
+  return null;
+};
 
 export default function Index() {
   const shopify =
@@ -37,449 +36,552 @@ export default function Index() {
   const [
     jobId,
     setJobId,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     itemId,
     setItemId,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     lastResult,
     setLastResult,
-  ] =
-    useState<unknown>(
-      null,
+  ] = useState<unknown>(
+    null,
+  );
+
+  const callApi = async (
+    url: string,
+    options: RequestInit = {},
+  ) => {
+    const token =
+      await shopify.idToken();
+
+    const response =
+      await fetch(
+        url,
+        {
+          ...options,
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+            ...options.headers,
+          },
+        },
+      );
+
+    const responseText =
+      await response.text();
+
+    let data: any;
+
+    try {
+      data = responseText
+        ? JSON.parse(
+            responseText,
+          )
+        : {};
+    } catch {
+      data = {
+        result:
+          responseText,
+      };
+    }
+
+    setLastResult(
+      data,
     );
 
-  const callApi =
-    async (
-      url:
-        string,
+    if (!response.ok) {
+      throw new Error(
+        data.message ??
+          `HTTP ${response.status}`,
+      );
+    }
 
-      options:
-        RequestInit =
-        {},
-    ) => {
-      const token =
-        await shopify.idToken();
+    return data;
+  };
 
-      const response =
-        await fetch(
-          url,
+  const requireJob = () => {
+    if (!jobId) {
+      shopify.toast.show(
+        "Create or select a job first.",
+        {
+          isError:
+            true,
+        },
+      );
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const requireIds = () => {
+    if (
+      !jobId ||
+      !itemId
+    ) {
+      shopify.toast.show(
+        "Create or regenerate a job first.",
+        {
+          isError:
+            true,
+        },
+      );
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const syncCurrentIds = (
+    data: any,
+  ) => {
+    if (data?.id) {
+      setJobId(
+        data.id,
+      );
+    }
+
+    if (
+      data?.items?.[0]?.id
+    ) {
+      setItemId(
+        data.items[0].id,
+      );
+    }
+  };
+
+  const createJob = async () => {
+    try {
+      const data =
+        await callApi(
+          "/api/backend/translation-jobs",
           {
-            ...options,
-
+            method:
+              "POST",
             headers: {
-              Authorization:
-                `Bearer ${token}`,
-
-              ...options.headers,
+              "Content-Type":
+                "application/json",
             },
+            body:
+              JSON.stringify({
+                targetLocale:
+                  "it",
+                resourceTypes: [
+                  "PRODUCT",
+                ],
+                maxItems:
+                  1,
+              }),
           },
         );
 
-      const data =
-        await response.json();
-
-      setLastResult(
+      syncCurrentIds(
         data,
       );
 
-      if (
-        !response.ok
-      ) {
-        throw new Error(
-          data.message ??
-          `HTTP ${response.status}`,
-        );
-      }
+      shopify.toast.show(
+        "Test job created",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
 
-      return data;
-    };
+      shopify.toast.show(
+        "Job creation failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
 
-  const requireIds =
-    () => {
-      if (
-        !jobId ||
-        !itemId
-      ) {
-        shopify.toast.show(
-          "Create or regenerate a job first.",
+  const executeJob = async () => {
+    if (!requireJob()) {
+      return;
+    }
+
+    try {
+      const data =
+        await callApi(
+          `/api/backend/translation-jobs/${jobId}/execute`,
           {
-            isError:
-              true,
+            method:
+              "POST",
           },
         );
 
-        return false;
-      }
-
-      return true;
-    };
-
-  const createJob =
-    async () => {
-      try {
-        const data =
-          await callApi(
-            "/api/backend/translation-jobs",
-            {
-              method:
-                "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-
-              body:
-                JSON.stringify({
-                  targetLocale:
-                    "it",
-
-                  resourceTypes: [
-                    "PRODUCT",
-                  ],
-
-                  maxItems:
-                    1,
-                }),
-            },
-          );
-
-        setJobId(
-          data.id,
-        );
-
+      if (
+        data?.items?.[0]?.id
+      ) {
         setItemId(
-          data.items?.[0]?.id ??
-          "",
-        );
-
-        shopify.toast.show(
-          "Test job created",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
-
-        shopify.toast.show(
-          "Job creation failed",
-          {
-            isError:
-              true,
-          },
+          data.items[0].id,
         );
       }
-    };
 
-  const executeJob =
-    async () => {
-      if (
-        !jobId
-      ) {
-        return;
-      }
+      shopify.toast.show(
+        data?.execution?.skipped
+          ? "Execution skipped safely"
+          : "Translation executed",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
 
-      try {
-        const data =
-          await callApi(
-            `/api/backend/translation-jobs/${jobId}/execute`,
-            {
-              method:
-                "POST",
-            },
-          );
+      shopify.toast.show(
+        "Execution failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
 
-        setItemId(
-          data.items?.[0]?.id ??
-          itemId,
-        );
+  const cancelJob = async () => {
+    if (!requireJob()) {
+      return;
+    }
 
-        shopify.toast.show(
-          "Translation executed",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
-
-        shopify.toast.show(
-          "Execution failed",
-          {
-            isError:
-              true,
-          },
-        );
-      }
-    };
-
-  const reviewJob =
-    async () => {
-      if (
-        !jobId
-      ) {
-        return;
-      }
-
-      try {
+    try {
+      const data =
         await callApi(
-          `/api/backend/translation-jobs/${jobId}/review`,
+          `/api/backend/translation-jobs/${jobId}/cancel`,
           {
             method:
               "POST",
           },
         );
 
-        shopify.toast.show(
-          "AI review completed",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
+      syncCurrentIds(
+        data,
+      );
 
-        shopify.toast.show(
-          "AI review failed",
-          {
-            isError:
-              true,
-          },
-        );
-      }
-    };
+      shopify.toast.show(
+        "Job cancelled",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
 
-  const approveAsIs =
-    async () => {
-      if (
-        !requireIds()
-      ) {
-        return;
-      }
+      shopify.toast.show(
+        "Cancel failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
 
-      try {
+  const resumeJob = async () => {
+    if (!requireJob()) {
+      return;
+    }
+
+    try {
+      const data =
         await callApi(
-          `/api/backend/translation-jobs/${jobId}/items/${itemId}/approve`,
+          `/api/backend/translation-jobs/${jobId}/resume`,
           {
             method:
               "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                note:
-                  "Approved as-is from ACA Locale development workflow.",
-              }),
           },
         );
 
-        shopify.toast.show(
-          "Translation approved",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
+      syncCurrentIds(
+        data,
+      );
 
-        shopify.toast.show(
-          "Approval failed",
-          {
-            isError:
-              true,
-          },
-        );
-      }
-    };
+      shopify.toast.show(
+        "Job resumed",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
 
-  const editAndApprove =
-    async () => {
-      if (
-        !requireIds()
-      ) {
-        return;
-      }
+      shopify.toast.show(
+        "Resume failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
 
-      const current =
-        (
-          lastResult as
-            any
-        )?.items?.[0]
-          ?.translatedValue ??
-        (
-          lastResult as
-            any
-        )?.translatedValue ??
-        "";
+  const retryFailedJob = async () => {
+    if (!requireJob()) {
+      return;
+    }
 
-      const value =
-        window.prompt(
-          "Final approved translation:",
-          current,
-        );
-
-      if (
-        value ===
-        null
-      ) {
-        return;
-      }
-
-      try {
+    try {
+      const data =
         await callApi(
-          `/api/backend/translation-jobs/${jobId}/items/${itemId}/approve`,
+          `/api/backend/translation-jobs/${jobId}/retry-failed`,
           {
             method:
               "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                approvedValue:
-                  value,
-
-                note:
-                  "Edited and approved by human reviewer.",
-              }),
           },
         );
 
-        shopify.toast.show(
-          "Edited translation approved",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
+      syncCurrentIds(
+        data,
+      );
 
-        shopify.toast.show(
-          "Edit + approval failed",
-          {
-            isError:
-              true,
+      shopify.toast.show(
+        "Failed items requeued",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
+
+      shopify.toast.show(
+        "Retry failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
+
+  const reviewJob = async () => {
+    if (!requireJob()) {
+      return;
+    }
+
+    try {
+      await callApi(
+        `/api/backend/translation-jobs/${jobId}/review`,
+        {
+          method:
+            "POST",
+        },
+      );
+
+      shopify.toast.show(
+        "AI review completed",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
+
+      shopify.toast.show(
+        "AI review failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
+
+  const approveAsIs = async () => {
+    if (!requireIds()) {
+      return;
+    }
+
+    try {
+      await callApi(
+        `/api/backend/translation-jobs/${jobId}/items/${itemId}/approve`,
+        {
+          method:
+            "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
           },
-        );
-      }
-    };
+          body:
+            JSON.stringify({
+              note:
+                "Approved as-is from ACA Locale development workflow.",
+            }),
+        },
+      );
 
-  const rejectItem =
-    async () => {
-      if (
-        !requireIds()
-      ) {
-        return;
-      }
+      shopify.toast.show(
+        "Translation approved",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
 
-      const note =
-        window.prompt(
-          "Reason for rejection:",
-          "Translation requires regeneration.",
-        );
+      shopify.toast.show(
+        "Approval failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
 
-      if (
-        !note
-      ) {
-        return;
-      }
+  const editAndApprove = async () => {
+    if (!requireIds()) {
+      return;
+    }
 
-      try {
-        await callApi(
-          `/api/backend/translation-jobs/${jobId}/items/${itemId}/reject`,
-          {
-            method:
-              "POST",
+    const current =
+      (lastResult as any)
+        ?.items?.[0]
+        ?.translatedValue ??
+      (lastResult as any)
+        ?.translatedValue ??
+      "";
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+    const value =
+      window.prompt(
+        "Final approved translation:",
+        current,
+      );
 
-            body:
-              JSON.stringify({
-                note,
-              }),
-          },
-        );
-
-        shopify.toast.show(
-          "Translation rejected",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
-
-        shopify.toast.show(
-          "Rejection failed",
-          {
-            isError:
-              true,
-          },
-        );
-      }
-    };
-
-  const regenerateItem =
-    async () => {
-      if (
-        !requireIds()
-      ) {
-        return;
-      }
-
-      try {
-        const data =
-          await callApi(
-            `/api/backend/translation-jobs/${jobId}/items/${itemId}/regenerate`,
-            {
-              method:
-                "POST",
-            },
-          );
-
-        setJobId(
-          data.id,
-        );
-
-        setItemId(
-          data.items?.[0]?.id ??
-          "",
-        );
-
-        shopify.toast.show(
-          "Regeneration job created",
-        );
-      } catch (error) {
-        console.error(
-          error,
-        );
-
-        shopify.toast.show(
-          "Regeneration failed",
-          {
-            isError:
-              true,
-          },
-        );
-      }
-    };
-
-    const publishItem =
-  async () => {
     if (
-      !requireIds()
+      value ===
+      null
     ) {
+      return;
+    }
+
+    try {
+      await callApi(
+        `/api/backend/translation-jobs/${jobId}/items/${itemId}/approve`,
+        {
+          method:
+            "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body:
+            JSON.stringify({
+              approvedValue:
+                value,
+              note:
+                "Edited and approved by human reviewer.",
+            }),
+        },
+      );
+
+      shopify.toast.show(
+        "Edited translation approved",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
+
+      shopify.toast.show(
+        "Edit + approval failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
+
+  const rejectItem = async () => {
+    if (!requireIds()) {
+      return;
+    }
+
+    const note =
+      window.prompt(
+        "Reason for rejection:",
+        "Translation requires regeneration.",
+      );
+
+    if (!note) {
+      return;
+    }
+
+    try {
+      await callApi(
+        `/api/backend/translation-jobs/${jobId}/items/${itemId}/reject`,
+        {
+          method:
+            "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body:
+            JSON.stringify({
+              note,
+            }),
+        },
+      );
+
+      shopify.toast.show(
+        "Translation rejected",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
+
+      shopify.toast.show(
+        "Rejection failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
+
+  const regenerateItem = async () => {
+    if (!requireIds()) {
+      return;
+    }
+
+    try {
+      const data =
+        await callApi(
+          `/api/backend/translation-jobs/${jobId}/items/${itemId}/regenerate`,
+          {
+            method:
+              "POST",
+          },
+        );
+
+      syncCurrentIds(
+        data,
+      );
+
+      shopify.toast.show(
+        "Regeneration job created",
+      );
+    } catch (error) {
+      console.error(
+        error,
+      );
+
+      shopify.toast.show(
+        "Regeneration failed",
+        {
+          isError:
+            true,
+        },
+      );
+    }
+  };
+
+  const publishItem = async () => {
+    if (!requireIds()) {
       return;
     }
 
@@ -569,6 +671,35 @@ export default function Index() {
           >
             <s-button
               onClick={
+                cancelJob
+              }
+            >
+              Cancel Job
+            </s-button>
+
+            <s-button
+              onClick={
+                resumeJob
+              }
+            >
+              Resume Job
+            </s-button>
+
+            <s-button
+              onClick={
+                retryFailedJob
+              }
+            >
+              Retry Failed
+            </s-button>
+          </s-stack>
+
+          <s-stack
+            direction="inline"
+            gap="base"
+          >
+            <s-button
+              onClick={
                 approveAsIs
               }
             >
@@ -598,13 +729,14 @@ export default function Index() {
             >
               Regenerate
             </s-button>
+
             <s-button
-  onClick={
-    publishItem
-  }
->
-  Publish to Shopify
-</s-button>
+              onClick={
+                publishItem
+              }
+            >
+              Publish to Shopify
+            </s-button>
           </s-stack>
         </s-stack>
       </s-section>
@@ -620,10 +752,8 @@ export default function Index() {
             style={{
               margin:
                 0,
-
               whiteSpace:
                 "pre-wrap",
-
               wordBreak:
                 "break-word",
             }}

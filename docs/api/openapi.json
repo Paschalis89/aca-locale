@@ -689,7 +689,7 @@
     },
     "/api/v1/translations/jobs/{id}/execute": {
       "post": {
-        "description": "Executes translation and deterministic validation. It does not publish to Shopify.",
+        "description": "Executes pending translation items and deterministic validation. Duplicate execution is protected by an atomic job claim.",
         "operationId": "TranslationJobsController_execute",
         "parameters": [
           {
@@ -712,6 +712,96 @@
           }
         ],
         "summary": "Execute a queued translation job",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}/cancel": {
+      "post": {
+        "description": "Cancellation is cooperative. A translation provider request already in flight may finish, but no additional pending items will be started.",
+        "operationId": "TranslationJobsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a queued or running translation job",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}/retry-failed": {
+      "post": {
+        "description": "Requeues only FAILED items in a FAILED or PARTIAL job. Successfully translated items are preserved.",
+        "operationId": "TranslationJobsController_retryFailed",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retry failed translation items",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}/resume": {
+      "post": {
+        "description": "Requeues interrupted GENERATING items. RUNNING jobs can only be recovered after they have been stale for at least five minutes.",
+        "operationId": "TranslationJobsController_resume",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resume a cancelled or stale running translation job",
         "tags": [
           "Translation Jobs"
         ]
@@ -875,44 +965,6 @@
           }
         ],
         "summary": "Regenerate a translation item",
-        "tags": [
-          "Translation Jobs"
-        ]
-      }
-    },
-    "/api/v1/translations/jobs/{jobId}/items/{itemId}/published": {
-      "post": {
-        "description": "Marks an approved translation as published after Shopify translationsRegister succeeds and synchronizes the local TranslationState.",
-        "operationId": "TranslationJobsController_markPublished",
-        "parameters": [
-          {
-            "name": "jobId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Translation publication confirmed."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Confirm a translation item as published",
         "tags": [
           "Translation Jobs"
         ]
