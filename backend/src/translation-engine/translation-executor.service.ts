@@ -13,6 +13,10 @@ import {
 } from '../translation-validation/translation-validator.service.js';
 
 import {
+  estimateUsageCost,
+} from '../translation-usage/translation-usage-cost.js';
+
+import {
   TranslationProviderRegistryService,
 } from './translation-provider-registry.service.js';
 
@@ -362,11 +366,88 @@ export class TranslationExecutorService {
                 item.model ??
                 job.model,
             });
+
+          await this.recordUsage({
+            shopId:
+              job.shopId,
+
+            jobId:
+              job.id,
+
+            itemId:
+              item.id,
+
+            provider:
+              result.provider,
+
+            model:
+              result.model,
+
+            success:
+              true,
+
+            fallback:
+              false,
+
+            usageKnown:
+              true,
+
+            billedCharacters:
+              result.billedCharacters ??
+              0,
+
+            inputTokens:
+              result.inputTokens ??
+              0,
+
+            outputTokens:
+              result.outputTokens ??
+              0,
+          });
         } catch (error) {
           primaryError =
             this.errorMessage(
               error,
             );
+
+          await this.recordUsage({
+            shopId:
+              job.shopId,
+
+            jobId:
+              job.id,
+
+            itemId:
+              item.id,
+
+            provider:
+              primaryProvider,
+
+            model:
+              item.model ??
+              job.model,
+
+            success:
+              false,
+
+            fallback:
+              false,
+
+            usageKnown:
+              false,
+
+            billedCharacters:
+              0,
+
+            inputTokens:
+              0,
+
+            outputTokens:
+              0,
+
+            errorMessage:
+              primaryError,
+          });
 
           if (
             !hasUsefulFallback ||
@@ -405,18 +486,97 @@ export class TranslationExecutorService {
                   job.fallbackModel,
               });
 
+            await this.recordUsage({
+              shopId:
+                job.shopId,
+
+              jobId:
+                job.id,
+
+              itemId:
+                item.id,
+
+              provider:
+                result.provider,
+
+              model:
+                result.model,
+
+              success:
+                true,
+
+              fallback:
+                true,
+
+              usageKnown:
+                true,
+
+              billedCharacters:
+                result.billedCharacters ??
+                0,
+
+              inputTokens:
+                result.inputTokens ??
+                0,
+
+              outputTokens:
+                result.outputTokens ??
+                0,
+            });
+
             fallbackUsed =
               true;
 
             fallbackSuccesses +=
               1;
           } catch (fallbackError) {
+            const fallbackErrorMessage =
+              this.errorMessage(
+                fallbackError,
+              );
+
+            await this.recordUsage({
+              shopId:
+                job.shopId,
+
+              jobId:
+                job.id,
+
+              itemId:
+                item.id,
+
+              provider:
+                fallbackProvider,
+
+              model:
+                job.fallbackModel,
+
+              success:
+                false,
+
+              fallback:
+                true,
+
+              usageKnown:
+                false,
+
+              billedCharacters:
+                0,
+
+              inputTokens:
+                0,
+
+              outputTokens:
+                0,
+
+              errorMessage:
+                fallbackErrorMessage,
+            });
+
             throw new Error(
               [
                 `Primary provider ${primaryProvider} failed: ${primaryError}`,
-                `Fallback provider ${fallbackProvider} failed: ${this.errorMessage(
-                  fallbackError,
-                )}`,
+                `Fallback provider ${fallbackProvider} failed: ${fallbackErrorMessage}`,
               ].join(
                 ' | ',
               ),
@@ -906,6 +1066,146 @@ export class TranslationExecutorService {
     ].includes(
       status,
     );
+  }
+
+  private async recordUsage(
+    input: {
+      shopId:
+        string;
+
+      jobId:
+        string;
+
+      itemId:
+        string;
+
+      provider:
+        string;
+
+      model:
+        string |
+        null;
+
+      success:
+        boolean;
+
+      fallback:
+        boolean;
+
+      usageKnown:
+        boolean;
+
+      billedCharacters:
+        number;
+
+      inputTokens:
+        number;
+
+      outputTokens:
+        number;
+
+      errorMessage?:
+        string |
+        null;
+    },
+  ) {
+    try {
+      const cost =
+        input.usageKnown
+          ? estimateUsageCost({
+              provider:
+                input.provider,
+
+              model:
+                input.model,
+
+              billedCharacters:
+                input.billedCharacters,
+
+              inputTokens:
+                input.inputTokens,
+
+              outputTokens:
+                input.outputTokens,
+            })
+          : {
+              estimatedCostMicrousd:
+                null,
+
+              pricingKey:
+                null,
+
+              pricingVersion:
+                process.env
+                  .ACA_LOCALE_USAGE_PRICING_VERSION ??
+                null,
+            };
+
+      await this.prisma.translationUsageEvent.create({
+        data: {
+          shopId:
+            input.shopId,
+
+          jobId:
+            input.jobId,
+
+          itemId:
+            input.itemId,
+
+          stage:
+            'TRANSLATION',
+
+          provider:
+            input.provider,
+
+          model:
+            input.model,
+
+          success:
+            input.success,
+
+          fallback:
+            input.fallback,
+
+          usageKnown:
+            input.usageKnown,
+
+          billedCharacters:
+            input.billedCharacters,
+
+          inputTokens:
+            input.inputTokens,
+
+          outputTokens:
+            input.outputTokens,
+
+          estimatedCostMicrousd:
+            cost
+              .estimatedCostMicrousd,
+
+          pricingKey:
+            cost.pricingKey,
+
+          pricingVersion:
+            cost.pricingVersion,
+
+          errorMessage:
+            input.errorMessage ??
+            null,
+        },
+      });
+    } catch (error) {
+      /*
+       * Usage accounting must never turn a
+       * successful external provider call into
+       * a failed translation that is then billed
+       * a second time on retry.
+       */
+      console.error(
+        '[ACA Locale] Unable to persist translation usage event:',
+        error,
+      );
+    }
   }
 
   private errorMessage(

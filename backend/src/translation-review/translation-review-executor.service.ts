@@ -9,6 +9,10 @@ import {
 } from '../database/prisma.service.js';
 
 import {
+  estimateUsageCost,
+} from '../translation-usage/translation-usage-cost.js';
+
+import {
   AiTranslationReviewerService,
 } from './ai-translation-reviewer.service.js';
 
@@ -182,6 +186,35 @@ export class TranslationReviewExecutorService {
         outputTokens +=
           result.outputTokens;
 
+        await this.recordUsage({
+          shopId:
+            job.shopId,
+
+          jobId:
+            job.id,
+
+          itemId:
+            item.id,
+
+          provider:
+            result.provider,
+
+          model:
+            result.model,
+
+          success:
+            true,
+
+          usageKnown:
+            true,
+
+          inputTokens:
+            result.inputTokens,
+
+          outputTokens:
+            result.outputTokens,
+        });
+
         reviewedItems +=
           1;
 
@@ -240,6 +273,43 @@ export class TranslationReviewExecutorService {
         failedReviews +=
           1;
 
+        const reviewErrorMessage =
+          this.errorMessage(
+            error,
+          );
+
+        await this.recordUsage({
+          shopId:
+            job.shopId,
+
+          jobId:
+            job.id,
+
+          itemId:
+            item.id,
+
+          provider:
+            job.reviewProvider,
+
+          model:
+            job.reviewModel,
+
+          success:
+            false,
+
+          usageKnown:
+            false,
+
+          inputTokens:
+            0,
+
+          outputTokens:
+            0,
+
+          errorMessage:
+            reviewErrorMessage,
+        });
+
         await this.prisma.translationJobItem.update({
           where: {
             id:
@@ -253,9 +323,7 @@ export class TranslationReviewExecutorService {
              * destroy the generated draft.
              */
             aiReviewErrorMessage:
-              this.errorMessage(
-                error,
-              ),
+              reviewErrorMessage,
           },
         });
       }
@@ -326,6 +394,131 @@ export class TranslationReviewExecutorService {
         outputTokens,
       },
     };
+  }
+
+  private async recordUsage(
+    input: {
+      shopId:
+        string;
+
+      jobId:
+        string;
+
+      itemId:
+        string;
+
+      provider:
+        string;
+
+      model:
+        string |
+        null;
+
+      success:
+        boolean;
+
+      usageKnown:
+        boolean;
+
+      inputTokens:
+        number;
+
+      outputTokens:
+        number;
+
+      errorMessage?:
+        string |
+        null;
+    },
+  ) {
+    try {
+      const cost =
+        input.usageKnown
+          ? estimateUsageCost({
+              provider:
+                input.provider,
+
+              model:
+                input.model,
+
+              inputTokens:
+                input.inputTokens,
+
+              outputTokens:
+                input.outputTokens,
+            })
+          : {
+              estimatedCostMicrousd:
+                null,
+
+              pricingKey:
+                null,
+
+              pricingVersion:
+                process.env
+                  .ACA_LOCALE_USAGE_PRICING_VERSION ??
+                null,
+            };
+
+      await this.prisma.translationUsageEvent.create({
+        data: {
+          shopId:
+            input.shopId,
+
+          jobId:
+            input.jobId,
+
+          itemId:
+            input.itemId,
+
+          stage:
+            'AI_REVIEW',
+
+          provider:
+            input.provider,
+
+          model:
+            input.model,
+
+          success:
+            input.success,
+
+          fallback:
+            false,
+
+          usageKnown:
+            input.usageKnown,
+
+          billedCharacters:
+            0,
+
+          inputTokens:
+            input.inputTokens,
+
+          outputTokens:
+            input.outputTokens,
+
+          estimatedCostMicrousd:
+            cost
+              .estimatedCostMicrousd,
+
+          pricingKey:
+            cost.pricingKey,
+
+          pricingVersion:
+            cost.pricingVersion,
+
+          errorMessage:
+            input.errorMessage ??
+            null,
+        },
+      });
+    } catch (error) {
+      console.error(
+        '[ACA Locale] Unable to persist AI review usage event:',
+        error,
+      );
+    }
   }
 
   private errorMessage(

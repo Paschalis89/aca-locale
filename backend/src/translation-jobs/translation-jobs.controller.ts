@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -187,6 +188,56 @@ export class TranslationJobsController {
   ) {
     return this.translationQueueService.jobStatus(
       jobId,
+    );
+  }
+
+  @Get(
+    'usage/summary',
+  )
+  @ApiOperation({
+    summary:
+      'Get translation usage and cost summary',
+
+    description:
+      'Returns raw provider usage, estimated configured cost, provider/stage breakdowns and daily/monthly aggregates for the authenticated shop.',
+  })
+  usageSummary(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
+
+    @Query('days')
+    days?:
+      string,
+  ) {
+    return this.translationJobsService.usageSummary(
+      shop.shopDomain,
+      days,
+    );
+  }
+
+  @Get(
+    'usage/events',
+  )
+  @ApiOperation({
+    summary:
+      'List recent translation usage events',
+
+    description:
+      'Returns the most recent translation and AI-review provider attempts for the authenticated shop.',
+  })
+  usageEvents(
+    @CurrentShop()
+    shop:
+      ShopifyAuthContext,
+
+    @Query('limit')
+    limit?:
+      string,
+  ) {
+    return this.translationJobsService.usageEvents(
+      shop.shopDomain,
+      limit,
     );
   }
 

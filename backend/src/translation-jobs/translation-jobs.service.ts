@@ -371,6 +371,523 @@ export class TranslationJobsService {
     return job;
   }
 
+  async usageSummary(
+    shopifyDomain:
+      string,
+
+    daysValue?:
+      string,
+  ) {
+    const shop =
+      await this.prisma.shop.findUnique({
+        where: {
+          shopifyDomain,
+        },
+
+        select: {
+          id:
+            true,
+        },
+      });
+
+    if (!shop) {
+      throw new NotFoundException(
+        'Shop is not registered.',
+      );
+    }
+
+    const days =
+      this.boundedInteger(
+        daysValue,
+        30,
+        1,
+        365,
+      );
+
+    const from =
+      new Date();
+
+    from.setUTCDate(
+      from.getUTCDate() -
+        (
+          days -
+          1
+        ),
+    );
+
+    from.setUTCHours(
+      0,
+      0,
+      0,
+      0,
+    );
+
+    const events =
+      await this.prisma.translationUsageEvent.findMany({
+        where: {
+          shopId:
+            shop.id,
+
+          createdAt: {
+            gte:
+              from,
+          },
+        },
+
+        select: {
+          stage:
+            true,
+
+          provider:
+            true,
+
+          model:
+            true,
+
+          success:
+            true,
+
+          usageKnown:
+            true,
+
+          billedCharacters:
+            true,
+
+          inputTokens:
+            true,
+
+          outputTokens:
+            true,
+
+          estimatedCostMicrousd:
+            true,
+
+          createdAt:
+            true,
+        },
+
+        orderBy: {
+          createdAt:
+            'asc',
+        },
+      });
+
+    type Bucket = {
+      events:
+        number;
+
+      successfulEvents:
+        number;
+
+      failedEvents:
+        number;
+
+      usageUnknownEvents:
+        number;
+
+      billedCharacters:
+        number;
+
+      inputTokens:
+        number;
+
+      outputTokens:
+        number;
+
+      estimatedCostMicrousd:
+        number;
+
+      costedEvents:
+        number;
+
+      unpricedEvents:
+        number;
+    };
+
+    const newBucket =
+      (): Bucket => ({
+        events:
+          0,
+
+        successfulEvents:
+          0,
+
+        failedEvents:
+          0,
+
+        usageUnknownEvents:
+          0,
+
+        billedCharacters:
+          0,
+
+        inputTokens:
+          0,
+
+        outputTokens:
+          0,
+
+        estimatedCostMicrousd:
+          0,
+
+        costedEvents:
+          0,
+
+        unpricedEvents:
+          0,
+      });
+
+    const addEvent =
+      (
+        bucket:
+          Bucket,
+
+        event:
+          (typeof events)[number],
+      ) => {
+        bucket.events +=
+          1;
+
+        if (
+          event.success
+        ) {
+          bucket.successfulEvents +=
+            1;
+        } else {
+          bucket.failedEvents +=
+            1;
+        }
+
+        if (
+          !event.usageKnown
+        ) {
+          bucket.usageUnknownEvents +=
+            1;
+        }
+
+        bucket.billedCharacters +=
+          event.billedCharacters;
+
+        bucket.inputTokens +=
+          event.inputTokens;
+
+        bucket.outputTokens +=
+          event.outputTokens;
+
+        if (
+          event.estimatedCostMicrousd ===
+          null
+        ) {
+          bucket.unpricedEvents +=
+            1;
+        } else {
+          bucket.costedEvents +=
+            1;
+
+          bucket.estimatedCostMicrousd +=
+            event.estimatedCostMicrousd;
+        }
+      };
+
+    const totals =
+      newBucket();
+
+    const providerBuckets =
+      new Map<
+        string,
+        Bucket
+      >();
+
+    const stageBuckets =
+      new Map<
+        string,
+        Bucket
+      >();
+
+    const dailyBuckets =
+      new Map<
+        string,
+        Bucket
+      >();
+
+    const monthlyBuckets =
+      new Map<
+        string,
+        Bucket
+      >();
+
+    for (
+      const event
+      of events
+    ) {
+      addEvent(
+        totals,
+        event,
+      );
+
+      const providerKey =
+        `${event.provider}:${event.model ?? '*'}`;
+
+      const providerBucket =
+        providerBuckets.get(
+          providerKey,
+        ) ??
+        newBucket();
+
+      addEvent(
+        providerBucket,
+        event,
+      );
+
+      providerBuckets.set(
+        providerKey,
+        providerBucket,
+      );
+
+      const stageKey =
+        event.stage;
+
+      const stageBucket =
+        stageBuckets.get(
+          stageKey,
+        ) ??
+        newBucket();
+
+      addEvent(
+        stageBucket,
+        event,
+      );
+
+      stageBuckets.set(
+        stageKey,
+        stageBucket,
+      );
+
+      const iso =
+        event.createdAt
+          .toISOString();
+
+      const dayKey =
+        iso.slice(
+          0,
+          10,
+        );
+
+      const dayBucket =
+        dailyBuckets.get(
+          dayKey,
+        ) ??
+        newBucket();
+
+      addEvent(
+        dayBucket,
+        event,
+      );
+
+      dailyBuckets.set(
+        dayKey,
+        dayBucket,
+      );
+
+      const monthKey =
+        iso.slice(
+          0,
+          7,
+        );
+
+      const monthBucket =
+        monthlyBuckets.get(
+          monthKey,
+        ) ??
+        newBucket();
+
+      addEvent(
+        monthBucket,
+        event,
+      );
+
+      monthlyBuckets.set(
+        monthKey,
+        monthBucket,
+      );
+    }
+
+    const serializeBucket =
+      (
+        bucket:
+          Bucket,
+      ) => ({
+        ...bucket,
+
+        estimatedCostUsd:
+          bucket
+            .estimatedCostMicrousd /
+          1_000_000,
+      });
+
+    return {
+      period: {
+        days,
+
+        from:
+          from.toISOString(),
+
+        to:
+          new Date()
+            .toISOString(),
+      },
+
+      totals:
+        serializeBucket(
+          totals,
+        ),
+
+      byProvider:
+        Array.from(
+          providerBuckets.entries(),
+        ).map(
+          (
+            [
+              key,
+              bucket,
+            ],
+          ) => {
+            const separator =
+              key.indexOf(
+                ':',
+              );
+
+            return {
+              provider:
+                key.slice(
+                  0,
+                  separator,
+                ),
+
+              model:
+                key.slice(
+                  separator +
+                    1,
+                ) ===
+                '*'
+                  ? null
+                  : key.slice(
+                      separator +
+                        1,
+                    ),
+
+              ...serializeBucket(
+                bucket,
+              ),
+            };
+          },
+        ),
+
+      byStage:
+        Array.from(
+          stageBuckets.entries(),
+        ).map(
+          (
+            [
+              stage,
+              bucket,
+            ],
+          ) => ({
+            stage,
+
+            ...serializeBucket(
+              bucket,
+            ),
+          }),
+        ),
+
+      daily:
+        Array.from(
+          dailyBuckets.entries(),
+        ).map(
+          (
+            [
+              date,
+              bucket,
+            ],
+          ) => ({
+            date,
+
+            ...serializeBucket(
+              bucket,
+            ),
+          }),
+        ),
+
+      monthly:
+        Array.from(
+          monthlyBuckets.entries(),
+        ).map(
+          (
+            [
+              month,
+              bucket,
+            ],
+          ) => ({
+            month,
+
+            ...serializeBucket(
+              bucket,
+            ),
+          }),
+        ),
+    };
+  }
+
+  async usageEvents(
+    shopifyDomain:
+      string,
+
+    limitValue?:
+      string,
+  ) {
+    const shop =
+      await this.prisma.shop.findUnique({
+        where: {
+          shopifyDomain,
+        },
+
+        select: {
+          id:
+            true,
+        },
+      });
+
+    if (!shop) {
+      throw new NotFoundException(
+        'Shop is not registered.',
+      );
+    }
+
+    const limit =
+      this.boundedInteger(
+        limitValue,
+        100,
+        1,
+        500,
+      );
+
+    return this.prisma.translationUsageEvent.findMany({
+      where: {
+        shopId:
+          shop.id,
+      },
+
+      orderBy: {
+        createdAt:
+          'desc',
+      },
+
+      take:
+        limit,
+    });
+  }
+
   async cancel(
     shopifyDomain:
       string,
@@ -791,6 +1308,56 @@ export class TranslationJobsService {
     ].includes(
       status,
     );
+  }
+
+  private boundedInteger(
+    value:
+      string |
+      undefined,
+
+    fallback:
+      number,
+
+    min:
+      number,
+
+    max:
+      number,
+  ) {
+    if (
+      value ===
+      undefined
+    ) {
+      return fallback;
+    }
+
+    const parsed =
+      Number(
+        value,
+      );
+
+    if (
+      !Number.isInteger(
+        parsed,
+      )
+    ) {
+      throw new BadRequestException(
+        'Expected an integer query parameter.',
+      );
+    }
+
+    if (
+      parsed <
+        min ||
+      parsed >
+        max
+    ) {
+      throw new BadRequestException(
+        `Query parameter must be between ${min} and ${max}.`,
+      );
+    }
+
+    return parsed;
   }
 
   private jobInclude() {

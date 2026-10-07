@@ -55,6 +55,11 @@ enum TranslationJobItemStatus {
   FAILED
 }
 
+enum TranslationUsageStage {
+  TRANSLATION
+  AI_REVIEW
+}
+
 model Shop {
   id String @id @default(cuid())
 
@@ -85,8 +90,9 @@ model Shop {
   languages ShopLanguage[]
   markets   ShopMarket[]
 
-  translationResources TranslationResource[]
-  translationJobs      TranslationJob[]
+  translationResources   TranslationResource[]
+  translationJobs        TranslationJob[]
+  translationUsageEvents TranslationUsageEvent[]
 
   @@index([status])
 }
@@ -286,7 +292,8 @@ model TranslationJob {
 
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  items TranslationJobItem[]
+  items       TranslationJobItem[]
+  usageEvents TranslationUsageEvent[]
 
   @@index([shopId, status])
   @@index([shopId, targetLocale])
@@ -365,8 +372,59 @@ model TranslationJobItem {
 
   field TranslationField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
+  usageEvents TranslationUsageEvent[]
+
   @@unique([jobId, fieldId])
   @@index([jobId, status])
   @@index([fieldId])
   @@index([regeneratedFromItemId])
+}
+
+model TranslationUsageEvent {
+  id String @id @default(cuid())
+
+  shopId String
+  jobId  String?
+  itemId String?
+
+  stage TranslationUsageStage
+
+  provider String
+  model    String?
+
+  success    Boolean @default(true)
+  fallback   Boolean @default(false)
+  usageKnown Boolean @default(true)
+
+  billedCharacters Int @default(0)
+  inputTokens      Int @default(0)
+  outputTokens     Int @default(0)
+
+  /**
+   * Estimated cost in millionths of a USD.
+   * Example:
+   * 1_000_000 microusd = 1 USD.
+   * Null means no matching pricing rule was
+   * configured when the usage event was written.
+   */
+  estimatedCostMicrousd Int?
+
+  pricingKey     String?
+  pricingVersion String?
+
+  errorMessage String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  job TranslationJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  item TranslationJobItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, createdAt])
+  @@index([jobId, createdAt])
+  @@index([itemId, createdAt])
+  @@index([provider, createdAt])
+  @@index([stage, createdAt])
 }
