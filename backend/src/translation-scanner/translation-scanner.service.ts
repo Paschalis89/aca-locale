@@ -11,6 +11,47 @@ import type {
   SyncTranslationScanDto,
 } from './dto/sync-translation-scan.dto.js';
 
+import {
+  getTranslationResourceGroup,
+  SHOPIFY_TRANSLATION_RESOURCE_TYPES,
+  TRANSLATION_RESOURCE_GROUPS,
+  type TranslationResourceGroup,
+} from './translation-resource-groups.js';
+
+type ResourceTypeSummary = {
+  resourceType: string;
+  group: TranslationResourceGroup;
+
+  resources: number;
+  fields: number;
+  actionableFields: number;
+
+  emptySource: number;
+  missing: number;
+  translated: number;
+  outdated: number;
+
+  coverage: number;
+};
+
+type GroupSummary = {
+  group: TranslationResourceGroup;
+
+  resourceTypes: number;
+  resourceTypesWithContent: number;
+
+  resources: number;
+  fields: number;
+  actionableFields: number;
+
+  emptySource: number;
+  missing: number;
+  translated: number;
+  outdated: number;
+
+  coverage: number;
+};
+
 @Injectable()
 export class TranslationScannerService {
   constructor(
@@ -96,10 +137,6 @@ export class TranslationScannerService {
               },
             });
 
-          /*
-           * Keep track of the fields Shopify
-           * returned for this resource.
-           */
           const seenFieldKeys:
             string[] = [];
 
@@ -158,10 +195,6 @@ export class TranslationScannerService {
                 },
               });
 
-            /*
-             * Empty source values should not
-             * affect translation coverage.
-             */
             const sourceIsEmpty =
               !content.value.trim();
 
@@ -169,7 +202,7 @@ export class TranslationScannerService {
              * Market-specific translations
              * are deliberately excluded here.
              *
-             * For now we are tracking the
+             * For now ACA Locale tracks the
              * generic locale translation.
              */
             const translation =
@@ -261,13 +294,8 @@ export class TranslationScannerService {
           }
 
           /*
-           * Remove fields that no longer exist
-           * in Shopify for this resource.
-           *
-           * We handle the zero-field case
-           * explicitly because SHOP and other
-           * resource types can legitimately
-           * return no translatable fields.
+           * Remove fields that disappeared
+           * from this Shopify resource.
            */
           if (
             seenFieldKeys.length ===
@@ -295,13 +323,11 @@ export class TranslationScannerService {
         }
 
         /*
-         * A complete scan represents Shopify's
-         * entire current dataset for this
-         * resource type.
-         *
-         * Therefore resources that disappeared
-         * from Shopify must also disappear from
-         * our local projection.
+         * Because the React Router gateway
+         * fetched every Shopify page,
+         * completeScan=true means this is the
+         * authoritative current resource list
+         * for this type.
          */
         if (scan.completeScan) {
           if (
@@ -416,14 +442,10 @@ export class TranslationScannerService {
       emptySource;
 
     const coverage =
-      actionableFields === 0
-        ? 100
-        : Math.round(
-            (
-              translated /
-              actionableFields
-            ) * 100,
-          );
+      this.calculateCoverage(
+        translated,
+        actionableFields,
+      );
 
     return {
       shopifyDomain,
@@ -438,6 +460,241 @@ export class TranslationScannerService {
       translated,
       outdated,
       coverage,
+    };
+  }
+
+  /*
+   * Dashboard-level summary.
+   *
+   * This produces:
+   *
+   * CONTENT
+   * CUSTOM_DATA
+   * COMMERCE
+   * THEME
+   * SYSTEM
+   *
+   * instead of mixing every Shopify
+   * resource into one meaningless number.
+   */
+  async getOverview(
+    shopifyDomain: string,
+    targetLocale: string,
+  ) {
+    const resourceTypes =
+      await this.buildResourceTypeSummaries(
+        shopifyDomain,
+        targetLocale,
+      );
+
+    const groupNames:
+      TranslationResourceGroup[] = [
+        'CONTENT',
+        'CUSTOM_DATA',
+        'COMMERCE',
+        'THEME',
+        'SYSTEM',
+      ];
+
+    /*
+     * OTHER is included only if a future
+     * Shopify resource type exists in DB
+     * but is not yet classified.
+     */
+    if (
+      resourceTypes.some(
+        (item) =>
+          item.group ===
+          'OTHER',
+      )
+    ) {
+      groupNames.push(
+        'OTHER',
+      );
+    }
+
+    const groups =
+      groupNames.map(
+        (group) => {
+          const items =
+            resourceTypes.filter(
+              (item) =>
+                item.group ===
+                group,
+            );
+
+          const summary:
+            GroupSummary = {
+              group,
+
+              resourceTypes:
+                items.length,
+
+              resourceTypesWithContent:
+                items.filter(
+                  (item) =>
+                    item.resources >
+                    0,
+                ).length,
+
+              resources:
+                0,
+
+              fields:
+                0,
+
+              actionableFields:
+                0,
+
+              emptySource:
+                0,
+
+              missing:
+                0,
+
+              translated:
+                0,
+
+              outdated:
+                0,
+
+              coverage:
+                100,
+            };
+
+          for (
+            const item
+            of items
+          ) {
+            summary.resources +=
+              item.resources;
+
+            summary.fields +=
+              item.fields;
+
+            summary.actionableFields +=
+              item.actionableFields;
+
+            summary.emptySource +=
+              item.emptySource;
+
+            summary.missing +=
+              item.missing;
+
+            summary.translated +=
+              item.translated;
+
+            summary.outdated +=
+              item.outdated;
+          }
+
+          summary.coverage =
+            this.calculateCoverage(
+              summary.translated,
+              summary.actionableFields,
+            );
+
+          return summary;
+        },
+      );
+
+    const overall = {
+      resourceTypes:
+        resourceTypes.length,
+
+      resourceTypesWithContent:
+        resourceTypes.filter(
+          (item) =>
+            item.resources >
+            0,
+        ).length,
+
+      resources:
+        0,
+
+      fields:
+        0,
+
+      actionableFields:
+        0,
+
+      emptySource:
+        0,
+
+      missing:
+        0,
+
+      translated:
+        0,
+
+      outdated:
+        0,
+
+      coverage:
+        100,
+    };
+
+    for (
+      const group
+      of groups
+    ) {
+      overall.resources +=
+        group.resources;
+
+      overall.fields +=
+        group.fields;
+
+      overall.actionableFields +=
+        group.actionableFields;
+
+      overall.emptySource +=
+        group.emptySource;
+
+      overall.missing +=
+        group.missing;
+
+      overall.translated +=
+        group.translated;
+
+      overall.outdated +=
+        group.outdated;
+    }
+
+    overall.coverage =
+      this.calculateCoverage(
+        overall.translated,
+        overall.actionableFields,
+      );
+
+    return {
+      shopifyDomain,
+      targetLocale,
+
+      summary:
+        overall,
+
+      groups,
+    };
+  }
+
+  /*
+   * Detailed breakdown used by the
+   * resource-types dashboard screen.
+   */
+  async getResourceTypesOverview(
+    shopifyDomain: string,
+    targetLocale: string,
+  ) {
+    const resourceTypes =
+      await this.buildResourceTypeSummaries(
+        shopifyDomain,
+        targetLocale,
+      );
+
+    return {
+      shopifyDomain,
+      targetLocale,
+      resourceTypes,
     };
   }
 
@@ -477,5 +734,261 @@ export class TranslationScannerService {
           'asc',
       },
     });
+  }
+
+  private async buildResourceTypeSummaries(
+    shopifyDomain: string,
+    targetLocale: string,
+  ): Promise<
+    ResourceTypeSummary[]
+  > {
+    const shop =
+      await this.prisma.shop.findUnique({
+        where: {
+          shopifyDomain,
+        },
+
+        select: {
+          id:
+            true,
+        },
+      });
+
+    if (!shop) {
+      throw new NotFoundException(
+        'Shop is not registered.',
+      );
+    }
+
+    /*
+     * Initialise all 30 known Shopify
+     * resource types.
+     *
+     * This is intentional: types with
+     * zero resources must still appear
+     * in the dashboard.
+     */
+    const summaries =
+      new Map<
+        string,
+        ResourceTypeSummary
+      >();
+
+    for (
+      const resourceType
+      of SHOPIFY_TRANSLATION_RESOURCE_TYPES
+    ) {
+      summaries.set(
+        resourceType,
+        this.createEmptyResourceTypeSummary(
+          resourceType,
+        ),
+      );
+    }
+
+    /*
+     * Only status information is loaded.
+     *
+     * sourceValue / translatedValue are
+     * deliberately NOT loaded here,
+     * especially because theme fields can
+     * contain thousands of large strings.
+     */
+    const resources =
+      await this.prisma.translationResource.findMany({
+        where: {
+          shopId:
+            shop.id,
+        },
+
+        select: {
+          resourceType:
+            true,
+
+          fields: {
+            select: {
+              states: {
+                where: {
+                  targetLocale,
+                },
+
+                select: {
+                  status:
+                    true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+    for (
+      const resource
+      of resources
+    ) {
+      let summary =
+        summaries.get(
+          resource.resourceType,
+        );
+
+      /*
+       * Future-proof fallback for resource
+       * types introduced by Shopify later.
+       */
+      if (!summary) {
+        summary =
+          this.createEmptyResourceTypeSummary(
+            resource.resourceType,
+          );
+
+        summaries.set(
+          resource.resourceType,
+          summary,
+        );
+      }
+
+      summary.resources++;
+
+      for (
+        const field
+        of resource.fields
+      ) {
+        /*
+         * TranslationState has a unique
+         * fieldId + targetLocale constraint,
+         * therefore there can be at most
+         * one state here.
+         */
+        const state =
+          field.states[0];
+
+        if (!state) {
+          continue;
+        }
+
+        summary.fields++;
+
+        switch (
+          state.status
+        ) {
+          case 'EMPTY_SOURCE':
+            summary.emptySource++;
+            break;
+
+          case 'MISSING':
+            summary.missing++;
+            break;
+
+          case 'TRANSLATED':
+            summary.translated++;
+            break;
+
+          case 'OUTDATED':
+            summary.outdated++;
+            break;
+        }
+      }
+    }
+
+    for (
+      const summary
+      of summaries.values()
+    ) {
+      summary.actionableFields =
+        summary.fields -
+        summary.emptySource;
+
+      summary.coverage =
+        this.calculateCoverage(
+          summary.translated,
+          summary.actionableFields,
+        );
+    }
+
+    /*
+     * Preserve the logical order used by
+     * ACA Locale instead of alphabetical
+     * database ordering.
+     */
+    const known =
+      SHOPIFY_TRANSLATION_RESOURCE_TYPES.map(
+        (resourceType) =>
+          summaries.get(
+            resourceType,
+          )!,
+      );
+
+    const unknown =
+      Array.from(
+        summaries.values(),
+      ).filter(
+        (summary) =>
+          !(
+            SHOPIFY_TRANSLATION_RESOURCE_TYPES as readonly string[]
+          ).includes(
+            summary.resourceType,
+          ),
+      );
+
+    return [
+      ...known,
+      ...unknown,
+    ];
+  }
+
+  private createEmptyResourceTypeSummary(
+    resourceType: string,
+  ): ResourceTypeSummary {
+    return {
+      resourceType,
+
+      group:
+        getTranslationResourceGroup(
+          resourceType,
+        ),
+
+      resources:
+        0,
+
+      fields:
+        0,
+
+      actionableFields:
+        0,
+
+      emptySource:
+        0,
+
+      missing:
+        0,
+
+      translated:
+        0,
+
+      outdated:
+        0,
+
+      coverage:
+        100,
+    };
+  }
+
+  private calculateCoverage(
+    translated: number,
+    actionableFields: number,
+  ) {
+    if (
+      actionableFields ===
+      0
+    ) {
+      return 100;
+    }
+
+    return Math.round(
+      (
+        translated /
+        actionableFields
+      ) * 100,
+    );
   }
 }

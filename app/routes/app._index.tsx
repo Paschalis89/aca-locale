@@ -1,152 +1,82 @@
-import { useEffect } from "react";
+import {
+  useState,
+} from "react";
+
 import type {
-  ActionFunctionArgs,
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { authenticate } from "../shopify.server";
-import { boundary } from "@shopify/shopify-app-react-router/server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+import {
+  useAppBridge,
+} from "@shopify/app-bridge-react";
 
-  return null;
-};
+import {
+  boundary,
+} from "@shopify/shopify-app-react-router/server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-            demoInfo: metafield(namespace: "$app", key: "demo_info") {
-              jsonValue
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-          metafields: [
-            {
-              namespace: "$app",
-              key: "demo_info",
-              value: "Created by React Router Template",
-            },
-          ],
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
+import {
+  authenticate,
+} from "../shopify.server";
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
+export const loader =
+  async ({
+    request,
+  }: LoaderFunctionArgs) => {
+    await authenticate.admin(
+      request,
+    );
 
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-
-  const variantResponseJson = await variantResponse.json();
-
-  const metaobjectResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpsertMetaobject($handle: MetaobjectHandleInput!, $values: JSON!) {
-      metaobjectUpsert(handle: $handle, values: $values) {
-        metaobject {
-          id
-          handle
-          values
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }`,
-    {
-      variables: {
-        handle: {
-          type: "$app:example",
-          handle: "demo-entry",
-        },
-        values: {
-          title: "Demo Entry",
-          description:
-            "This metaobject was created by the Shopify app template to demonstrate the metaobject API.",
-        },
-      },
-    },
-  );
-
-  const metaobjectResponseJson = await metaobjectResponse.json();
-
-  return {
-    product: responseJson!.data!.productCreate!.product,
-    variant:
-      variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
-    metaobject: metaobjectResponseJson!.data!.metaobjectUpsert!.metaobject,
+    return null;
   };
-};
 
 export default function Index() {
-  const fetcher = useFetcher<typeof action>();
+  const shopify =
+    useAppBridge();
 
-  const shopify = useAppBridge();
-  const scanEntireStore =
-  async () => {
-    try {
+  const [
+    jobId,
+    setJobId,
+  ] =
+    useState("");
+
+  const [
+    itemId,
+    setItemId,
+  ] =
+    useState("");
+
+  const [
+    lastResult,
+    setLastResult,
+  ] =
+    useState<unknown>(
+      null,
+    );
+
+  const callApi =
+    async (
+      url:
+        string,
+
+      options:
+        RequestInit =
+        {},
+    ) => {
       const token =
         await shopify.idToken();
 
       const response =
         await fetch(
-          "/api/shopify/translation-scan-all?locale=it",
+          url,
           {
-            method:
-              "POST",
+            ...options,
 
             headers: {
               Authorization:
                 `Bearer ${token}`,
+
+              ...options.headers,
             },
           },
         );
@@ -154,262 +84,570 @@ export default function Index() {
       const data =
         await response.json();
 
-      console.log(
-        "[ACA Locale] Whole store scan:",
+      setLastResult(
         data,
       );
 
-      if (!response.ok) {
+      if (
+        !response.ok
+      ) {
+        throw new Error(
+          data.message ??
+          `HTTP ${response.status}`,
+        );
+      }
+
+      return data;
+    };
+
+  const requireIds =
+    () => {
+      if (
+        !jobId ||
+        !itemId
+      ) {
         shopify.toast.show(
-          `Store scan error: ${response.status}`,
+          "Create or regenerate a job first.",
           {
-            isError: true,
+            isError:
+              true,
           },
         );
 
+        return false;
+      }
+
+      return true;
+    };
+
+  const createJob =
+    async () => {
+      try {
+        const data =
+          await callApi(
+            "/api/backend/translation-jobs",
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  targetLocale:
+                    "it",
+
+                  resourceTypes: [
+                    "PRODUCT",
+                  ],
+
+                  maxItems:
+                    1,
+                }),
+            },
+          );
+
+        setJobId(
+          data.id,
+        );
+
+        setItemId(
+          data.items?.[0]?.id ??
+          "",
+        );
+
+        shopify.toast.show(
+          "Test job created",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "Job creation failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+  const executeJob =
+    async () => {
+      if (
+        !jobId
+      ) {
         return;
       }
 
+      try {
+        const data =
+          await callApi(
+            `/api/backend/translation-jobs/${jobId}/execute`,
+            {
+              method:
+                "POST",
+            },
+          );
+
+        setItemId(
+          data.items?.[0]?.id ??
+          itemId,
+        );
+
+        shopify.toast.show(
+          "Translation executed",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "Execution failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+  const reviewJob =
+    async () => {
+      if (
+        !jobId
+      ) {
+        return;
+      }
+
+      try {
+        await callApi(
+          `/api/backend/translation-jobs/${jobId}/review`,
+          {
+            method:
+              "POST",
+          },
+        );
+
+        shopify.toast.show(
+          "AI review completed",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "AI review failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+  const approveAsIs =
+    async () => {
+      if (
+        !requireIds()
+      ) {
+        return;
+      }
+
+      try {
+        await callApi(
+          `/api/backend/translation-jobs/${jobId}/items/${itemId}/approve`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                note:
+                  "Approved as-is from ACA Locale development workflow.",
+              }),
+          },
+        );
+
+        shopify.toast.show(
+          "Translation approved",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "Approval failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+  const editAndApprove =
+    async () => {
+      if (
+        !requireIds()
+      ) {
+        return;
+      }
+
+      const current =
+        (
+          lastResult as
+            any
+        )?.items?.[0]
+          ?.translatedValue ??
+        (
+          lastResult as
+            any
+        )?.translatedValue ??
+        "";
+
+      const value =
+        window.prompt(
+          "Final approved translation:",
+          current,
+        );
+
+      if (
+        value ===
+        null
+      ) {
+        return;
+      }
+
+      try {
+        await callApi(
+          `/api/backend/translation-jobs/${jobId}/items/${itemId}/approve`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                approvedValue:
+                  value,
+
+                note:
+                  "Edited and approved by human reviewer.",
+              }),
+          },
+        );
+
+        shopify.toast.show(
+          "Edited translation approved",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "Edit + approval failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+  const rejectItem =
+    async () => {
+      if (
+        !requireIds()
+      ) {
+        return;
+      }
+
+      const note =
+        window.prompt(
+          "Reason for rejection:",
+          "Translation requires regeneration.",
+        );
+
+      if (
+        !note
+      ) {
+        return;
+      }
+
+      try {
+        await callApi(
+          `/api/backend/translation-jobs/${jobId}/items/${itemId}/reject`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                note,
+              }),
+          },
+        );
+
+        shopify.toast.show(
+          "Translation rejected",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "Rejection failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+  const regenerateItem =
+    async () => {
+      if (
+        !requireIds()
+      ) {
+        return;
+      }
+
+      try {
+        const data =
+          await callApi(
+            `/api/backend/translation-jobs/${jobId}/items/${itemId}/regenerate`,
+            {
+              method:
+                "POST",
+            },
+          );
+
+        setJobId(
+          data.id,
+        );
+
+        setItemId(
+          data.items?.[0]?.id ??
+          "",
+        );
+
+        shopify.toast.show(
+          "Regeneration job created",
+        );
+      } catch (error) {
+        console.error(
+          error,
+        );
+
+        shopify.toast.show(
+          "Regeneration failed",
+          {
+            isError:
+              true,
+          },
+        );
+      }
+    };
+
+    const publishItem =
+  async () => {
+    if (
+      !requireIds()
+    ) {
+      return;
+    }
+
+    try {
+      const data =
+        await callApi(
+          `/api/shopify/translation-jobs/${jobId}/items/${itemId}/publish`,
+          {
+            method:
+              "POST",
+          },
+        );
+
       shopify.toast.show(
-        `Store scan completed: ${data.summary.missing} missing`,
+        data.alreadyPublished
+          ? "Translation already published"
+          : "Translation published to Shopify",
       );
     } catch (error) {
       console.error(
-        "[ACA Locale] Whole store scan failed:",
         error,
       );
 
       shopify.toast.show(
-        "Whole store scan failed",
+        "Shopify publication failed",
         {
-          isError: true,
+          isError:
+            true,
         },
       );
     }
   };
 
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-
-  useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
-    }
-  }, [fetcher.data?.product?.id, shopify]);
-
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
-
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
-      </s-button>
+    <s-page heading="ACA Locale – Translation Pipeline">
+      <s-section heading="Development workflow">
+        <s-stack
+          direction="block"
+          gap="base"
+        >
+          <s-paragraph>
+            Current job:{" "}
+            <strong>
+              {jobId || "none"}
+            </strong>
+          </s-paragraph>
 
-      <s-button
-  onClick={scanEntireStore}
->
-  Scan Entire Store
-</s-button>
+          <s-paragraph>
+            Current item:{" "}
+            <strong>
+              {itemId || "none"}
+            </strong>
+          </s-paragraph>
 
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
-        <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
+          <s-stack
+            direction="inline"
+            gap="base"
           >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
-        </s-paragraph>
-      </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
-          >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references. Includes a product{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data/metafields"
-            target="_blank"
-          >
-            metafield
-          </s-link>{" "}
-          and{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data/metaobjects"
-            target="_blank"
-          >
-            metaobject
-          </s-link>
-          .
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
-          <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
-          >
-            Generate a product
-          </s-button>
-          {fetcher.data?.product && (
             <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
+              onClick={
+                createJob
+              }
             >
-              Edit product
+              Create 1-item Job
             </s-button>
-          )}
+
+            <s-button
+              onClick={
+                executeJob
+              }
+            >
+              Execute
+            </s-button>
+
+            <s-button
+              onClick={
+                reviewJob
+              }
+            >
+              AI Review
+            </s-button>
+          </s-stack>
+
+          <s-stack
+            direction="inline"
+            gap="base"
+          >
+            <s-button
+              onClick={
+                approveAsIs
+              }
+            >
+              Approve As-Is
+            </s-button>
+
+            <s-button
+              onClick={
+                editAndApprove
+              }
+            >
+              Edit + Approve
+            </s-button>
+
+            <s-button
+              onClick={
+                rejectItem
+              }
+            >
+              Reject
+            </s-button>
+
+            <s-button
+              onClick={
+                regenerateItem
+              }
+            >
+              Regenerate
+            </s-button>
+            <s-button
+  onClick={
+    publishItem
+  }
+>
+  Publish to Shopify
+</s-button>
+          </s-stack>
         </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>metaobjectUpsert mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <code>
-                    {JSON.stringify(fetcher.data.metaobject, null, 2)}
-                  </code>
-                </pre>
-              </s-box>
-            </s-stack>
-          </s-section>
-        )}
       </s-section>
 
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Custom data: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data"
-            target="_blank"
-          >
-            Metafields &amp; metaobjects
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
-      </s-section>
+      <s-section heading="Last API response">
+        <s-box
+          padding="base"
+          borderWidth="base"
+          borderRadius="base"
+          background="subdued"
+        >
+          <pre
+            style={{
+              margin:
+                0,
 
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
-          <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
-            >
-              example app
-            </s-link>
-          </s-list-item>
-          <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
-          </s-list-item>
-        </s-unordered-list>
+              whiteSpace:
+                "pre-wrap",
+
+              wordBreak:
+                "break-word",
+            }}
+          >
+            {lastResult
+              ? JSON.stringify(
+                  lastResult,
+                  null,
+                  2,
+                )
+              : "No request executed yet."}
+          </pre>
+        </s-box>
       </s-section>
     </s-page>
   );
 }
 
-export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};
+export const headers:
+  HeadersFunction =
+  (
+    headersArgs,
+  ) => {
+    return boundary.headers(
+      headersArgs,
+    );
+  };

@@ -42,7 +42,9 @@ import {
   TranslationScannerModule,
 } from './translation-scanner/translation-scanner.module.js';
 
-
+import {
+  TranslationJobsModule,
+} from './translation-jobs/translation-jobs.module.js';
 
 @Module({
   imports: [
@@ -59,6 +61,7 @@ import {
     MarketsModule,
     ShopifySyncModule,
     TranslationScannerModule,
+    TranslationJobsModule,
   ],
 })
 export class AppModule {}

@@ -20,6 +20,41 @@ enum AiProvider {
   GOOGLE
 }
 
+enum TranslationProvider {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+  DEEPL
+}
+
+enum TranslationStateStatus {
+  EMPTY_SOURCE
+  MISSING
+  TRANSLATED
+  OUTDATED
+}
+
+enum TranslationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum TranslationJobItemStatus {
+  PENDING
+  GENERATING
+  GENERATED
+  VALIDATED
+  NEEDS_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+  FAILED
+}
+
 model Shop {
   id String @id @default(cuid())
 
@@ -51,6 +86,7 @@ model Shop {
   markets   ShopMarket[]
 
   translationResources TranslationResource[]
+  translationJobs      TranslationJob[]
 
   @@index([status])
 }
@@ -76,13 +112,13 @@ model AiConfiguration {
 
   shopId String @unique
 
-  translationProvider AiProvider @default(OPENAI)
+  translationProvider TranslationProvider @default(OPENAI)
   translationModel    String?
 
   reviewProvider AiProvider @default(OPENAI)
   reviewModel    String?
 
-  fallbackProvider AiProvider @default(OPENAI)
+  fallbackProvider TranslationProvider @default(OPENAI)
   fallbackModel    String?
 
   createdAt DateTime @default(now())
@@ -148,13 +184,6 @@ model ShopMarket {
   @@index([status])
 }
 
-enum TranslationStateStatus {
-  EMPTY_SOURCE
-  MISSING
-  TRANSLATED
-  OUTDATED
-}
-
 model TranslationResource {
   id String @id @default(cuid())
 
@@ -194,7 +223,8 @@ model TranslationField {
 
   resource TranslationResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
-  states TranslationState[]
+  states   TranslationState[]
+  jobItems TranslationJobItem[]
 
   @@unique([resourceId, key])
   @@index([resourceId])
@@ -221,4 +251,122 @@ model TranslationState {
 
   @@unique([fieldId, targetLocale])
   @@index([targetLocale, status])
+}
+
+model TranslationJob {
+  id String @id @default(cuid())
+
+  shopId String
+
+  sourceLocale String
+  targetLocale String
+
+  status TranslationJobStatus @default(QUEUED)
+
+  provider TranslationProvider?
+  model    String?
+
+  fallbackProvider TranslationProvider?
+  fallbackModel    String?
+
+  reviewProvider AiProvider?
+  reviewModel    String?
+
+  totalItems     Int @default(0)
+  completedItems Int @default(0)
+  failedItems    Int @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  errorMessage String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  items TranslationJobItem[]
+
+  @@index([shopId, status])
+  @@index([shopId, targetLocale])
+  @@index([createdAt])
+}
+
+model TranslationJobItem {
+  id String @id @default(cuid())
+
+  jobId   String
+  fieldId String
+
+  fallbackUsed        Boolean @default(false)
+  primaryErrorMessage String? @db.Text
+
+  sourceDigest String
+  sourceValue  String @db.Text
+
+  translatedValue String? @db.Text
+
+  status TranslationJobItemStatus @default(PENDING)
+
+  provider TranslationProvider?
+  model    String?
+
+  generatedAt DateTime?
+  validatedAt DateTime?
+
+  validationPassed Boolean?
+
+  validationErrors   Int @default(0)
+  validationWarnings Int @default(0)
+
+  validationIssues Json?
+
+  validationVersion String?
+
+  approvedAt    DateTime?
+  approvedValue String?   @db.Text
+
+  humanReviewedAt DateTime?
+  humanReviewNote String?   @db.Text
+
+  publishedAt DateTime?
+
+  aiReviewedAt DateTime?
+
+  aiReviewPassed Boolean?
+  aiReviewScore  Int?
+
+  aiReviewIssues Json?
+
+  aiReviewSuggestedTranslation String? @db.Text
+  aiReviewErrorMessage         String? @db.Text
+
+  aiReviewProvider AiProvider?
+  aiReviewModel    String?
+
+  /**
+   * Regeneration audit chain.
+   * A regenerated translation is a NEW
+   * job item. The previous item is never
+   * overwritten.
+   */
+  regeneratedFromItemId String?
+
+  regeneratedFromItem TranslationJobItem?  @relation("TranslationItemRegeneration", fields: [regeneratedFromItemId], references: [id], onDelete: SetNull)
+  regeneratedItems    TranslationJobItem[] @relation("TranslationItemRegeneration")
+
+  errorMessage String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  job TranslationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  field TranslationField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, fieldId])
+  @@index([jobId, status])
+  @@index([fieldId])
+  @@index([regeneratedFromItemId])
 }

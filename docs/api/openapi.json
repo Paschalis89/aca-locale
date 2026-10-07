@@ -117,6 +117,150 @@
         ]
       }
     },
+    "/api/v1/ai/providers": {
+      "get": {
+        "operationId": "AiController_getProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProvidersStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get AI and translation provider availability",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/ai/providers/health": {
+      "get": {
+        "operationId": "AiController_getProviderHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify configured provider credentials",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/ai/models": {
+      "get": {
+        "description": "Returns models currently available through the configured OpenAI, Anthropic and Google accounts. DeepL does not require a model selection.",
+        "operationId": "AiController_getModels",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiModelCatalogDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the available AI model catalog",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/ai/configuration": {
+      "get": {
+        "operationId": "AiController_getConfiguration",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigurationDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get AI configuration for the authenticated shop",
+        "tags": [
+          "AI Providers"
+        ]
+      },
+      "patch": {
+        "operationId": "AiController_updateConfiguration",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAiConfigurationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigurationDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update AI configuration for the authenticated shop",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
     "/api/v1/languages": {
       "get": {
         "operationId": "LanguagesController_findAll",
@@ -313,7 +457,7 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Translation scan summary returned successfully."
           }
         },
         "security": [
@@ -321,7 +465,83 @@
             "bearer": []
           }
         ],
-        "summary": "Get translation scan summary",
+        "summary": "Get translation scan summary for one resource type",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/overview": {
+      "get": {
+        "description": "Returns the translation status grouped into content, custom data, commerce, theme and system resources.",
+        "operationId": "TranslationScannerController_overview",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Global translation scanner overview returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationScannerOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the global translation scanner overview",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/resource-types": {
+      "get": {
+        "description": "Returns scanner statistics for every supported Shopify translatable resource type, including resource types with zero content.",
+        "operationId": "TranslationScannerController_resourceTypesOverview",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resource type translation statistics returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationResourceTypesOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get translation scanner statistics by Shopify resource type",
         "tags": [
           "Translation Scanner"
         ]
@@ -352,7 +572,7 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Scanned translation resources returned successfully."
           }
         },
         "security": [
@@ -363,6 +583,414 @@
         "summary": "List scanned translation resources",
         "tags": [
           "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs": {
+      "post": {
+        "operationId": "TranslationJobsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTranslationJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Translation job created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationJobDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a translation job",
+        "tags": [
+          "Translation Jobs"
+        ]
+      },
+      "get": {
+        "operationId": "TranslationJobsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TranslationJobDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List translation jobs",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}": {
+      "get": {
+        "operationId": "TranslationJobsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationJobDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get translation job details",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}/execute": {
+      "post": {
+        "description": "Executes translation and deterministic validation. It does not publish to Shopify.",
+        "operationId": "TranslationJobsController_execute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Execute a queued translation job",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{id}/review": {
+      "post": {
+        "description": "Runs the snapshotted AI reviewer without overwriting the generated translation.",
+        "operationId": "TranslationJobsController_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run AI review for a translation job",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{jobId}/items/{itemId}/approve": {
+      "post": {
+        "description": "Supports approve-as-is and edit-and-approve. The final value is deterministically validated.",
+        "operationId": "TranslationJobsController_approveItem",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveTranslationItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a translation item",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{jobId}/items/{itemId}/reject": {
+      "post": {
+        "operationId": "TranslationJobsController_rejectItem",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectTranslationItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject a translation item",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{jobId}/items/{itemId}/regenerate": {
+      "post": {
+        "description": "Creates a new one-item translation job while preserving the original translation item and its audit history.",
+        "operationId": "TranslationJobsController_regenerateItem",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Regenerate a translation item",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{jobId}/items/{itemId}/published": {
+      "post": {
+        "description": "Marks an approved translation as published after Shopify translationsRegister succeeds and synchronizes the local TranslationState.",
+        "operationId": "TranslationJobsController_markPublished",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Translation publication confirmed."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm a translation item as published",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{jobId}/items/{itemId}/publication/prepare": {
+      "post": {
+        "description": "Validates publication eligibility and returns the Shopify resource, key, locale, approved value and source digest required by the React Router Shopify gateway.",
+        "operationId": "TranslationJobsController_preparePublication",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Translation publication prepared successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Prepare an approved translation for Shopify publication",
+        "tags": [
+          "Translation Jobs"
+        ]
+      }
+    },
+    "/api/v1/translations/jobs/{jobId}/items/{itemId}/publication/confirm": {
+      "post": {
+        "description": "Marks an approved translation as published only after Shopify translationsRegister succeeds and updates the local TranslationState projection.",
+        "operationId": "TranslationJobsController_confirmPublication",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Translation publication confirmed successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm successful Shopify publication",
+        "tags": [
+          "Translation Jobs"
         ]
       }
     }
@@ -384,6 +1012,338 @@
       }
     },
     "schemas": {
+      "AiProviderStatusDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openai",
+              "anthropic",
+              "google",
+              "deepl"
+            ],
+            "example": "openai"
+          },
+          "configured": {
+            "type": "boolean",
+            "example": true
+          },
+          "supportsTranslation": {
+            "type": "boolean",
+            "example": true
+          },
+          "supportsReview": {
+            "type": "boolean",
+            "example": true
+          },
+          "requiresModel": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "provider",
+          "configured",
+          "supportsTranslation",
+          "supportsReview",
+          "requiresModel"
+        ]
+      },
+      "AiProvidersStatusDto": {
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiProviderStatusDto"
+            }
+          }
+        },
+        "required": [
+          "providers"
+        ]
+      },
+      "ProviderUsageDto": {
+        "type": "object",
+        "properties": {
+          "characterCount": {
+            "type": "number",
+            "example": 0
+          },
+          "characterLimit": {
+            "type": "number",
+            "example": 1000000
+          }
+        },
+        "required": [
+          "characterCount",
+          "characterLimit"
+        ]
+      },
+      "ProviderHealthDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openai",
+              "anthropic",
+              "google",
+              "deepl"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "ERROR",
+              "NOT_CONFIGURED"
+            ]
+          },
+          "latencyMs": {
+            "type": "object",
+            "example": 214,
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "availableModels": {
+            "type": "number",
+            "example": 42
+          },
+          "usage": {
+            "$ref": "#/components/schemas/ProviderUsageDto"
+          }
+        },
+        "required": [
+          "provider",
+          "status",
+          "message"
+        ]
+      },
+      "ProvidersHealthDto": {
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderHealthDto"
+            }
+          }
+        },
+        "required": [
+          "providers"
+        ]
+      },
+      "AiModelCatalogItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "gpt-5.6-luna"
+          },
+          "name": {
+            "type": "string",
+            "example": "gpt-5.6-luna"
+          },
+          "selectable": {
+            "type": "boolean",
+            "description": "Whether ACA Locale considers this model suitable for text translation/review.",
+            "example": true
+          },
+          "createdAt": {
+            "type": "object",
+            "nullable": true,
+            "example": "2026-09-01T00:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "selectable"
+        ]
+      },
+      "AiProviderModelCatalogDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openai",
+              "anthropic",
+              "google",
+              "deepl"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "ERROR",
+              "NOT_CONFIGURED"
+            ]
+          },
+          "configured": {
+            "type": "boolean",
+            "example": true
+          },
+          "requiresModel": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "modelCount": {
+            "type": "number",
+            "example": 12
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiModelCatalogItemDto"
+            }
+          }
+        },
+        "required": [
+          "provider",
+          "status",
+          "configured",
+          "requiresModel",
+          "message",
+          "modelCount",
+          "models"
+        ]
+      },
+      "AiModelCatalogDto": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "example": "2026-10-05T00:00:00.000Z"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiProviderModelCatalogDto"
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "providers"
+        ]
+      },
+      "AiConfigurationDto": {
+        "type": "object",
+        "properties": {
+          "translationProvider": {
+            "type": "string",
+            "example": "OPENAI",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE",
+              "DEEPL"
+            ]
+          },
+          "translationModel": {
+            "type": "object",
+            "nullable": true,
+            "example": null
+          },
+          "reviewProvider": {
+            "type": "string",
+            "example": "ANTHROPIC",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE"
+            ]
+          },
+          "reviewModel": {
+            "type": "object",
+            "nullable": true,
+            "example": null
+          },
+          "fallbackProvider": {
+            "type": "string",
+            "example": "GOOGLE",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE",
+              "DEEPL"
+            ]
+          },
+          "fallbackModel": {
+            "type": "object",
+            "nullable": true,
+            "example": null
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "translationProvider",
+          "reviewProvider",
+          "fallbackProvider",
+          "updatedAt"
+        ]
+      },
+      "UpdateAiConfigurationDto": {
+        "type": "object",
+        "properties": {
+          "translationProvider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE",
+              "DEEPL"
+            ],
+            "example": "DEEPL"
+          },
+          "translationModel": {
+            "type": "object",
+            "example": "gpt-5.6",
+            "nullable": true
+          },
+          "reviewProvider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE"
+            ],
+            "example": "ANTHROPIC"
+          },
+          "reviewModel": {
+            "type": "object",
+            "example": "claude-sonnet-...",
+            "nullable": true
+          },
+          "fallbackProvider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE",
+              "DEEPL"
+            ],
+            "example": "GOOGLE"
+          },
+          "fallbackModel": {
+            "type": "object",
+            "example": "gemini-...",
+            "nullable": true
+          }
+        }
+      },
       "ShopifyLocaleDto": {
         "type": "object",
         "properties": {
@@ -671,6 +1631,607 @@
           "resourceType",
           "targetLocale",
           "resources"
+        ]
+      },
+      "TranslationOverallSummaryDto": {
+        "type": "object",
+        "properties": {
+          "resourceTypes": {
+            "type": "number",
+            "example": 30
+          },
+          "resourceTypesWithContent": {
+            "type": "number",
+            "example": 22
+          },
+          "resources": {
+            "type": "number",
+            "example": 126
+          },
+          "fields": {
+            "type": "number",
+            "example": 9173
+          },
+          "actionableFields": {
+            "type": "number",
+            "example": 9163
+          },
+          "emptySource": {
+            "type": "number",
+            "example": 10
+          },
+          "missing": {
+            "type": "number",
+            "example": 9163
+          },
+          "translated": {
+            "type": "number",
+            "example": 0
+          },
+          "outdated": {
+            "type": "number",
+            "example": 0
+          },
+          "coverage": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "resourceTypes",
+          "resourceTypesWithContent",
+          "resources",
+          "fields",
+          "actionableFields",
+          "emptySource",
+          "missing",
+          "translated",
+          "outdated",
+          "coverage"
+        ]
+      },
+      "TranslationGroupSummaryDto": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string",
+            "enum": [
+              "CONTENT",
+              "CUSTOM_DATA",
+              "COMMERCE",
+              "THEME",
+              "SYSTEM",
+              "OTHER"
+            ],
+            "example": "CONTENT"
+          },
+          "resourceTypes": {
+            "type": "number",
+            "example": 12
+          },
+          "resourceTypesWithContent": {
+            "type": "number",
+            "example": 8
+          },
+          "resources": {
+            "type": "number",
+            "example": 96
+          },
+          "fields": {
+            "type": "number",
+            "example": 145
+          },
+          "actionableFields": {
+            "type": "number",
+            "example": 143
+          },
+          "emptySource": {
+            "type": "number",
+            "example": 2
+          },
+          "missing": {
+            "type": "number",
+            "example": 143
+          },
+          "translated": {
+            "type": "number",
+            "example": 0
+          },
+          "outdated": {
+            "type": "number",
+            "example": 0
+          },
+          "coverage": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "group",
+          "resourceTypes",
+          "resourceTypesWithContent",
+          "resources",
+          "fields",
+          "actionableFields",
+          "emptySource",
+          "missing",
+          "translated",
+          "outdated",
+          "coverage"
+        ]
+      },
+      "TranslationScannerOverviewDto": {
+        "type": "object",
+        "properties": {
+          "shopifyDomain": {
+            "type": "string",
+            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TranslationOverallSummaryDto"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationGroupSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "shopifyDomain",
+          "targetLocale",
+          "summary",
+          "groups"
+        ]
+      },
+      "TranslationResourceTypeSummaryDto": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "example": "PRODUCT"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "CONTENT",
+              "CUSTOM_DATA",
+              "COMMERCE",
+              "THEME",
+              "SYSTEM",
+              "OTHER"
+            ],
+            "example": "CONTENT"
+          },
+          "resources": {
+            "type": "number",
+            "example": 17
+          },
+          "fields": {
+            "type": "number",
+            "example": 57
+          },
+          "actionableFields": {
+            "type": "number",
+            "example": 56
+          },
+          "emptySource": {
+            "type": "number",
+            "example": 1
+          },
+          "missing": {
+            "type": "number",
+            "example": 56
+          },
+          "translated": {
+            "type": "number",
+            "example": 0
+          },
+          "outdated": {
+            "type": "number",
+            "example": 0
+          },
+          "coverage": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "resourceType",
+          "group",
+          "resources",
+          "fields",
+          "actionableFields",
+          "emptySource",
+          "missing",
+          "translated",
+          "outdated",
+          "coverage"
+        ]
+      },
+      "TranslationResourceTypesOverviewDto": {
+        "type": "object",
+        "properties": {
+          "shopifyDomain": {
+            "type": "string",
+            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationResourceTypeSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "shopifyDomain",
+          "targetLocale",
+          "resourceTypes"
+        ]
+      },
+      "CreateTranslationJobDto": {
+        "type": "object",
+        "properties": {
+          "targetLocale": {
+            "type": "string",
+            "description": "Target Shopify locale.",
+            "example": "it"
+          },
+          "resourceTypes": {
+            "description": "Shopify resource types to include in the translation job.",
+            "example": [
+              "PRODUCT",
+              "COLLECTION",
+              "PAGE"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "maxItems": {
+            "type": "number",
+            "description": "Maximum number of translation fields to include in this job.",
+            "example": 100,
+            "default": 100,
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "targetLocale",
+          "resourceTypes"
+        ]
+      },
+      "TranslationJobResourceDto": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "example": "PRODUCT"
+          },
+          "shopifyResourceId": {
+            "type": "string",
+            "example": "gid://shopify/Product/123456789"
+          }
+        },
+        "required": [
+          "resourceType",
+          "shopifyResourceId"
+        ]
+      },
+      "TranslationJobFieldDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "title"
+          },
+          "type": {
+            "type": "string",
+            "example": "STRING"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "example": "en"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/TranslationJobResourceDto"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "sourceLocale",
+          "resource"
+        ]
+      },
+      "TranslationJobItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "GENERATING",
+              "GENERATED",
+              "VALIDATED",
+              "NEEDS_REVIEW",
+              "APPROVED",
+              "PUBLISHED",
+              "FAILED"
+            ],
+            "example": "PENDING"
+          },
+          "sourceDigest": {
+            "type": "string"
+          },
+          "sourceValue": {
+            "type": "string",
+            "example": "Example product title"
+          },
+          "translatedValue": {
+            "type": "object",
+            "nullable": true
+          },
+          "provider": {
+            "type": "object",
+            "nullable": true
+          },
+          "model": {
+            "type": "object",
+            "nullable": true
+          },
+          "generatedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "object",
+            "nullable": true
+          },
+          "field": {
+            "$ref": "#/components/schemas/TranslationJobFieldDto"
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "status",
+          "sourceDigest",
+          "sourceValue",
+          "field"
+        ]
+      },
+      "TranslationJobDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "cmv1234567890"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "example": "en"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "PARTIAL",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "example": "QUEUED"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE"
+            ],
+            "example": "OPENAI",
+            "nullable": true
+          },
+          "model": {
+            "type": "object",
+            "example": "gpt-5.6-luna",
+            "nullable": true
+          },
+          "totalItems": {
+            "type": "number",
+            "example": 100
+          },
+          "completedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "failedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "startedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationJobItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sourceLocale",
+          "targetLocale",
+          "status",
+          "totalItems",
+          "completedItems",
+          "failedItems",
+          "createdAt",
+          "updatedAt",
+          "items"
+        ]
+      },
+      "TranslationJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "cmv1234567890"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "example": "en"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "PARTIAL",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "example": "QUEUED"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE"
+            ],
+            "example": "OPENAI",
+            "nullable": true
+          },
+          "model": {
+            "type": "object",
+            "example": "gpt-5.6-luna",
+            "nullable": true
+          },
+          "totalItems": {
+            "type": "number",
+            "example": 100
+          },
+          "completedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "failedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "startedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceLocale",
+          "targetLocale",
+          "status",
+          "totalItems",
+          "completedItems",
+          "failedItems",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ApproveTranslationItemDto": {
+        "type": "object",
+        "properties": {
+          "approvedValue": {
+            "type": "string",
+            "description": "Optional manually edited translation. If omitted, the generated translatedValue is approved as-is.",
+            "example": "Snowboard con inventario non monitorato"
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional human review note.",
+            "example": "Terminology adjusted for the Italian storefront."
+          }
+        }
+      },
+      "RejectTranslationItemDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Reason why the generated translation was rejected.",
+            "example": "Terminology is not suitable for the Italian market."
+          }
+        },
+        "required": [
+          "note"
         ]
       }
     }
