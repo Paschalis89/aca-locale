@@ -1,26 +1,14 @@
-import {
-  Module,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
-import {
-  DatabaseModule,
-} from '../database/database.module.js';
+import { DatabaseModule } from '../database/database.module.js';
 
-import {
-  TranslationPublicationService,
-} from './translation-publication.service.js';
+import { TranslationPublicationService } from './translation-publication.service.js';
 
 @Module({
-  imports: [
-    DatabaseModule,
-  ],
+  imports: [DatabaseModule],
 
-  providers: [
-    TranslationPublicationService,
-  ],
+  providers: [TranslationPublicationService],
 
-  exports: [
-    TranslationPublicationService,
-  ],
+  exports: [TranslationPublicationService],
 })
 export class TranslationPublicationModule {}

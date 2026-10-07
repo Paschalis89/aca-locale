@@ -11,6 +11,10 @@ import {
 } from './ai/ai.module.js';
 
 import {
+  validateEnvironment,
+} from './config/environment.validation.js';
+
+import {
   DatabaseModule,
 } from './database/database.module.js';
 
@@ -23,8 +27,8 @@ import {
 } from './health/health.module.js';
 
 import {
-  ShopsModule,
-} from './shops/shops.module.js';
+  InternalModule,
+} from './internal/internal.module.js';
 
 import {
   LanguagesModule,
@@ -35,25 +39,42 @@ import {
 } from './markets/markets.module.js';
 
 import {
-  ShopifySyncModule,
-} from './shopify-sync/shopify-sync.module.js';
+  ReadinessModule,
+} from './readiness/readiness.module.js';
 
 import {
-  TranslationScannerModule,
-} from './translation-scanner/translation-scanner.module.js';
+  ShopsModule,
+} from './shops/shops.module.js';
+
+import {
+  ShopifySyncModule,
+} from './shopify-sync/shopify-sync.module.js';
 
 import {
   TranslationJobsModule,
 } from './translation-jobs/translation-jobs.module.js';
 
+import {
+  TranslationScannerModule,
+} from './translation-scanner/translation-scanner.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true,
+      isGlobal:
+        true,
+
+      cache:
+        true,
+
+      validate:
+        validateEnvironment,
     }),
 
     DatabaseModule,
     HealthModule,
+    ReadinessModule,
+    InternalModule,
     ShopsModule,
     DemoModule,
     AiModule,

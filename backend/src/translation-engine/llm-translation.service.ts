@@ -4,13 +4,9 @@ import {
   Injectable,
 } from '@nestjs/common';
 
-import {
-  generateText,
-} from 'ai';
+import { generateText } from 'ai';
 
-import {
-  AiRegistryService,
-} from '../ai/ai-registry.service.js';
+import { AiRegistryService } from '../ai/ai-registry.service.js';
 
 import type {
   TranslationProviderInput,
@@ -18,27 +14,18 @@ import type {
   TranslationProviderResult,
 } from './translation-provider.types.js';
 
-type LlmProvider =
-  | 'OPENAI'
-  | 'ANTHROPIC'
-  | 'GOOGLE';
+type LlmProvider = 'OPENAI' | 'ANTHROPIC' | 'GOOGLE';
 
 @Injectable()
 export class LlmTranslationService {
-  constructor(
-    private readonly aiRegistry:
-      AiRegistryService,
-  ) {}
+  constructor(private readonly aiRegistry: AiRegistryService) {}
 
   async translate(
-    provider:
-      LlmProvider,
+    provider: LlmProvider,
 
-    input:
-      TranslationProviderInput,
+    input: TranslationProviderInput,
   ): Promise<TranslationProviderResult> {
-    const modelId =
-      input.model?.trim();
+    const modelId = input.model?.trim();
 
     if (!modelId) {
       throw new BadRequestException(
@@ -46,82 +33,52 @@ export class LlmTranslationService {
       );
     }
 
-    const registryModelId =
-      `${provider.toLowerCase()}:${modelId}`;
+    const registryModelId = `${provider.toLowerCase()}:${modelId}`;
 
-    const model =
-      this.aiRegistry.getModel(
-        registryModelId,
-      );
+    const model = this.aiRegistry.getModel(registryModelId);
 
     try {
-      const result =
-        await generateText({
-          model,
+      const result = await generateText({
+        model,
 
-          system:
-            this.buildSystemPrompt(),
+        system: this.buildSystemPrompt(),
 
-          prompt:
-            this.buildUserPrompt(
-              input,
-            ),
+        prompt: this.buildUserPrompt(input),
 
-          temperature:
-            0,
+        temperature: 0,
 
-        maxRetries:
-            0,
-        });
+        maxRetries: 0,
+      });
 
-      const translatedText =
-        result.text?.trim();
+      const translatedText = result.text?.trim();
 
       if (!translatedText) {
-        throw new Error(
-          `${provider} returned an empty translation.`,
-        );
+        throw new Error(`${provider} returned an empty translation.`);
       }
 
-      const usage =
-        result.usage as unknown as {
-          inputTokens?:
-            number;
+      const usage = result.usage as unknown as {
+        inputTokens?: number;
 
-          outputTokens?:
-            number;
+        outputTokens?: number;
 
-          promptTokens?:
-            number;
+        promptTokens?: number;
 
-          completionTokens?:
-            number;
-        };
+        completionTokens?: number;
+      };
 
       return {
-        text:
-          translatedText,
+        text: translatedText,
 
         provider,
 
-        model:
-          modelId,
+        model: modelId,
 
-        inputTokens:
-          usage?.inputTokens ??
-          usage?.promptTokens ??
-          0,
+        inputTokens: usage?.inputTokens ?? usage?.promptTokens ?? 0,
 
-        outputTokens:
-          usage?.outputTokens ??
-          usage?.completionTokens ??
-          0,
+        outputTokens: usage?.outputTokens ?? usage?.completionTokens ?? 0,
       };
     } catch (error) {
-      if (
-        error instanceof
-        BadRequestException
-      ) {
+      if (error instanceof BadRequestException) {
         throw error;
       }
 
@@ -157,10 +114,7 @@ export class LlmTranslationService {
     ].join('\n');
   }
 
-  private buildUserPrompt(
-    input:
-      TranslationProviderInput,
-  ) {
+  private buildUserPrompt(input: TranslationProviderInput) {
     return [
       `Source locale: ${input.sourceLocale}`,
       `Target locale: ${input.targetLocale}`,

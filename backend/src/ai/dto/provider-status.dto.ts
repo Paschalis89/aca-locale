@@ -1,15 +1,8 @@
-import {
-  ApiProperty,
-} from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class AiProviderStatusDto {
   @ApiProperty({
-    enum: [
-      'openai',
-      'anthropic',
-      'google',
-      'deepl',
-    ],
+    enum: ['openai', 'anthropic', 'google', 'deepl'],
     example: 'openai',
   })
   provider!: string;
@@ -37,10 +30,7 @@ export class AiProviderStatusDto {
 
 export class AiProvidersStatusDto {
   @ApiProperty({
-    type: [
-      AiProviderStatusDto,
-    ],
+    type: [AiProviderStatusDto],
   })
-  providers!:
-    AiProviderStatusDto[];
+  providers!: AiProviderStatusDto[];
 }

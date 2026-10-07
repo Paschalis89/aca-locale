@@ -4,54 +4,39 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  PrismaService,
-} from '../database/prisma.service.js';
+import { PrismaService } from '../database/prisma.service.js';
 
-import type {
-  CreateTranslationJobDto,
-} from './dto/create-translation-job.dto.js';
+import type { CreateTranslationJobDto } from './dto/create-translation-job.dto.js';
 
 @Injectable()
 export class TranslationJobsService {
-  private static readonly STALE_RUNNING_MS =
-    5 * 60 * 1000;
+  private static readonly STALE_RUNNING_MS = 5 * 60 * 1000;
 
-  constructor(
-    private readonly prisma:
-      PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    body:
-      CreateTranslationJobDto,
+    body: CreateTranslationJobDto,
   ) {
-    const shop =
-      await this.prisma.shop.findUnique({
-        where: {
-          shopifyDomain,
-        },
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
 
-        include: {
-          aiConfiguration:
-            true,
+      include: {
+        aiConfiguration: true,
 
-          languages: {
-            include: {
-              language:
-                true,
-            },
+        languages: {
+          include: {
+            language: true,
           },
         },
-      });
+      },
+    });
 
     if (!shop) {
-      throw new NotFoundException(
-        'Shop is not registered.',
-      );
+      throw new NotFoundException('Shop is not registered.');
     }
 
     if (!shop.sourceLocale) {
@@ -60,24 +45,17 @@ export class TranslationJobsService {
       );
     }
 
-    const targetLocale =
-      body.targetLocale.trim();
+    const targetLocale = body.targetLocale.trim();
 
-    if (
-      targetLocale ===
-      shop.sourceLocale
-    ) {
+    if (targetLocale === shop.sourceLocale) {
       throw new BadRequestException(
         'Target locale cannot be the same as the source locale.',
       );
     }
 
-    const targetLanguage =
-      shop.languages.find(
-        (shopLanguage) =>
-          shopLanguage.language.locale ===
-          targetLocale,
-      );
+    const targetLanguage = shop.languages.find(
+      (shopLanguage) => shopLanguage.language.locale === targetLocale,
+    );
 
     if (!targetLanguage) {
       throw new BadRequestException(
@@ -85,185 +63,135 @@ export class TranslationJobsService {
       );
     }
 
-    const resourceTypes =
-      Array.from(
-        new Set(
-          body.resourceTypes.map(
-            (resourceType) =>
-              resourceType
-                .trim()
-                .toUpperCase(),
-          ),
+    const resourceTypes = Array.from(
+      new Set(
+        body.resourceTypes.map((resourceType) =>
+          resourceType.trim().toUpperCase(),
         ),
-      );
+      ),
+    );
 
-    const maxItems =
-      body.maxItems ??
-      100;
+    const maxItems = body.maxItems ?? 100;
 
-    const states =
-      await this.prisma.translationState.findMany({
-        where: {
-          targetLocale,
+    const states = await this.prisma.translationState.findMany({
+      where: {
+        targetLocale,
 
-          OR: [
-            {
-              status:
-                'MISSING',
-            },
-            {
-              status:
-                'OUTDATED',
-            },
-          ],
-
-          field: {
-            sourceLocale:
-              shop.sourceLocale,
-
-            type: {
-              not:
-                'URI',
-            },
-
-            resource: {
-              shopId:
-                shop.id,
-
-              resourceType: {
-                in:
-                  resourceTypes,
-              },
-            },
-
-            jobItems: {
-              none: {
-                job: {
-                  shopId:
-                    shop.id,
-
-                  targetLocale,
-
-                  OR: [
-                    {
-                      status:
-                        'QUEUED',
-                    },
-                    {
-                      status:
-                        'RUNNING',
-                    },
-                  ],
-                },
-              },
-            },
-          },
-        },
-
-        select: {
-          status:
-            true,
-
-          field: {
-            select: {
-              id:
-                true,
-
-              sourceLocale:
-                true,
-
-              sourceValue:
-                true,
-
-              sourceDigest:
-                true,
-
-              resource: {
-                select: {
-                  resourceType:
-                    true,
-
-                  shopifyResourceId:
-                    true,
-                },
-              },
-            },
-          },
-        },
-
-        orderBy: [
+        OR: [
           {
-            field: {
-              resource: {
-                resourceType:
-                  'asc',
-              },
-            },
+            status: 'MISSING',
           },
           {
-            updatedAt:
-              'asc',
+            status: 'OUTDATED',
           },
         ],
 
-        take:
-          maxItems,
-      });
+        field: {
+          sourceLocale: shop.sourceLocale,
 
-    if (
-      states.length ===
-      0
-    ) {
+          type: {
+            not: 'URI',
+          },
+
+          resource: {
+            shopId: shop.id,
+
+            resourceType: {
+              in: resourceTypes,
+            },
+          },
+
+          jobItems: {
+            none: {
+              job: {
+                shopId: shop.id,
+
+                targetLocale,
+
+                OR: [
+                  {
+                    status: 'QUEUED',
+                  },
+                  {
+                    status: 'RUNNING',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+
+      select: {
+        status: true,
+
+        field: {
+          select: {
+            id: true,
+
+            sourceLocale: true,
+
+            sourceValue: true,
+
+            sourceDigest: true,
+
+            resource: {
+              select: {
+                resourceType: true,
+
+                shopifyResourceId: true,
+              },
+            },
+          },
+        },
+      },
+
+      orderBy: [
+        {
+          field: {
+            resource: {
+              resourceType: 'asc',
+            },
+          },
+        },
+        {
+          updatedAt: 'asc',
+        },
+      ],
+
+      take: maxItems,
+    });
+
+    if (states.length === 0) {
       throw new BadRequestException(
         'No eligible MISSING or OUTDATED translation fields were found for the requested resource types.',
       );
     }
 
-    const provider =
-      shop.aiConfiguration
-        ?.translationProvider ??
-      null;
+    const provider = shop.aiConfiguration?.translationProvider ?? null;
 
-    const model =
-      shop.aiConfiguration
-        ?.translationModel ??
-      null;
+    const model = shop.aiConfiguration?.translationModel ?? null;
 
-    const fallbackProvider =
-      shop.aiConfiguration
-        ?.fallbackProvider ??
-      null;
+    const fallbackProvider = shop.aiConfiguration?.fallbackProvider ?? null;
 
     const fallbackModel =
-      fallbackProvider ===
-      'DEEPL'
+      fallbackProvider === 'DEEPL'
         ? null
-        : shop.aiConfiguration
-            ?.fallbackModel ??
-          null;
+        : (shop.aiConfiguration?.fallbackModel ?? null);
 
-    const reviewProvider =
-      shop.aiConfiguration
-        ?.reviewProvider ??
-      null;
+    const reviewProvider = shop.aiConfiguration?.reviewProvider ?? null;
 
-    const reviewModel =
-      shop.aiConfiguration
-        ?.reviewModel ??
-      null;
+    const reviewModel = shop.aiConfiguration?.reviewModel ?? null;
 
     return this.prisma.translationJob.create({
       data: {
-        shopId:
-          shop.id,
+        shopId: shop.id,
 
-        sourceLocale:
-          shop.sourceLocale,
+        sourceLocale: shop.sourceLocale,
 
         targetLocale,
 
-        status:
-          'QUEUED',
+        status: 'QUEUED',
 
         provider,
         model,
@@ -272,914 +200,517 @@ export class TranslationJobsService {
         reviewProvider,
         reviewModel,
 
-        totalItems:
-          states.length,
+        totalItems: states.length,
 
         items: {
-          create:
-            states.map(
-              (state) => ({
-                fieldId:
-                  state.field.id,
+          create: states.map((state) => ({
+            fieldId: state.field.id,
 
-                sourceDigest:
-                  state.field
-                    .sourceDigest,
+            sourceDigest: state.field.sourceDigest,
 
-                sourceValue:
-                  state.field
-                    .sourceValue,
+            sourceValue: state.field.sourceValue,
 
-                status:
-                  'PENDING',
+            status: 'PENDING',
 
-                provider,
-                model,
-              }),
-            ),
+            provider,
+            model,
+          })),
         },
       },
 
-      include:
-        this.jobInclude(),
+      include: this.jobInclude(),
     });
   }
 
-  async findAll(
-    shopifyDomain:
-      string,
-  ) {
-    const shop =
-      await this.prisma.shop.findUnique({
-        where: {
-          shopifyDomain,
-        },
+  async findAll(shopifyDomain: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
 
-        select: {
-          id:
-            true,
-        },
-      });
+      select: {
+        id: true,
+      },
+    });
 
     if (!shop) {
-      throw new NotFoundException(
-        'Shop is not registered.',
-      );
+      throw new NotFoundException('Shop is not registered.');
     }
 
     return this.prisma.translationJob.findMany({
       where: {
-        shopId:
-          shop.id,
+        shopId: shop.id,
       },
 
       orderBy: {
-        createdAt:
-          'desc',
+        createdAt: 'desc',
       },
     });
   }
 
   async findOne(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
   ) {
-    const job =
-      await this.prisma.translationJob.findFirst({
-        where: {
-          id:
-            jobId,
+    const job = await this.prisma.translationJob.findFirst({
+      where: {
+        id: jobId,
 
-          shop: {
-            shopifyDomain,
-          },
+        shop: {
+          shopifyDomain,
         },
+      },
 
-        include:
-          this.jobInclude(),
-      });
+      include: this.jobInclude(),
+    });
 
     if (!job) {
-      throw new NotFoundException(
-        'Translation job not found.',
-      );
+      throw new NotFoundException('Translation job not found.');
     }
 
     return job;
   }
 
   async usageSummary(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    daysValue?:
-      string,
+    daysValue?: string,
   ) {
-    const shop =
-      await this.prisma.shop.findUnique({
-        where: {
-          shopifyDomain,
-        },
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
 
-        select: {
-          id:
-            true,
-        },
-      });
+      select: {
+        id: true,
+      },
+    });
 
     if (!shop) {
-      throw new NotFoundException(
-        'Shop is not registered.',
-      );
+      throw new NotFoundException('Shop is not registered.');
     }
 
-    const days =
-      this.boundedInteger(
-        daysValue,
-        30,
-        1,
-        365,
-      );
+    const days = this.boundedInteger(daysValue, 30, 1, 365);
 
-    const from =
-      new Date();
+    const from = new Date();
 
-    from.setUTCDate(
-      from.getUTCDate() -
-        (
-          days -
-          1
-        ),
-    );
+    from.setUTCDate(from.getUTCDate() - (days - 1));
 
-    from.setUTCHours(
-      0,
-      0,
-      0,
-      0,
-    );
+    from.setUTCHours(0, 0, 0, 0);
 
-    const events =
-      await this.prisma.translationUsageEvent.findMany({
-        where: {
-          shopId:
-            shop.id,
+    const events = await this.prisma.translationUsageEvent.findMany({
+      where: {
+        shopId: shop.id,
 
-          createdAt: {
-            gte:
-              from,
-          },
+        createdAt: {
+          gte: from,
         },
+      },
 
-        select: {
-          stage:
-            true,
+      select: {
+        stage: true,
 
-          provider:
-            true,
+        provider: true,
 
-          model:
-            true,
+        model: true,
 
-          success:
-            true,
+        success: true,
 
-          usageKnown:
-            true,
+        usageKnown: true,
 
-          billedCharacters:
-            true,
+        billedCharacters: true,
 
-          inputTokens:
-            true,
+        inputTokens: true,
 
-          outputTokens:
-            true,
+        outputTokens: true,
 
-          estimatedCostMicrousd:
-            true,
+        estimatedCostMicrousd: true,
 
-          createdAt:
-            true,
-        },
+        createdAt: true,
+      },
 
-        orderBy: {
-          createdAt:
-            'asc',
-        },
-      });
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
 
     type Bucket = {
-      events:
-        number;
+      events: number;
 
-      successfulEvents:
-        number;
+      successfulEvents: number;
 
-      failedEvents:
-        number;
+      failedEvents: number;
 
-      usageUnknownEvents:
-        number;
+      usageUnknownEvents: number;
 
-      billedCharacters:
-        number;
+      billedCharacters: number;
 
-      inputTokens:
-        number;
+      inputTokens: number;
 
-      outputTokens:
-        number;
+      outputTokens: number;
 
-      estimatedCostMicrousd:
-        number;
+      estimatedCostMicrousd: number;
 
-      costedEvents:
-        number;
+      costedEvents: number;
 
-      unpricedEvents:
-        number;
+      unpricedEvents: number;
     };
 
-    const newBucket =
-      (): Bucket => ({
-        events:
-          0,
+    const newBucket = (): Bucket => ({
+      events: 0,
 
-        successfulEvents:
-          0,
+      successfulEvents: 0,
 
-        failedEvents:
-          0,
+      failedEvents: 0,
 
-        usageUnknownEvents:
-          0,
+      usageUnknownEvents: 0,
 
-        billedCharacters:
-          0,
+      billedCharacters: 0,
 
-        inputTokens:
-          0,
+      inputTokens: 0,
 
-        outputTokens:
-          0,
+      outputTokens: 0,
 
-        estimatedCostMicrousd:
-          0,
+      estimatedCostMicrousd: 0,
 
-        costedEvents:
-          0,
+      costedEvents: 0,
 
-        unpricedEvents:
-          0,
-      });
+      unpricedEvents: 0,
+    });
 
-    const addEvent =
-      (
-        bucket:
-          Bucket,
+    const addEvent = (
+      bucket: Bucket,
 
-        event:
-          (typeof events)[number],
-      ) => {
-        bucket.events +=
-          1;
+      event: (typeof events)[number],
+    ) => {
+      bucket.events += 1;
 
-        if (
-          event.success
-        ) {
-          bucket.successfulEvents +=
-            1;
-        } else {
-          bucket.failedEvents +=
-            1;
-        }
+      if (event.success) {
+        bucket.successfulEvents += 1;
+      } else {
+        bucket.failedEvents += 1;
+      }
 
-        if (
-          !event.usageKnown
-        ) {
-          bucket.usageUnknownEvents +=
-            1;
-        }
+      if (!event.usageKnown) {
+        bucket.usageUnknownEvents += 1;
+      }
 
-        bucket.billedCharacters +=
-          event.billedCharacters;
+      bucket.billedCharacters += event.billedCharacters;
 
-        bucket.inputTokens +=
-          event.inputTokens;
+      bucket.inputTokens += event.inputTokens;
 
-        bucket.outputTokens +=
-          event.outputTokens;
+      bucket.outputTokens += event.outputTokens;
 
-        if (
-          event.estimatedCostMicrousd ===
-          null
-        ) {
-          bucket.unpricedEvents +=
-            1;
-        } else {
-          bucket.costedEvents +=
-            1;
+      if (event.estimatedCostMicrousd === null) {
+        bucket.unpricedEvents += 1;
+      } else {
+        bucket.costedEvents += 1;
 
-          bucket.estimatedCostMicrousd +=
-            event.estimatedCostMicrousd;
-        }
-      };
+        bucket.estimatedCostMicrousd += event.estimatedCostMicrousd;
+      }
+    };
 
-    const totals =
-      newBucket();
+    const totals = newBucket();
 
-    const providerBuckets =
-      new Map<
-        string,
-        Bucket
-      >();
+    const providerBuckets = new Map<string, Bucket>();
 
-    const stageBuckets =
-      new Map<
-        string,
-        Bucket
-      >();
+    const stageBuckets = new Map<string, Bucket>();
 
-    const dailyBuckets =
-      new Map<
-        string,
-        Bucket
-      >();
+    const dailyBuckets = new Map<string, Bucket>();
 
-    const monthlyBuckets =
-      new Map<
-        string,
-        Bucket
-      >();
+    const monthlyBuckets = new Map<string, Bucket>();
 
-    for (
-      const event
-      of events
-    ) {
-      addEvent(
-        totals,
-        event,
-      );
+    for (const event of events) {
+      addEvent(totals, event);
 
-      const providerKey =
-        `${event.provider}:${event.model ?? '*'}`;
+      const providerKey = `${event.provider}:${event.model ?? '*'}`;
 
-      const providerBucket =
-        providerBuckets.get(
-          providerKey,
-        ) ??
-        newBucket();
+      const providerBucket = providerBuckets.get(providerKey) ?? newBucket();
 
-      addEvent(
-        providerBucket,
-        event,
-      );
+      addEvent(providerBucket, event);
 
-      providerBuckets.set(
-        providerKey,
-        providerBucket,
-      );
+      providerBuckets.set(providerKey, providerBucket);
 
-      const stageKey =
-        event.stage;
+      const stageKey = event.stage;
 
-      const stageBucket =
-        stageBuckets.get(
-          stageKey,
-        ) ??
-        newBucket();
+      const stageBucket = stageBuckets.get(stageKey) ?? newBucket();
 
-      addEvent(
-        stageBucket,
-        event,
-      );
+      addEvent(stageBucket, event);
 
-      stageBuckets.set(
-        stageKey,
-        stageBucket,
-      );
+      stageBuckets.set(stageKey, stageBucket);
 
-      const iso =
-        event.createdAt
-          .toISOString();
+      const iso = event.createdAt.toISOString();
 
-      const dayKey =
-        iso.slice(
-          0,
-          10,
-        );
+      const dayKey = iso.slice(0, 10);
 
-      const dayBucket =
-        dailyBuckets.get(
-          dayKey,
-        ) ??
-        newBucket();
+      const dayBucket = dailyBuckets.get(dayKey) ?? newBucket();
 
-      addEvent(
-        dayBucket,
-        event,
-      );
+      addEvent(dayBucket, event);
 
-      dailyBuckets.set(
-        dayKey,
-        dayBucket,
-      );
+      dailyBuckets.set(dayKey, dayBucket);
 
-      const monthKey =
-        iso.slice(
-          0,
-          7,
-        );
+      const monthKey = iso.slice(0, 7);
 
-      const monthBucket =
-        monthlyBuckets.get(
-          monthKey,
-        ) ??
-        newBucket();
+      const monthBucket = monthlyBuckets.get(monthKey) ?? newBucket();
 
-      addEvent(
-        monthBucket,
-        event,
-      );
+      addEvent(monthBucket, event);
 
-      monthlyBuckets.set(
-        monthKey,
-        monthBucket,
-      );
+      monthlyBuckets.set(monthKey, monthBucket);
     }
 
-    const serializeBucket =
-      (
-        bucket:
-          Bucket,
-      ) => ({
-        ...bucket,
+    const serializeBucket = (bucket: Bucket) => ({
+      ...bucket,
 
-        estimatedCostUsd:
-          bucket
-            .estimatedCostMicrousd /
-          1_000_000,
-      });
+      estimatedCostUsd: bucket.estimatedCostMicrousd / 1_000_000,
+    });
 
     return {
       period: {
         days,
 
-        from:
-          from.toISOString(),
+        from: from.toISOString(),
 
-        to:
-          new Date()
-            .toISOString(),
+        to: new Date().toISOString(),
       },
 
-      totals:
-        serializeBucket(
-          totals,
-        ),
+      totals: serializeBucket(totals),
 
-      byProvider:
-        Array.from(
-          providerBuckets.entries(),
-        ).map(
-          (
-            [
-              key,
-              bucket,
-            ],
-          ) => {
-            const separator =
-              key.indexOf(
-                ':',
-              );
+      byProvider: Array.from(providerBuckets.entries()).map(([key, bucket]) => {
+        const separator = key.indexOf(':');
 
-            return {
-              provider:
-                key.slice(
-                  0,
-                  separator,
-                ),
+        return {
+          provider: key.slice(0, separator),
 
-              model:
-                key.slice(
-                  separator +
-                    1,
-                ) ===
-                '*'
-                  ? null
-                  : key.slice(
-                      separator +
-                        1,
-                    ),
+          model:
+            key.slice(separator + 1) === '*' ? null : key.slice(separator + 1),
 
-              ...serializeBucket(
-                bucket,
-              ),
-            };
-          },
-        ),
+          ...serializeBucket(bucket),
+        };
+      }),
 
-      byStage:
-        Array.from(
-          stageBuckets.entries(),
-        ).map(
-          (
-            [
-              stage,
-              bucket,
-            ],
-          ) => ({
-            stage,
+      byStage: Array.from(stageBuckets.entries()).map(([stage, bucket]) => ({
+        stage,
 
-            ...serializeBucket(
-              bucket,
-            ),
-          }),
-        ),
+        ...serializeBucket(bucket),
+      })),
 
-      daily:
-        Array.from(
-          dailyBuckets.entries(),
-        ).map(
-          (
-            [
-              date,
-              bucket,
-            ],
-          ) => ({
-            date,
+      daily: Array.from(dailyBuckets.entries()).map(([date, bucket]) => ({
+        date,
 
-            ...serializeBucket(
-              bucket,
-            ),
-          }),
-        ),
+        ...serializeBucket(bucket),
+      })),
 
-      monthly:
-        Array.from(
-          monthlyBuckets.entries(),
-        ).map(
-          (
-            [
-              month,
-              bucket,
-            ],
-          ) => ({
-            month,
+      monthly: Array.from(monthlyBuckets.entries()).map(([month, bucket]) => ({
+        month,
 
-            ...serializeBucket(
-              bucket,
-            ),
-          }),
-        ),
+        ...serializeBucket(bucket),
+      })),
     };
   }
 
   async usageEvents(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    limitValue?:
-      string,
+    limitValue?: string,
   ) {
-    const shop =
-      await this.prisma.shop.findUnique({
-        where: {
-          shopifyDomain,
-        },
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
 
-        select: {
-          id:
-            true,
-        },
-      });
+      select: {
+        id: true,
+      },
+    });
 
     if (!shop) {
-      throw new NotFoundException(
-        'Shop is not registered.',
-      );
+      throw new NotFoundException('Shop is not registered.');
     }
 
-    const limit =
-      this.boundedInteger(
-        limitValue,
-        100,
-        1,
-        500,
-      );
+    const limit = this.boundedInteger(limitValue, 100, 1, 500);
 
     return this.prisma.translationUsageEvent.findMany({
       where: {
-        shopId:
-          shop.id,
+        shopId: shop.id,
       },
 
       orderBy: {
-        createdAt:
-          'desc',
+        createdAt: 'desc',
       },
 
-      take:
-        limit,
+      take: limit,
     });
   }
 
   async cancel(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
   ) {
-    const job =
-      await this.findLifecycleJob(
-        shopifyDomain,
-        jobId,
-      );
+    const job = await this.findLifecycleJob(shopifyDomain, jobId);
 
-    if (
-      job.status ===
-      'CANCELLED'
-    ) {
-      return this.findOne(
-        shopifyDomain,
-        jobId,
-      );
+    if (job.status === 'CANCELLED') {
+      return this.findOne(shopifyDomain, jobId);
     }
 
-    if (
-      job.status !==
-        'QUEUED' &&
-      job.status !==
-        'RUNNING'
-    ) {
+    if (job.status !== 'QUEUED' && job.status !== 'RUNNING') {
       throw new BadRequestException(
         `Translation job cannot be cancelled from status "${job.status}".`,
       );
     }
 
-    const now =
-      new Date();
+    const now = new Date();
 
-    await this.prisma.$transaction(
-      async (
-        tx,
-      ) => {
-        const cancelled =
-          await tx.translationJob.updateMany({
-            where: {
-              id:
-                job.id,
+    await this.prisma.$transaction(async (tx) => {
+      const cancelled = await tx.translationJob.updateMany({
+        where: {
+          id: job.id,
 
-              status: {
-                in: [
-                  'QUEUED',
-                  'RUNNING',
-                ],
-              },
-            },
-
-            data: {
-              status:
-                'CANCELLED',
-
-              completedAt:
-                now,
-
-              errorMessage:
-                'Cancelled by user.',
-            },
-          });
-
-        if (
-          cancelled.count !==
-          1
-        ) {
-          return;
-        }
-
-        await tx.translationJobItem.updateMany({
-          where: {
-            jobId:
-              job.id,
-
-            status:
-              'GENERATING',
+          status: {
+            in: ['QUEUED', 'RUNNING'],
           },
+        },
 
-          data: {
-            status:
-              'PENDING',
-          },
-        });
-      },
-    );
+        data: {
+          status: 'CANCELLED',
 
-    return this.findOne(
-      shopifyDomain,
-      jobId,
-    );
+          completedAt: now,
+
+          errorMessage: 'Cancelled by user.',
+        },
+      });
+
+      if (cancelled.count !== 1) {
+        return;
+      }
+
+      await tx.translationJobItem.updateMany({
+        where: {
+          jobId: job.id,
+
+          status: 'GENERATING',
+        },
+
+        data: {
+          status: 'PENDING',
+        },
+      });
+    });
+
+    return this.findOne(shopifyDomain, jobId);
   }
 
   async retryFailed(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
   ) {
-    const job =
-      await this.findLifecycleJob(
-        shopifyDomain,
-        jobId,
-      );
+    const job = await this.findLifecycleJob(shopifyDomain, jobId);
 
-    if (
-      job.status !==
-        'FAILED' &&
-      job.status !==
-        'PARTIAL'
-    ) {
+    if (job.status !== 'FAILED' && job.status !== 'PARTIAL') {
       throw new BadRequestException(
         `Failed items cannot be retried from job status "${job.status}".`,
       );
     }
 
-    const failedItems =
-      job.items.filter(
-        (item) =>
-          item.status ===
-          'FAILED',
-      );
+    const failedItems = job.items.filter((item) => item.status === 'FAILED');
 
-    if (
-      failedItems.length ===
-      0
-    ) {
+    if (failedItems.length === 0) {
       throw new BadRequestException(
         'Translation job contains no failed items to retry.',
       );
     }
 
-    const failedIds =
-      failedItems.map(
-        (item) =>
-          item.id,
-      );
+    const failedIds = failedItems.map((item) => item.id);
 
-    const completedItems =
-      job.items.filter(
-        (item) =>
-          this.isTranslationCompletedStatus(
-            item.status,
-          ),
-      ).length;
+    const completedItems = job.items.filter((item) =>
+      this.isTranslationCompletedStatus(item.status),
+    ).length;
 
-    await this.prisma.$transaction(
-      async (
-        tx,
-      ) => {
-        await tx.translationJobItem.updateMany({
-          where: {
-            id: {
-              in:
-                failedIds,
-            },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.translationJobItem.updateMany({
+        where: {
+          id: {
+            in: failedIds,
           },
+        },
 
-          data: {
-            status:
-              'PENDING',
+        data: {
+          status: 'PENDING',
 
-            translatedValue:
-              null,
+          translatedValue: null,
 
-            generatedAt:
-              null,
+          generatedAt: null,
 
-            validatedAt:
-              null,
+          validatedAt: null,
 
-            validationPassed:
-              null,
+          validationPassed: null,
 
-            validationErrors:
-              0,
+          validationErrors: 0,
 
-            validationWarnings:
-              0,
+          validationWarnings: 0,
 
-            validationVersion:
-              null,
+          validationVersion: null,
 
-            fallbackUsed:
-              false,
+          fallbackUsed: false,
 
-            primaryErrorMessage:
-              null,
+          primaryErrorMessage: null,
 
-            errorMessage:
-              null,
+          errorMessage: null,
 
-            provider:
-              job.provider,
+          provider: job.provider,
 
-            model:
-              job.model,
-          },
-        });
+          model: job.model,
+        },
+      });
 
-        await tx.translationJob.update({
-          where: {
-            id:
-              job.id,
-          },
+      await tx.translationJob.update({
+        where: {
+          id: job.id,
+        },
 
-          data: {
-            status:
-              'QUEUED',
+        data: {
+          status: 'QUEUED',
 
-            completedItems,
+          completedItems,
 
-            failedItems:
-              0,
+          failedItems: 0,
 
-            completedAt:
-              null,
+          completedAt: null,
 
-            errorMessage:
-              null,
-          },
-        });
-      },
-    );
+          errorMessage: null,
+        },
+      });
+    });
 
-    return this.findOne(
-      shopifyDomain,
-      jobId,
-    );
+    return this.findOne(shopifyDomain, jobId);
   }
 
   async resume(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
   ) {
-    const job =
-      await this.findLifecycleJob(
-        shopifyDomain,
-        jobId,
-      );
+    const job = await this.findLifecycleJob(shopifyDomain, jobId);
 
-    if (
-      job.status ===
-      'QUEUED'
-    ) {
-      return this.findOne(
-        shopifyDomain,
-        jobId,
-      );
+    if (job.status === 'QUEUED') {
+      return this.findOne(shopifyDomain, jobId);
     }
 
-    if (
-      job.status !==
-        'CANCELLED' &&
-      job.status !==
-        'RUNNING'
-    ) {
+    if (job.status !== 'CANCELLED' && job.status !== 'RUNNING') {
       throw new BadRequestException(
         `Translation job cannot be resumed from status "${job.status}".`,
       );
     }
 
-    if (
-      job.status ===
-      'RUNNING'
-    ) {
-      const age =
-        Date.now() -
-        job.updatedAt.getTime();
+    if (job.status === 'RUNNING') {
+      const age = Date.now() - job.updatedAt.getTime();
 
-      if (
-        age <
-        TranslationJobsService
-          .STALE_RUNNING_MS
-      ) {
-        const remainingSeconds =
-          Math.ceil(
-            (
-              TranslationJobsService
-                .STALE_RUNNING_MS -
-              age
-            ) /
-              1000,
-          );
+      if (age < TranslationJobsService.STALE_RUNNING_MS) {
+        const remainingSeconds = Math.ceil(
+          (TranslationJobsService.STALE_RUNNING_MS - age) / 1000,
+        );
 
         throw new BadRequestException(
           `Translation job is still active. Retry resume in approximately ${remainingSeconds} seconds if it remains stuck.`,
@@ -1187,117 +718,84 @@ export class TranslationJobsService {
       }
     }
 
-    const completedItems =
-      job.items.filter(
-        (item) =>
-          this.isTranslationCompletedStatus(
-            item.status,
-          ),
-      ).length;
+    const completedItems = job.items.filter((item) =>
+      this.isTranslationCompletedStatus(item.status),
+    ).length;
 
-    const failedItems =
-      job.items.filter(
-        (item) =>
-          item.status ===
-          'FAILED',
-      ).length;
+    const failedItems = job.items.filter(
+      (item) => item.status === 'FAILED',
+    ).length;
 
-    await this.prisma.$transaction(
-      async (
-        tx,
-      ) => {
-        await tx.translationJobItem.updateMany({
-          where: {
-            jobId:
-              job.id,
-
-            status:
-              'GENERATING',
-          },
-
-          data: {
-            status:
-              'PENDING',
-
-            errorMessage:
-              null,
-          },
-        });
-
-        await tx.translationJob.update({
-          where: {
-            id:
-              job.id,
-          },
-
-          data: {
-            status:
-              'QUEUED',
-
-            completedItems,
-
-            failedItems,
-
-            completedAt:
-              null,
-
-            errorMessage:
-              null,
-          },
-        });
-      },
-    );
-
-    return this.findOne(
-      shopifyDomain,
-      jobId,
-    );
-  }
-
-  private async findLifecycleJob(
-    shopifyDomain:
-      string,
-
-    jobId:
-      string,
-  ) {
-    const job =
-      await this.prisma.translationJob.findFirst({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.translationJobItem.updateMany({
         where: {
-          id:
-            jobId,
+          jobId: job.id,
 
-          shop: {
-            shopifyDomain,
-          },
+          status: 'GENERATING',
         },
 
-        include: {
-          items: {
-            select: {
-              id:
-                true,
+        data: {
+          status: 'PENDING',
 
-              status:
-                true,
-            },
-          },
+          errorMessage: null,
         },
       });
 
+      await tx.translationJob.update({
+        where: {
+          id: job.id,
+        },
+
+        data: {
+          status: 'QUEUED',
+
+          completedItems,
+
+          failedItems,
+
+          completedAt: null,
+
+          errorMessage: null,
+        },
+      });
+    });
+
+    return this.findOne(shopifyDomain, jobId);
+  }
+
+  private async findLifecycleJob(
+    shopifyDomain: string,
+
+    jobId: string,
+  ) {
+    const job = await this.prisma.translationJob.findFirst({
+      where: {
+        id: jobId,
+
+        shop: {
+          shopifyDomain,
+        },
+      },
+
+      include: {
+        items: {
+          select: {
+            id: true,
+
+            status: true,
+          },
+        },
+      },
+    });
+
     if (!job) {
-      throw new NotFoundException(
-        'Translation job not found.',
-      );
+      throw new NotFoundException('Translation job not found.');
     }
 
     return job;
   }
 
-  private isTranslationCompletedStatus(
-    status:
-      string,
-  ) {
+  private isTranslationCompletedStatus(status: string) {
     return [
       'GENERATED',
       'VALIDATED',
@@ -1305,53 +803,29 @@ export class TranslationJobsService {
       'APPROVED',
       'REJECTED',
       'PUBLISHED',
-    ].includes(
-      status,
-    );
+    ].includes(status);
   }
 
   private boundedInteger(
-    value:
-      string |
-      undefined,
+    value: string | undefined,
 
-    fallback:
-      number,
+    fallback: number,
 
-    min:
-      number,
+    min: number,
 
-    max:
-      number,
+    max: number,
   ) {
-    if (
-      value ===
-      undefined
-    ) {
+    if (value === undefined) {
       return fallback;
     }
 
-    const parsed =
-      Number(
-        value,
-      );
+    const parsed = Number(value);
 
-    if (
-      !Number.isInteger(
-        parsed,
-      )
-    ) {
-      throw new BadRequestException(
-        'Expected an integer query parameter.',
-      );
+    if (!Number.isInteger(parsed)) {
+      throw new BadRequestException('Expected an integer query parameter.');
     }
 
-    if (
-      parsed <
-        min ||
-      parsed >
-        max
-    ) {
+    if (parsed < min || parsed > max) {
       throw new BadRequestException(
         `Query parameter must be between ${min} and ${max}.`,
       );
@@ -1366,22 +840,17 @@ export class TranslationJobsService {
         include: {
           field: {
             select: {
-              key:
-                true,
+              key: true,
 
-              type:
-                true,
+              type: true,
 
-              sourceLocale:
-                true,
+              sourceLocale: true,
 
               resource: {
                 select: {
-                  resourceType:
-                    true,
+                  resourceType: true,
 
-                  shopifyResourceId:
-                    true,
+                  shopifyResourceId: true,
                 },
               },
             },
@@ -1389,8 +858,7 @@ export class TranslationJobsService {
         },
 
         orderBy: {
-          createdAt:
-            'asc',
+          createdAt: 'asc',
         },
       },
     } as const;

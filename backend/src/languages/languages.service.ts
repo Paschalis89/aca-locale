@@ -1,37 +1,19 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
-import {
-  PrismaService,
-} from '../database/prisma.service.js';
+import { PrismaService } from '../database/prisma.service.js';
 
-import type {
-  ShopifyLocaleDto,
-} from './dto/sync-shopify-locales.dto.js';
+import type { ShopifyLocaleDto } from './dto/sync-shopify-locales.dto.js';
 
 @Injectable()
 export class LanguagesService {
-  constructor(
-    private readonly prisma:
-      PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async syncShopifyLocales(
-    shopifyDomain: string,
-    locales: ShopifyLocaleDto[],
-  ) {
+  async syncShopifyLocales(shopifyDomain: string, locales: ShopifyLocaleDto[]) {
     if (locales.length === 0) {
-      throw new BadRequestException(
-        'Shopify returned no locales.',
-      );
+      throw new BadRequestException('Shopify returned no locales.');
     }
 
-    const primaryLocales =
-      locales.filter(
-        (locale) => locale.primary,
-      );
+    const primaryLocales = locales.filter((locale) => locale.primary);
 
     if (primaryLocales.length !== 1) {
       throw new BadRequestException(
@@ -39,149 +21,120 @@ export class LanguagesService {
       );
     }
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        const shop =
-          await tx.shop.upsert({
-            where: {
-              shopifyDomain,
-            },
+    return this.prisma.$transaction(async (tx) => {
+      const shop = await tx.shop.upsert({
+        where: {
+          shopifyDomain,
+        },
 
-            update: {},
+        update: {},
 
-            create: {
-              shopifyDomain,
+        create: {
+          shopifyDomain,
 
-              settings: {
-                create: {},
-              },
+          settings: {
+            create: {},
+          },
 
-              aiConfiguration: {
-                create: {},
-              },
-            },
-          });
+          aiConfiguration: {
+            create: {},
+          },
+        },
+      });
 
-        const syncedLanguageIds:
-          string[] = [];
+      const syncedLanguageIds: string[] = [];
 
-        for (const locale of locales) {
-          const language =
-            await tx.language.upsert({
-              where: {
-                locale:
-                  locale.locale,
-              },
-
-              update: {
-                name:
-                  locale.name,
-              },
-
-              create: {
-                locale:
-                  locale.locale,
-
-                name:
-                  locale.name,
-              },
-            });
-
-          syncedLanguageIds.push(
-            language.id,
-          );
-
-          await tx.shopLanguage.upsert({
-            where: {
-              shopId_languageId: {
-                shopId:
-                  shop.id,
-
-                languageId:
-                  language.id,
-              },
-            },
-
-            update: {
-              primary:
-                locale.primary,
-
-              published:
-                locale.published,
-            },
-
-            create: {
-              shopId:
-                shop.id,
-
-              languageId:
-                language.id,
-
-              primary:
-                locale.primary,
-
-              published:
-                locale.published,
-            },
-          });
-        }
-
-        await tx.shopLanguage.deleteMany({
+      for (const locale of locales) {
+        const language = await tx.language.upsert({
           where: {
-            shopId:
-              shop.id,
+            locale: locale.locale,
+          },
 
-            languageId: {
-              notIn:
-                syncedLanguageIds,
-            },
+          update: {
+            name: locale.name,
+          },
+
+          create: {
+            locale: locale.locale,
+
+            name: locale.name,
           },
         });
 
-        const primaryLocale =
-          primaryLocales[0].locale;
+        syncedLanguageIds.push(language.id);
 
-        await tx.shop.update({
+        await tx.shopLanguage.upsert({
           where: {
-            id:
-              shop.id,
+            shopId_languageId: {
+              shopId: shop.id,
+
+              languageId: language.id,
+            },
           },
 
-          data: {
-            sourceLocale:
-              primaryLocale,
+          update: {
+            primary: locale.primary,
+
+            published: locale.published,
+          },
+
+          create: {
+            shopId: shop.id,
+
+            languageId: language.id,
+
+            primary: locale.primary,
+
+            published: locale.published,
           },
         });
+      }
 
-        return tx.shop.findUnique({
-          where: {
-            id:
-              shop.id,
+      await tx.shopLanguage.deleteMany({
+        where: {
+          shopId: shop.id,
+
+          languageId: {
+            notIn: syncedLanguageIds,
           },
+        },
+      });
 
-          include: {
-            languages: {
-              include: {
-                language:
-                  true,
-              },
+      const primaryLocale = primaryLocales[0].locale;
 
-              orderBy: {
-                language: {
-                  locale:
-                    'asc',
-                },
+      await tx.shop.update({
+        where: {
+          id: shop.id,
+        },
+
+        data: {
+          sourceLocale: primaryLocale,
+        },
+      });
+
+      return tx.shop.findUnique({
+        where: {
+          id: shop.id,
+        },
+
+        include: {
+          languages: {
+            include: {
+              language: true,
+            },
+
+            orderBy: {
+              language: {
+                locale: 'asc',
               },
             },
           },
-        });
-      },
-    );
+        },
+      });
+    });
   }
 
-  async findForShop(
-    shopifyDomain: string,
-  ) {
+  async findForShop(shopifyDomain: string) {
     return this.prisma.shopLanguage.findMany({
       where: {
         shop: {
@@ -190,14 +143,12 @@ export class LanguagesService {
       },
 
       include: {
-        language:
-          true,
+        language: true,
       },
 
       orderBy: {
         language: {
-          locale:
-            'asc',
+          locale: 'asc',
         },
       },
     });

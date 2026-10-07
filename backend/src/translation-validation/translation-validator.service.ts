@@ -1,6 +1,4 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import type {
   TranslationValidationInput,
@@ -10,25 +8,14 @@ import type {
 
 @Injectable()
 export class TranslationValidatorService {
-  private readonly version =
-    'deterministic-v1';
+  private readonly version = 'deterministic-v1';
 
-  validate(
-    input:
-      TranslationValidationInput,
-  ):
-    TranslationValidationResult {
-    const issues:
-      TranslationValidationIssue[] =
-      [];
+  validate(input: TranslationValidationInput): TranslationValidationResult {
+    const issues: TranslationValidationIssue[] = [];
 
-    const source =
-      input.sourceValue ??
-      '';
+    const source = input.sourceValue ?? '';
 
-    const translated =
-      input.translatedValue ??
-      '';
+    const translated = input.translatedValue ?? '';
 
     /*
      * Empty translation is always
@@ -38,112 +25,53 @@ export class TranslationValidatorService {
      * generating a cascade of secondary
      * missing-token errors.
      */
-    if (
-      translated.trim()
-        .length ===
-      0
-    ) {
+    if (translated.trim().length === 0) {
       issues.push({
-        code:
-          'EMPTY_TRANSLATION',
+        code: 'EMPTY_TRANSLATION',
 
-        severity:
-          'ERROR',
+        severity: 'ERROR',
 
-        message:
-          'The translated value is empty.',
+        message: 'The translated value is empty.',
       });
 
-      return this.result(
-        issues,
-      );
+      return this.result(issues);
     }
 
-    this.validateLiquid(
-      source,
-      translated,
-      issues,
-    );
+    this.validateLiquid(source, translated, issues);
 
-    this.validatePlaceholders(
-      source,
-      translated,
-      issues,
-    );
+    this.validatePlaceholders(source, translated, issues);
 
-    this.validateUrls(
-      source,
-      translated,
-      issues,
-    );
+    this.validateUrls(source, translated, issues);
 
-    this.validateEmails(
-      source,
-      translated,
-      issues,
-    );
+    this.validateEmails(source, translated, issues);
 
-    this.validateHtml(
-      source,
-      translated,
-      issues,
-    );
+    this.validateHtml(source, translated, issues);
 
-    this.validateNumbers(
-      source,
-      translated,
-      issues,
-    );
+    this.validateNumbers(source, translated, issues);
 
-    this.validateSameAsSource(
-      source,
-      translated,
-      issues,
-    );
+    this.validateSameAsSource(source, translated, issues);
 
-    this.validateLengthRatio(
-      source,
-      translated,
-      issues,
-    );
+    this.validateLengthRatio(source, translated, issues);
 
-    return this.result(
-      issues,
-    );
+    return this.result(issues);
   }
 
   private validateLiquid(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const expected =
-      this.extractLiquidTokens(
-        source,
-      );
+    const expected = this.extractLiquidTokens(source);
 
-    const actual =
-      this.extractLiquidTokens(
-        translated,
-      );
+    const actual = this.extractLiquidTokens(translated);
 
-    if (
-      !this.sameMultiset(
-        expected,
-        actual,
-      )
-    ) {
+    if (!this.sameMultiset(expected, actual)) {
       issues.push({
-        code:
-          'LIQUID_TOKEN_MISMATCH',
+        code: 'LIQUID_TOKEN_MISMATCH',
 
-        severity:
-          'ERROR',
+        severity: 'ERROR',
 
         message:
           'Liquid tokens were changed, removed, or added during translation.',
@@ -155,37 +83,21 @@ export class TranslationValidatorService {
   }
 
   private validatePlaceholders(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const expected =
-      this.extractPlaceholders(
-        source,
-      );
+    const expected = this.extractPlaceholders(source);
 
-    const actual =
-      this.extractPlaceholders(
-        translated,
-      );
+    const actual = this.extractPlaceholders(translated);
 
-    if (
-      !this.sameMultiset(
-        expected,
-        actual,
-      )
-    ) {
+    if (!this.sameMultiset(expected, actual)) {
       issues.push({
-        code:
-          'PLACEHOLDER_MISMATCH',
+        code: 'PLACEHOLDER_MISMATCH',
 
-        severity:
-          'ERROR',
+        severity: 'ERROR',
 
         message:
           'One or more placeholders were changed, removed, or added during translation.',
@@ -197,37 +109,21 @@ export class TranslationValidatorService {
   }
 
   private validateUrls(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const expected =
-      this.extractUrls(
-        source,
-      );
+    const expected = this.extractUrls(source);
 
-    const actual =
-      this.extractUrls(
-        translated,
-      );
+    const actual = this.extractUrls(translated);
 
-    if (
-      !this.sameMultiset(
-        expected,
-        actual,
-      )
-    ) {
+    if (!this.sameMultiset(expected, actual)) {
       issues.push({
-        code:
-          'URL_MISMATCH',
+        code: 'URL_MISMATCH',
 
-        severity:
-          'ERROR',
+        severity: 'ERROR',
 
         message:
           'One or more URLs were changed, removed, or added during translation.',
@@ -239,37 +135,21 @@ export class TranslationValidatorService {
   }
 
   private validateEmails(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const expected =
-      this.extractEmails(
-        source,
-      );
+    const expected = this.extractEmails(source);
 
-    const actual =
-      this.extractEmails(
-        translated,
-      );
+    const actual = this.extractEmails(translated);
 
-    if (
-      !this.sameMultiset(
-        expected,
-        actual,
-      )
-    ) {
+    if (!this.sameMultiset(expected, actual)) {
       issues.push({
-        code:
-          'EMAIL_MISMATCH',
+        code: 'EMAIL_MISMATCH',
 
-        severity:
-          'ERROR',
+        severity: 'ERROR',
 
         message:
           'One or more email addresses were changed, removed, or added during translation.',
@@ -281,40 +161,23 @@ export class TranslationValidatorService {
   }
 
   private validateHtml(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const expected =
-      this.extractHtmlStructure(
-        source,
-      );
+    const expected = this.extractHtmlStructure(source);
 
-    const actual =
-      this.extractHtmlStructure(
-        translated,
-      );
+    const actual = this.extractHtmlStructure(translated);
 
-    if (
-      !this.sameSequence(
-        expected,
-        actual,
-      )
-    ) {
+    if (!this.sameSequence(expected, actual)) {
       issues.push({
-        code:
-          'HTML_STRUCTURE_MISMATCH',
+        code: 'HTML_STRUCTURE_MISMATCH',
 
-        severity:
-          'ERROR',
+        severity: 'ERROR',
 
-        message:
-          'HTML structure was changed during translation.',
+        message: 'HTML structure was changed during translation.',
 
         expected,
         actual,
@@ -323,14 +186,11 @@ export class TranslationValidatorService {
   }
 
   private validateNumbers(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
     /*
      * Compare digit groups rather than
@@ -349,33 +209,17 @@ export class TranslationValidatorService {
      * separators does not trigger an
      * unnecessary warning.
      */
-    const expected =
-      source.match(
-        /\d+/g,
-      ) ??
-      [];
+    const expected = source.match(/\d+/g) ?? [];
 
-    const actual =
-      translated.match(
-        /\d+/g,
-      ) ??
-      [];
+    const actual = translated.match(/\d+/g) ?? [];
 
-    if (
-      !this.sameMultiset(
-        expected,
-        actual,
-      )
-    ) {
+    if (!this.sameMultiset(expected, actual)) {
       issues.push({
-        code:
-          'NUMBER_TOKEN_MISMATCH',
+        code: 'NUMBER_TOKEN_MISMATCH',
 
-        severity:
-          'WARNING',
+        severity: 'WARNING',
 
-        message:
-          'Numeric values differ between source and translation.',
+        message: 'Numeric values differ between source and translation.',
 
         expected,
         actual,
@@ -384,32 +228,17 @@ export class TranslationValidatorService {
   }
 
   private validateSameAsSource(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const normalizedSource =
-      this.normalizeText(
-        source,
-      );
+    const normalizedSource = this.normalizeText(source);
 
-    const normalizedTranslated =
-      this.normalizeText(
-        translated,
-      );
+    const normalizedTranslated = this.normalizeText(translated);
 
-    if (
-      normalizedSource.length <
-        4 ||
-      !/[A-Za-zÀ-ÿ]/u.test(
-        normalizedSource,
-      )
-    ) {
+    if (normalizedSource.length < 4 || !/[A-Za-zÀ-ÿ]/u.test(normalizedSource)) {
       return;
     }
 
@@ -418,163 +247,85 @@ export class TranslationValidatorService {
       normalizedTranslated.toLocaleLowerCase()
     ) {
       issues.push({
-        code:
-          'SAME_AS_SOURCE',
+        code: 'SAME_AS_SOURCE',
 
-        severity:
-          'WARNING',
+        severity: 'WARNING',
 
-        message:
-          'Translation is identical to the source text.',
+        message: 'Translation is identical to the source text.',
       });
     }
   }
 
   private validateLengthRatio(
-    source:
-      string,
+    source: string,
 
-    translated:
-      string,
+    translated: string,
 
-    issues:
-      TranslationValidationIssue[],
+    issues: TranslationValidationIssue[],
   ) {
-    const sourceText =
-      this.visibleText(
-        source,
-      );
+    const sourceText = this.visibleText(source);
 
-    const translatedText =
-      this.visibleText(
-        translated,
-      );
+    const translatedText = this.visibleText(translated);
 
     /*
      * Very short strings are too noisy
      * for length-ratio validation.
      */
-    if (
-      sourceText.length <
-      12
-    ) {
+    if (sourceText.length < 12) {
       return;
     }
 
-    if (
-      sourceText.length ===
-      0
-    ) {
+    if (sourceText.length === 0) {
       return;
     }
 
-    const ratio =
-      translatedText.length /
-      sourceText.length;
+    const ratio = translatedText.length / sourceText.length;
 
-    if (
-      ratio <
-      0.35
-    ) {
+    if (ratio < 0.35) {
       issues.push({
-        code:
-          'LENGTH_RATIO_LOW',
+        code: 'LENGTH_RATIO_LOW',
 
-        severity:
-          'WARNING',
+        severity: 'WARNING',
 
-        message:
-          `Translation is unusually short compared with the source (ratio ${ratio.toFixed(
-            2,
-          )}).`,
+        message: `Translation is unusually short compared with the source (ratio ${ratio.toFixed(
+          2,
+        )}).`,
       });
     }
 
-    if (
-      ratio >
-      3
-    ) {
+    if (ratio > 3) {
       issues.push({
-        code:
-          'LENGTH_RATIO_HIGH',
+        code: 'LENGTH_RATIO_HIGH',
 
-        severity:
-          'WARNING',
+        severity: 'WARNING',
 
-        message:
-          `Translation is unusually long compared with the source (ratio ${ratio.toFixed(
-            2,
-          )}).`,
+        message: `Translation is unusually long compared with the source (ratio ${ratio.toFixed(
+          2,
+        )}).`,
       });
     }
   }
 
-  private extractLiquidTokens(
-    value:
-      string,
-  ) {
-    const matches =
-      value.match(
-        /{{[\s\S]*?}}|{%[\s\S]*?%}/g,
-      ) ??
-      [];
+  private extractLiquidTokens(value: string) {
+    const matches = value.match(/{{[\s\S]*?}}|{%[\s\S]*?%}/g) ?? [];
 
-    return matches.map(
-      (
-        token,
-      ) =>
-        this.normalizeLiquidToken(
-          token,
-        ),
-    );
+    return matches.map((token) => this.normalizeLiquidToken(token));
   }
 
-  private normalizeLiquidToken(
-    token:
-      string,
-  ) {
-    if (
-      token.startsWith(
-        '{{',
-      )
-    ) {
-      const inner =
-        token
-          .slice(
-            2,
-            -2,
-          )
-          .trim()
-          .replace(
-            /\s+/g,
-            ' ',
-          );
+  private normalizeLiquidToken(token: string) {
+    if (token.startsWith('{{')) {
+      const inner = token.slice(2, -2).trim().replace(/\s+/g, ' ');
 
       return `{{${inner}}}`;
     }
 
-    const inner =
-      token
-        .slice(
-          2,
-          -2,
-        )
-        .trim()
-        .replace(
-          /\s+/g,
-          ' ',
-        );
+    const inner = token.slice(2, -2).trim().replace(/\s+/g, ' ');
 
     return `{%${inner}%}`;
   }
 
-  private extractPlaceholders(
-    value:
-      string,
-  ) {
-    const tokens:
-      string[] =
-      [];
+  private extractPlaceholders(value: string) {
+    const tokens: string[] = [];
 
     /*
      * printf style:
@@ -584,30 +335,18 @@ export class TranslationValidatorService {
      * %1$s
      * %2$d
      */
-    const printf =
-      value.match(
-        /%(?:\d+\$)?[sdifouxXeEgGc]/g,
-      ) ??
-      [];
+    const printf = value.match(/%(?:\d+\$)?[sdifouxXeEgGc]/g) ?? [];
 
-    tokens.push(
-      ...printf,
-    );
+    tokens.push(...printf);
 
     /*
      * JavaScript / template style:
      *
      * ${name}
      */
-    const dollarBraces =
-      value.match(
-        /\$\{[A-Za-z_][A-Za-z0-9_.-]*\}/g,
-      ) ??
-      [];
+    const dollarBraces = value.match(/\$\{[A-Za-z_][A-Za-z0-9_.-]*\}/g) ?? [];
 
-    tokens.push(
-      ...dollarBraces,
-    );
+    tokens.push(...dollarBraces);
 
     /*
      * Generic placeholders:
@@ -618,126 +357,56 @@ export class TranslationValidatorService {
      * Avoid Liquid {{ ... }}.
      */
     const braces =
-      value.match(
-        /(?<![$\{])\{[A-Za-z_][A-Za-z0-9_.-]*\}(?!})/g,
-      ) ??
-      [];
+      value.match(/(?<![$\{])\{[A-Za-z_][A-Za-z0-9_.-]*\}(?!})/g) ?? [];
 
-    tokens.push(
-      ...braces,
-    );
+    tokens.push(...braces);
 
     return tokens;
   }
 
-  private extractUrls(
-    value:
-      string,
-  ) {
-    const matches =
-      value.match(
-        /https?:\/\/[^\s<>"']+/gi,
-      ) ??
-      [];
+  private extractUrls(value: string) {
+    const matches = value.match(/https?:\/\/[^\s<>"']+/gi) ?? [];
 
-    return matches.map(
-      (
-        url,
-      ) =>
-        url.replace(
-          /[),.;!?]+$/g,
-          '',
-        ),
-    );
+    return matches.map((url) => url.replace(/[),.;!?]+$/g, ''));
   }
 
-  private extractEmails(
-    value:
-      string,
-  ) {
+  private extractEmails(value: string) {
     return (
-      value.match(
-        /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-      ) ??
-      []
-    ).map(
-      (
-        email,
-      ) =>
-        email.toLocaleLowerCase(),
-    );
+      value.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi) ?? []
+    ).map((email) => email.toLocaleLowerCase());
   }
 
-  private extractHtmlStructure(
-    value:
-      string,
-  ) {
-    const tags:
-      string[] =
-      [];
+  private extractHtmlStructure(value: string) {
+    const tags: string[] = [];
 
-    const regex =
-      /<\/?([A-Za-z][A-Za-z0-9:-]*)\b[^>]*>/g;
+    const regex = /<\/?([A-Za-z][A-Za-z0-9:-]*)\b[^>]*>/g;
 
-    let match:
-      RegExpExecArray |
-      null;
+    let match: RegExpExecArray | null;
 
-    while (
-      (
-        match =
-          regex.exec(
-            value,
-          )
-      ) !==
-      null
-    ) {
-      const raw =
-        match[0];
+    while ((match = regex.exec(value)) !== null) {
+      const raw = match[0];
 
-      const name =
-        match[1]
-          .toLocaleLowerCase();
+      const name = match[1].toLocaleLowerCase();
 
-      if (
-        raw.startsWith(
-          '</',
-        )
-      ) {
-        tags.push(
-          `</${name}>`,
-        );
+      if (raw.startsWith('</')) {
+        tags.push(`</${name}>`);
 
         continue;
       }
 
-      if (
-        raw.endsWith(
-          '/>',
-        ) ||
-        this.isVoidHtmlTag(
-          name,
-        )
-      ) {
-        tags.push(
-          `<${name}/>`,
-        );
+      if (raw.endsWith('/>') || this.isVoidHtmlTag(name)) {
+        tags.push(`<${name}/>`);
 
         continue;
       }
 
-      tags.push(
-        `<${name}>`,
-      );
+      tags.push(`<${name}>`);
     }
 
     return tags;
   }
 
-  private isVoidHtmlTag(
-    name:
-      string,
-  ) {
+  private isVoidHtmlTag(name: string) {
     return new Set([
       'area',
       'base',
@@ -753,127 +422,64 @@ export class TranslationValidatorService {
       'source',
       'track',
       'wbr',
-    ]).has(
-      name,
-    );
+    ]).has(name);
   }
 
-  private visibleText(
-    value:
-      string,
-  ) {
+  private visibleText(value: string) {
     return value
-      .replace(
-        /<[^>]*>/g,
-        ' ',
-      )
-      .replace(
-        /{{[\s\S]*?}}|{%[\s\S]*?%}/g,
-        ' ',
-      )
-      .replace(
-        /\s+/g,
-        ' ',
-      )
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/{{[\s\S]*?}}|{%[\s\S]*?%}/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
-  private normalizeText(
-    value:
-      string,
-  ) {
-    return value
-      .replace(
-        /\s+/g,
-        ' ',
-      )
-      .trim();
+  private normalizeText(value: string) {
+    return value.replace(/\s+/g, ' ').trim();
   }
 
   private sameSequence(
-    left:
-      string[],
+    left: string[],
 
-    right:
-      string[],
+    right: string[],
   ) {
-    if (
-      left.length !==
-      right.length
-    ) {
+    if (left.length !== right.length) {
       return false;
     }
 
-    return left.every(
-      (
-        value,
-        index,
-      ) =>
-        value ===
-        right[index],
-    );
+    return left.every((value, index) => value === right[index]);
   }
 
   private sameMultiset(
-    left:
-      string[],
+    left: string[],
 
-    right:
-      string[],
+    right: string[],
   ) {
-    if (
-      left.length !==
-      right.length
-    ) {
+    if (left.length !== right.length) {
       return false;
     }
 
-    const leftSorted =
-      [...left].sort();
+    const leftSorted = [...left].sort();
 
-    const rightSorted =
-      [...right].sort();
+    const rightSorted = [...right].sort();
 
-    return leftSorted.every(
-      (
-        value,
-        index,
-      ) =>
-        value ===
-        rightSorted[index],
-    );
+    return leftSorted.every((value, index) => value === rightSorted[index]);
   }
 
   private result(
-    issues:
-      TranslationValidationIssue[],
-  ):
-    TranslationValidationResult {
-    const errorCount =
-      issues.filter(
-        (
-          issue,
-        ) =>
-          issue.severity ===
-          'ERROR',
-      ).length;
+    issues: TranslationValidationIssue[],
+  ): TranslationValidationResult {
+    const errorCount = issues.filter(
+      (issue) => issue.severity === 'ERROR',
+    ).length;
 
-    const warningCount =
-      issues.filter(
-        (
-          issue,
-        ) =>
-          issue.severity ===
-          'WARNING',
-      ).length;
+    const warningCount = issues.filter(
+      (issue) => issue.severity === 'WARNING',
+    ).length;
 
     return {
-      version:
-        this.version,
+      version: this.version,
 
-      passed:
-        errorCount ===
-        0,
+      passed: errorCount === 0,
 
       errorCount,
 

@@ -1,11 +1,6 @@
-import {
-  BadGatewayException,
-  Injectable,
-} from '@nestjs/common';
+import { BadGatewayException, Injectable } from '@nestjs/common';
 
-import {
-  AiRegistryService,
-} from '../ai/ai-registry.service.js';
+import { AiRegistryService } from '../ai/ai-registry.service.js';
 
 export type DeepLTranslateInput = {
   text: string;
@@ -20,136 +15,80 @@ export type DeepLTranslateInput = {
 export type DeepLTranslateResult = {
   text: string;
 
-  detectedSourceLanguage?:
-    string;
+  detectedSourceLanguage?: string;
 
-  billedCharacters?:
-    number;
+  billedCharacters?: number;
 };
 
 @Injectable()
 export class DeepLTranslationService {
-  constructor(
-    private readonly aiRegistry:
-      AiRegistryService,
-  ) {}
+  constructor(private readonly aiRegistry: AiRegistryService) {}
 
-  async translate(
-    input: DeepLTranslateInput,
-  ): Promise<DeepLTranslateResult> {
-    const {
-      apiKey,
-      apiUrl,
-    } =
-      this.aiRegistry
-        .getDeepLConfiguration();
+  async translate(input: DeepLTranslateInput): Promise<DeepLTranslateResult> {
+    const { apiKey, apiUrl } = this.aiRegistry.getDeepLConfiguration();
 
-    const sourceLang =
-      this.toDeepLSourceLanguage(
-        input.sourceLocale,
-      );
+    const sourceLang = this.toDeepLSourceLanguage(input.sourceLocale);
 
-    const targetLang =
-      this.toDeepLTargetLanguage(
-        input.targetLocale,
-      );
+    const targetLang = this.toDeepLTargetLanguage(input.targetLocale);
 
-    const isHtml =
-      input.contentType
-        ?.toUpperCase() ===
-      'HTML';
+    const isHtml = input.contentType?.toUpperCase() === 'HTML';
 
-    const body:
-      Record<string, unknown> = {
-        text: [
-          input.text,
-        ],
+    const body: Record<string, unknown> = {
+      text: [input.text],
 
-        source_lang:
-          sourceLang,
+      source_lang: sourceLang,
 
-        target_lang:
-          targetLang,
+      target_lang: targetLang,
 
-        show_billed_characters:
-          true,
+      show_billed_characters: true,
 
-        preserve_formatting:
-          true,
-      };
+      preserve_formatting: true,
+    };
 
     if (isHtml) {
-      body.tag_handling =
-        'html';
+      body.tag_handling = 'html';
 
-      body.tag_handling_version =
-        'v2';
+      body.tag_handling_version = 'v2';
     }
 
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
 
-    const timeout =
-      setTimeout(
-        () =>
-          controller.abort(),
-        20_000,
-      );
+    const timeout = setTimeout(() => controller.abort(), 20_000);
 
     try {
-      const response =
-        await fetch(
-          `${apiUrl}/v2/translate`,
-          {
-            method:
-              'POST',
+      const response = await fetch(`${apiUrl}/v2/translate`, {
+        method: 'POST',
 
-            headers: {
-              Authorization:
-                `DeepL-Auth-Key ${apiKey}`,
+        headers: {
+          Authorization: `DeepL-Auth-Key ${apiKey}`,
 
-              'Content-Type':
-                'application/json',
-            },
+          'Content-Type': 'application/json',
+        },
 
-            body:
-              JSON.stringify(
-                body,
-              ),
+        body: JSON.stringify(body),
 
-            signal:
-              controller.signal,
-          },
-        );
+        signal: controller.signal,
+      });
 
-      const rawBody =
-        await response.text();
+      const rawBody = await response.text();
 
-      let data:
-        {
-          translations?: Array<{
-            text?: string;
+      let data: {
+        translations?: Array<{
+          text?: string;
 
-            detected_source_language?:
-              string;
+          detected_source_language?: string;
 
-            billed_characters?:
-              number;
-          }>;
+          billed_characters?: number;
+        }>;
 
-          message?:
-            string;
+        message?: string;
 
-          code?:
-            string;
-        } = {};
+        code?: string;
+      } = {};
 
       if (rawBody) {
         try {
-          data =
-            JSON.parse(
-              rawBody,
-            );
+          data = JSON.parse(rawBody);
         } catch {
           // Leave data empty.
         }
@@ -163,71 +102,38 @@ export class DeepLTranslationService {
         );
       }
 
-      const translation =
-        data.translations?.[0];
+      const translation = data.translations?.[0];
 
-      if (
-        !translation?.text
-      ) {
-        throw new BadGatewayException(
-          'DeepL returned no translation.',
-        );
+      if (!translation?.text) {
+        throw new BadGatewayException('DeepL returned no translation.');
       }
 
       return {
-        text:
-          translation.text,
+        text: translation.text,
 
-        detectedSourceLanguage:
-          translation
-            .detected_source_language,
+        detectedSourceLanguage: translation.detected_source_language,
 
-        billedCharacters:
-          translation
-            .billed_characters,
+        billedCharacters: translation.billed_characters,
       };
     } catch (error) {
-      if (
-        error instanceof
-        BadGatewayException
-      ) {
+      if (error instanceof BadGatewayException) {
         throw error;
       }
 
-      if (
-        error instanceof Error &&
-        error.name ===
-          'AbortError'
-      ) {
-        throw new BadGatewayException(
-          'DeepL request timed out.',
-        );
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new BadGatewayException('DeepL request timed out.');
       }
 
       throw new BadGatewayException(
-        error instanceof Error
-          ? error.message
-          : 'DeepL translation failed.',
+        error instanceof Error ? error.message : 'DeepL translation failed.',
       );
     } finally {
-      clearTimeout(
-        timeout,
-      );
+      clearTimeout(timeout);
     }
   }
 
-  private toDeepLSourceLanguage(
-    locale:
-      string,
-  ) {
-    const normalized =
-      locale
-        .trim()
-        .replace(
-          '_',
-          '-',
-        )
-        .toUpperCase();
+  private toDeepLSourceLanguage(locale: string) {
+    const normalized = locale.trim().replace('_', '-').toUpperCase();
 
     /*
      * DeepL source languages generally use
@@ -238,58 +144,31 @@ export class DeepLTranslationService {
      * en-GB -> EN
      * pt-BR -> PT
      */
-    return normalized
-      .split(
-        '-',
-      )[0];
+    return normalized.split('-')[0];
   }
 
-  private toDeepLTargetLanguage(
-    locale:
-      string,
-  ) {
-    const normalized =
-      locale
-        .trim()
-        .replace(
-          '_',
-          '-',
-        )
-        .toUpperCase();
+  private toDeepLTargetLanguage(locale: string) {
+    const normalized = locale.trim().replace('_', '-').toUpperCase();
 
     /*
      * Preserve the DeepL target variants
      * for locales where the regional/script
      * distinction matters.
      */
-    const explicitMappings:
-      Record<string, string> = {
-        'EN-US':
-          'EN-US',
+    const explicitMappings: Record<string, string> = {
+      'EN-US': 'EN-US',
 
-        'EN-GB':
-          'EN-GB',
+      'EN-GB': 'EN-GB',
 
-        'PT-BR':
-          'PT-BR',
+      'PT-BR': 'PT-BR',
 
-        'PT-PT':
-          'PT-PT',
+      'PT-PT': 'PT-PT',
 
-        'ZH-HANS':
-          'ZH-HANS',
+      'ZH-HANS': 'ZH-HANS',
 
-        'ZH-HANT':
-          'ZH-HANT',
-      };
+      'ZH-HANT': 'ZH-HANT',
+    };
 
-    return (
-      explicitMappings[
-        normalized
-      ] ??
-      normalized.split(
-        '-',
-      )[0]
-    );
+    return explicitMappings[normalized] ?? normalized.split('-')[0];
   }
 }

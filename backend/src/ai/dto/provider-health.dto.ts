@@ -1,7 +1,4 @@
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ProviderUsageDto {
   @ApiProperty({
@@ -17,21 +14,12 @@ export class ProviderUsageDto {
 
 export class ProviderHealthDto {
   @ApiProperty({
-    enum: [
-      'openai',
-      'anthropic',
-      'google',
-      'deepl',
-    ],
+    enum: ['openai', 'anthropic', 'google', 'deepl'],
   })
   provider!: string;
 
   @ApiProperty({
-    enum: [
-      'OK',
-      'ERROR',
-      'NOT_CONFIGURED',
-    ],
+    enum: ['OK', 'ERROR', 'NOT_CONFIGURED'],
   })
   status!: string;
 
@@ -50,17 +38,14 @@ export class ProviderHealthDto {
   availableModels?: number;
 
   @ApiPropertyOptional({
-    type:
-      ProviderUsageDto,
+    type: ProviderUsageDto,
   })
   usage?: ProviderUsageDto;
 }
 
 export class ProvidersHealthDto {
   @ApiProperty({
-    type: [
-      ProviderHealthDto,
-    ],
+    type: [ProviderHealthDto],
   })
   providers!: ProviderHealthDto[];
 }

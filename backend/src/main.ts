@@ -1,4 +1,5 @@
 import {
+  Logger,
   ValidationPipe,
 } from '@nestjs/common';
 
@@ -26,38 +27,59 @@ import {
   createOpenApiDocument,
 } from './docs/openapi.js';
 
+function parseCorsOrigins(
+  value:
+    string |
+    undefined,
+) {
+  return (
+    value
+      ?.split(',')
+      .map(
+        (origin) =>
+          origin.trim(),
+      )
+      .filter(Boolean) ??
+    []
+  );
+}
+
 async function bootstrap() {
+  const logger =
+    new Logger(
+      'Bootstrap',
+    );
+
   const app =
     await NestFactory.create<NestExpressApplication>(
       AppModule,
     );
 
-  /*
-   * Shopify theme translation resources
-   * can contain large JSON / HTML payloads.
-   *
-   * Express defaults to roughly 100 KB.
-   * 5 MB gives ACA Locale enough room
-   * without allowing unnecessarily large
-   * request bodies.
-   */
+  app.enableShutdownHooks();
+
   app.useBodyParser(
     'json',
     {
-      limit: '5mb',
+      limit:
+        '5mb',
     },
   );
 
   app.useBodyParser(
     'urlencoded',
     {
-      limit: '5mb',
-      extended: true,
+      limit:
+        '5mb',
+
+      extended:
+        true,
     },
   );
 
   const configService =
-    app.get(ConfigService);
+    app.get(
+      ConfigService,
+    );
 
   const port =
     configService.get<number>(
@@ -71,74 +93,127 @@ async function bootstrap() {
       'api/v1',
     );
 
+  const environment =
+    configService.get<string>(
+      'NODE_ENV',
+      'development',
+    );
+
   app.setGlobalPrefix(
     apiPrefix,
   );
 
+  const corsOrigins =
+    parseCorsOrigins(
+      configService.get<string>(
+        'CORS_ORIGINS',
+      ),
+    );
+
   app.enableCors({
-    origin: true,
-    credentials: true,
+    origin:
+      corsOrigins.length > 0
+        ? corsOrigins
+        : environment !==
+          'production',
+
+    credentials:
+      true,
   });
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
+      whitelist:
+        true,
+
+      transform:
+        true,
+
+      forbidNonWhitelisted:
+        true,
     }),
   );
 
-  const openApiDocument =
-    createOpenApiDocument(app);
+  const swaggerEnabled =
+    environment !==
+      'production' ||
+    configService.get<string>(
+      'ENABLE_SWAGGER',
+    ) ===
+      'true';
 
-  SwaggerModule.setup(
-    'docs',
-    app,
-    openApiDocument,
-    {
-      customSiteTitle:
-        'ACA Locale API Documentation',
+  if (swaggerEnabled) {
+    const openApiDocument =
+      createOpenApiDocument(
+        app,
+      );
 
-      swaggerOptions: {
-        persistAuthorization:
-          true,
+    SwaggerModule.setup(
+      'docs',
+      app,
+      openApiDocument,
+      {
+        customSiteTitle:
+          'ACA Locale API Documentation',
 
-        displayRequestDuration:
-          true,
+        swaggerOptions: {
+          persistAuthorization:
+            true,
+
+          displayRequestDuration:
+            true,
+        },
       },
-    },
-  );
+    );
+  }
 
   await app.listen(
     port,
     '0.0.0.0',
   );
 
-  console.log('');
-  console.log(
-    '======================================',
-  );
-  console.log(
-    ' ACA Locale Backend',
-  );
-  console.log(
-    '======================================',
-  );
-  console.log('');
-
-  console.log(
-    `API:     http://localhost:${port}/${apiPrefix}`,
+  logger.log(
+    `ACA Locale Backend listening on 0.0.0.0:${port}`,
   );
 
-  console.log(
-    `Swagger: http://localhost:${port}/docs`,
+  logger.log(
+    `API prefix: /${apiPrefix}`,
   );
 
-  console.log(
-    `OpenAPI: http://localhost:${port}/docs-json`,
+  logger.log(
+    'Liveness: /' +
+      apiPrefix +
+      '/health/live',
   );
 
-  console.log('');
+  logger.log(
+    'Readiness: /' +
+      apiPrefix +
+      '/health/ready',
+  );
+
+  if (swaggerEnabled) {
+    logger.log(
+      `Swagger: /docs`,
+    );
+  }
 }
 
-void bootstrap();
+void bootstrap().catch(
+  (error) => {
+    const logger =
+      new Logger(
+        'Bootstrap',
+      );
+
+    logger.error(
+      'ACA Locale backend failed to start.',
+      error instanceof Error
+        ? error.stack
+        : String(error),
+    );
+
+    process.exitCode =
+      1;
+  },
+);

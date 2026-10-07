@@ -1,34 +1,18 @@
-import {
-  Module,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
-import {
-  ShopifyAuthModule,
-} from '../shopify-auth/shopify-auth.module.js';
+import { ShopifyAuthModule } from '../shopify-auth/shopify-auth.module.js';
 
-import {
-  ShopsController,
-} from './shops.controller.js';
+import { ShopsController } from './shops.controller.js';
 
-import {
-  ShopsService,
-} from './shops.service.js';
+import { ShopsService } from './shops.service.js';
 
 @Module({
-  imports: [
-    ShopifyAuthModule,
-  ],
+  imports: [ShopifyAuthModule],
 
-  controllers: [
-    ShopsController,
-  ],
+  controllers: [ShopsController],
 
-  providers: [
-    ShopsService,
-  ],
+  providers: [ShopsService],
 
-  exports: [
-    ShopsService,
-  ],
+  exports: [ShopsService],
 })
 export class ShopsModule {}

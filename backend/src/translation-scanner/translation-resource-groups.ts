@@ -14,10 +14,7 @@ export const TRANSLATION_RESOURCE_GROUPS = {
     'SHOP_POLICY',
   ],
 
-  CUSTOM_DATA: [
-    'METAFIELD',
-    'METAOBJECT',
-  ],
+  CUSTOM_DATA: ['METAFIELD', 'METAOBJECT'],
 
   COMMERCE: [
     'DELIVERY_METHOD_DEFINITION',
@@ -38,16 +35,11 @@ export const TRANSLATION_RESOURCE_GROUPS = {
     'ONLINE_STORE_THEME_SETTINGS_DATA_SECTIONS',
   ],
 
-  SYSTEM: [
-    'EMAIL_TEMPLATE',
-    'PACKING_SLIP_TEMPLATE',
-    'SHOP',
-  ],
+  SYSTEM: ['EMAIL_TEMPLATE', 'PACKING_SLIP_TEMPLATE', 'SHOP'],
 } as const;
 
 export type TranslationResourceGroup =
-  | keyof typeof TRANSLATION_RESOURCE_GROUPS
-  | 'OTHER';
+  keyof typeof TRANSLATION_RESOURCE_GROUPS | 'OTHER';
 
 export const SHOPIFY_TRANSLATION_RESOURCE_TYPES = [
   ...TRANSLATION_RESOURCE_GROUPS.CONTENT,
@@ -60,21 +52,10 @@ export const SHOPIFY_TRANSLATION_RESOURCE_TYPES = [
 export function getTranslationResourceGroup(
   resourceType: string,
 ): TranslationResourceGroup {
-  for (
-    const [
-      group,
-      resourceTypes,
-    ] of Object.entries(
-      TRANSLATION_RESOURCE_GROUPS,
-    )
-  ) {
-    if (
-      (
-        resourceTypes as readonly string[]
-      ).includes(
-        resourceType,
-      )
-    ) {
+  for (const [group, resourceTypes] of Object.entries(
+    TRANSLATION_RESOURCE_GROUPS,
+  )) {
+    if ((resourceTypes as readonly string[]).includes(resourceType)) {
       return group as keyof typeof TRANSLATION_RESOURCE_GROUPS;
     }
   }

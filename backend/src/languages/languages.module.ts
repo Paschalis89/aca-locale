@@ -1,34 +1,18 @@
-import {
-  Module,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
-import {
-  ShopifyAuthModule,
-} from '../shopify-auth/shopify-auth.module.js';
+import { ShopifyAuthModule } from '../shopify-auth/shopify-auth.module.js';
 
-import {
-  LanguagesController,
-} from './languages.controller.js';
+import { LanguagesController } from './languages.controller.js';
 
-import {
-  LanguagesService,
-} from './languages.service.js';
+import { LanguagesService } from './languages.service.js';
 
 @Module({
-  imports: [
-    ShopifyAuthModule,
-  ],
+  imports: [ShopifyAuthModule],
 
-  controllers: [
-    LanguagesController,
-  ],
+  controllers: [LanguagesController],
 
-  providers: [
-    LanguagesService,
-  ],
+  providers: [LanguagesService],
 
-  exports: [
-    LanguagesService,
-  ],
+  exports: [LanguagesService],
 })
 export class LanguagesModule {}

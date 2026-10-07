@@ -1,12 +1,6 @@
-import {
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
-import {
-  IsIn,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 const translationProviders = [
   'OPENAI',
@@ -15,87 +9,54 @@ const translationProviders = [
   'DEEPL',
 ] as const;
 
-const aiProviders = [
-  'OPENAI',
-  'ANTHROPIC',
-  'GOOGLE',
-] as const;
+const aiProviders = ['OPENAI', 'ANTHROPIC', 'GOOGLE'] as const;
 
 export class UpdateAiConfigurationDto {
   @ApiPropertyOptional({
-    enum:
-      translationProviders,
-    example:
-      'DEEPL',
+    enum: translationProviders,
+    example: 'DEEPL',
   })
   @IsOptional()
-  @IsIn(
-    translationProviders,
-  )
-  translationProvider?:
-    'OPENAI' |
-    'ANTHROPIC' |
-    'GOOGLE' |
-    'DEEPL';
+  @IsIn(translationProviders)
+  translationProvider?: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | 'DEEPL';
 
   @ApiPropertyOptional({
-    example:
-      'gpt-5.6',
+    example: 'gpt-5.6',
     nullable: true,
   })
   @IsOptional()
   @IsString()
-  translationModel?:
-    string | null;
+  translationModel?: string | null;
 
   @ApiPropertyOptional({
-    enum:
-      aiProviders,
-    example:
-      'ANTHROPIC',
+    enum: aiProviders,
+    example: 'ANTHROPIC',
   })
   @IsOptional()
-  @IsIn(
-    aiProviders,
-  )
-  reviewProvider?:
-    'OPENAI' |
-    'ANTHROPIC' |
-    'GOOGLE';
+  @IsIn(aiProviders)
+  reviewProvider?: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE';
 
   @ApiPropertyOptional({
-    example:
-      'claude-sonnet-...',
+    example: 'claude-sonnet-...',
     nullable: true,
   })
   @IsOptional()
   @IsString()
-  reviewModel?:
-    string | null;
+  reviewModel?: string | null;
 
   @ApiPropertyOptional({
-    enum:
-      translationProviders,
-    example:
-      'GOOGLE',
+    enum: translationProviders,
+    example: 'GOOGLE',
   })
   @IsOptional()
-  @IsIn(
-    translationProviders,
-  )
-  fallbackProvider?:
-    'OPENAI' |
-    'ANTHROPIC' |
-    'GOOGLE' |
-    'DEEPL';
+  @IsIn(translationProviders)
+  fallbackProvider?: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | 'DEEPL';
 
   @ApiPropertyOptional({
-    example:
-      'gemini-...',
+    example: 'gemini-...',
     nullable: true,
   })
   @IsOptional()
   @IsString()
-  fallbackModel?:
-    string | null;
+  fallbackModel?: string | null;
 }

@@ -1,12 +1,8 @@
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TranslationJobDto {
   @ApiProperty({
-    example:
-      'cmv1234567890',
+    example: 'cmv1234567890',
   })
   id!: string;
 
@@ -21,24 +17,13 @@ export class TranslationJobDto {
   targetLocale!: string;
 
   @ApiProperty({
-    enum: [
-      'QUEUED',
-      'RUNNING',
-      'COMPLETED',
-      'PARTIAL',
-      'FAILED',
-      'CANCELLED',
-    ],
+    enum: ['QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED', 'CANCELLED'],
     example: 'QUEUED',
   })
   status!: string;
 
   @ApiPropertyOptional({
-    enum: [
-      'OPENAI',
-      'ANTHROPIC',
-      'GOOGLE',
-    ],
+    enum: ['OPENAI', 'ANTHROPIC', 'GOOGLE'],
     example: 'OPENAI',
     nullable: true,
   })
@@ -94,8 +79,7 @@ export class TranslationJobResourceDto {
   resourceType!: string;
 
   @ApiProperty({
-    example:
-      'gid://shopify/Product/123456789',
+    example: 'gid://shopify/Product/123456789',
   })
   shopifyResourceId!: string;
 }
@@ -117,11 +101,9 @@ export class TranslationJobFieldDto {
   sourceLocale!: string;
 
   @ApiProperty({
-    type:
-      TranslationJobResourceDto,
+    type: TranslationJobResourceDto,
   })
-  resource!:
-    TranslationJobResourceDto;
+  resource!: TranslationJobResourceDto;
 }
 
 export class TranslationJobItemDto {
@@ -150,68 +132,54 @@ export class TranslationJobItemDto {
   sourceDigest!: string;
 
   @ApiProperty({
-    example:
-      'Example product title',
+    example: 'Example product title',
   })
   sourceValue!: string;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  translatedValue!:
-    string | null;
+  translatedValue!: string | null;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  provider!:
-    string | null;
+  provider!: string | null;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  model!:
-    string | null;
+  model!: string | null;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  generatedAt!:
-    Date | null;
+  generatedAt!: Date | null;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  approvedAt!:
-    Date | null;
+  approvedAt!: Date | null;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  publishedAt!:
-    Date | null;
+  publishedAt!: Date | null;
 
   @ApiPropertyOptional({
     nullable: true,
   })
-  errorMessage!:
-    string | null;
+  errorMessage!: string | null;
 
   @ApiProperty({
-    type:
-      TranslationJobFieldDto,
+    type: TranslationJobFieldDto,
   })
-  field!:
-    TranslationJobFieldDto;
+  field!: TranslationJobFieldDto;
 }
 
-export class TranslationJobDetailDto
-  extends TranslationJobDto {
+export class TranslationJobDetailDto extends TranslationJobDto {
   @ApiProperty({
-    type: [
-      TranslationJobItemDto,
-    ],
+    type: [TranslationJobItemDto],
   })
-  items!:
-    TranslationJobItemDto[];
+  items!: TranslationJobItemDto[];
 }

@@ -1,12 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
-import {
-  DocumentBuilder,
-  SwaggerModule,
-} from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-export function createOpenApiDocument(
-  app: INestApplication,
-) {
+export function createOpenApiDocument(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('ACA Locale API')
     .setDescription(

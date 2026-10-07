@@ -1,23 +1,12 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
-import {
-  AnthropicTranslationAdapter,
-} from './anthropic-translation.adapter.js';
+import { AnthropicTranslationAdapter } from './anthropic-translation.adapter.js';
 
-import {
-  DeepLTranslationAdapter,
-} from './deepl-translation.adapter.js';
+import { DeepLTranslationAdapter } from './deepl-translation.adapter.js';
 
-import {
-  GoogleTranslationAdapter,
-} from './google-translation.adapter.js';
+import { GoogleTranslationAdapter } from './google-translation.adapter.js';
 
-import {
-  OpenAiTranslationAdapter,
-} from './openai-translation.adapter.js';
+import { OpenAiTranslationAdapter } from './openai-translation.adapter.js';
 
 import type {
   TranslationProviderAdapter,
@@ -27,26 +16,17 @@ import type {
 @Injectable()
 export class TranslationProviderRegistryService {
   constructor(
-    private readonly deepL:
-      DeepLTranslationAdapter,
+    private readonly deepL: DeepLTranslationAdapter,
 
-    private readonly openAi:
-      OpenAiTranslationAdapter,
+    private readonly openAi: OpenAiTranslationAdapter,
 
-    private readonly anthropic:
-      AnthropicTranslationAdapter,
+    private readonly anthropic: AnthropicTranslationAdapter,
 
-    private readonly google:
-      GoogleTranslationAdapter,
+    private readonly google: GoogleTranslationAdapter,
   ) {}
 
-  getProvider(
-    provider:
-      TranslationProviderName,
-  ): TranslationProviderAdapter {
-    switch (
-      provider
-    ) {
+  getProvider(provider: TranslationProviderName): TranslationProviderAdapter {
+    switch (provider) {
       case 'DEEPL':
         return this.deepL;
 

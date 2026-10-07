@@ -1,44 +1,29 @@
 type UsagePricingRule = {
-  charactersPerMillionUsd?:
-    number;
+  charactersPerMillionUsd?: number;
 
-  inputPerMillionUsd?:
-    number;
+  inputPerMillionUsd?: number;
 
-  outputPerMillionUsd?:
-    number;
+  outputPerMillionUsd?: number;
 };
 
 type UsageCostInput = {
-  provider:
-    string;
+  provider: string;
 
-  model?:
-    string |
-    null;
+  model?: string | null;
 
-  billedCharacters?:
-    number;
+  billedCharacters?: number;
 
-  inputTokens?:
-    number;
+  inputTokens?: number;
 
-  outputTokens?:
-    number;
+  outputTokens?: number;
 };
 
 export type UsageCostEstimate = {
-  estimatedCostMicrousd:
-    number |
-    null;
+  estimatedCostMicrousd: number | null;
 
-  pricingKey:
-    string |
-    null;
+  pricingKey: string | null;
 
-  pricingVersion:
-    string |
-    null;
+  pricingVersion: string | null;
 };
 
 /**
@@ -67,34 +52,19 @@ export type UsageCostEstimate = {
  *
  * Exact provider:model wins over provider:*.
  */
-export function estimateUsageCost(
-  input:
-    UsageCostInput,
-): UsageCostEstimate {
-  const rules =
-    readPricingRules();
+export function estimateUsageCost(input: UsageCostInput): UsageCostEstimate {
+  const rules = readPricingRules();
 
-  const provider =
-    input.provider
-      .trim()
-      .toUpperCase();
+  const provider = input.provider.trim().toUpperCase();
 
-  const model =
-    input.model
-      ?.trim() ||
-    null;
+  const model = input.model?.trim() || null;
 
-  const exactKey =
-    model
-      ? `${provider}:${model}`
-      : null;
+  const exactKey = model ? `${provider}:${model}` : null;
 
-  const wildcardKey =
-    `${provider}:*`;
+  const wildcardKey = `${provider}:*`;
 
   const pricingKey =
-    exactKey &&
-    rules[exactKey]
+    exactKey && rules[exactKey]
       ? exactKey
       : rules[wildcardKey]
         ? wildcardKey
@@ -102,42 +72,25 @@ export function estimateUsageCost(
 
   if (!pricingKey) {
     return {
-      estimatedCostMicrousd:
-        null,
+      estimatedCostMicrousd: null,
 
-      pricingKey:
-        null,
+      pricingKey: null,
 
-      pricingVersion:
-        process.env
-          .ACA_LOCALE_USAGE_PRICING_VERSION ??
-        null,
+      pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
     };
   }
 
-  const rule =
-    rules[pricingKey];
+  const rule = rules[pricingKey];
 
-  let microusd =
-    0;
+  let microusd = 0;
 
-  let hasApplicableRate =
-    false;
+  let hasApplicableRate = false;
 
-  const billedCharacters =
-    safeUsageNumber(
-      input.billedCharacters,
-    );
+  const billedCharacters = safeUsageNumber(input.billedCharacters);
 
-  const inputTokens =
-    safeUsageNumber(
-      input.inputTokens,
-    );
+  const inputTokens = safeUsageNumber(input.inputTokens);
 
-  const outputTokens =
-    safeUsageNumber(
-      input.outputTokens,
-    );
+  const outputTokens = safeUsageNumber(input.outputTokens);
 
   /*
    * USD / 1,000,000 units converts neatly
@@ -146,49 +99,22 @@ export function estimateUsageCost(
    * units / 1,000,000 * USD-rate * 1,000,000
    * = units * USD-rate.
    */
-  if (
-    billedCharacters >
-      0 &&
-    isValidRate(
-      rule.charactersPerMillionUsd,
-    )
-  ) {
-    microusd +=
-      billedCharacters *
-      rule.charactersPerMillionUsd!;
+  if (billedCharacters > 0 && isValidRate(rule.charactersPerMillionUsd)) {
+    microusd += billedCharacters * rule.charactersPerMillionUsd!;
 
-    hasApplicableRate =
-      true;
+    hasApplicableRate = true;
   }
 
-  if (
-    inputTokens >
-      0 &&
-    isValidRate(
-      rule.inputPerMillionUsd,
-    )
-  ) {
-    microusd +=
-      inputTokens *
-      rule.inputPerMillionUsd!;
+  if (inputTokens > 0 && isValidRate(rule.inputPerMillionUsd)) {
+    microusd += inputTokens * rule.inputPerMillionUsd!;
 
-    hasApplicableRate =
-      true;
+    hasApplicableRate = true;
   }
 
-  if (
-    outputTokens >
-      0 &&
-    isValidRate(
-      rule.outputPerMillionUsd,
-    )
-  ) {
-    microusd +=
-      outputTokens *
-      rule.outputPerMillionUsd!;
+  if (outputTokens > 0 && isValidRate(rule.outputPerMillionUsd)) {
+    microusd += outputTokens * rule.outputPerMillionUsd!;
 
-    hasApplicableRate =
-      true;
+    hasApplicableRate = true;
   }
 
   /*
@@ -198,189 +124,88 @@ export function estimateUsageCost(
    */
   if (
     !hasApplicableRate &&
-    billedCharacters ===
-      0 &&
-    inputTokens ===
-      0 &&
-    outputTokens ===
-      0
+    billedCharacters === 0 &&
+    inputTokens === 0 &&
+    outputTokens === 0
   ) {
     return {
-      estimatedCostMicrousd:
-        0,
+      estimatedCostMicrousd: 0,
 
       pricingKey,
 
-      pricingVersion:
-        process.env
-          .ACA_LOCALE_USAGE_PRICING_VERSION ??
-        null,
+      pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
     };
   }
 
   if (!hasApplicableRate) {
     return {
-      estimatedCostMicrousd:
-        null,
+      estimatedCostMicrousd: null,
 
       pricingKey,
 
-      pricingVersion:
-        process.env
-          .ACA_LOCALE_USAGE_PRICING_VERSION ??
-        null,
+      pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
     };
   }
 
   return {
-    estimatedCostMicrousd:
-      Math.max(
-        0,
-        Math.round(
-          microusd,
-        ),
-      ),
+    estimatedCostMicrousd: Math.max(0, Math.round(microusd)),
 
     pricingKey,
 
-    pricingVersion:
-      process.env
-        .ACA_LOCALE_USAGE_PRICING_VERSION ??
-      null,
+    pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
   };
 }
 
-function readPricingRules(): Record<
-  string,
-  UsagePricingRule
-> {
-  const raw =
-    process.env
-      .ACA_LOCALE_USAGE_PRICING_JSON
-      ?.trim();
+function readPricingRules(): Record<string, UsagePricingRule> {
+  const raw = process.env.ACA_LOCALE_USAGE_PRICING_JSON?.trim();
 
   if (!raw) {
     return {};
   }
 
   try {
-    const parsed =
-      JSON.parse(
-        raw,
-      ) as Record<
-        string,
-        UsagePricingRule
-      >;
+    const parsed = JSON.parse(raw) as Record<string, UsagePricingRule>;
 
-    const normalized:
-      Record<
-        string,
-        UsagePricingRule
-      > =
-      {};
+    const normalized: Record<string, UsagePricingRule> = {};
 
-    for (
-      const [
-        key,
-        value,
-      ]
-      of Object.entries(
-        parsed,
-      )
-    ) {
-      if (
-        !value ||
-        typeof value !==
-          'object'
-      ) {
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!value || typeof value !== 'object') {
         continue;
       }
 
-      const separator =
-        key.indexOf(
-          ':',
-        );
+      const separator = key.indexOf(':');
 
-      if (
-        separator <=
-        0
-      ) {
+      if (separator <= 0) {
         continue;
       }
 
-      const provider =
-        key
-          .slice(
-            0,
-            separator,
-          )
-          .trim()
-          .toUpperCase();
+      const provider = key.slice(0, separator).trim().toUpperCase();
 
-      const model =
-        key
-          .slice(
-            separator +
-              1,
-          )
-          .trim();
+      const model = key.slice(separator + 1).trim();
 
-      if (
-        !provider ||
-        !model
-      ) {
+      if (!provider || !model) {
         continue;
       }
 
-      normalized[
-        `${provider}:${model}`
-      ] =
-        value;
+      normalized[`${provider}:${model}`] = value;
     }
 
     return normalized;
   } catch (error) {
-    console.error(
-      '[ACA Locale] Invalid ACA_LOCALE_USAGE_PRICING_JSON:',
-      error,
-    );
+    console.error('[ACA Locale] Invalid ACA_LOCALE_USAGE_PRICING_JSON:', error);
 
     return {};
   }
 }
 
-function safeUsageNumber(
-  value:
-    number |
-    undefined,
-) {
-  if (
-    typeof value !==
-      'number' ||
-    !Number.isFinite(
-      value,
-    ) ||
-    value <
-      0
-  ) {
+function safeUsageNumber(value: number | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     return 0;
   }
 
   return value;
 }
 
-function isValidRate(
-  value:
-    number |
-    undefined,
-): value is number {
-  return (
-    typeof value ===
-      'number' &&
-    Number.isFinite(
-      value,
-    ) &&
-    value >=
-      0
-  );
+function isValidRate(value: number | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }

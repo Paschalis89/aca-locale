@@ -1,6 +1,4 @@
-import {
-  Type,
-} from 'class-transformer';
+import { Type } from 'class-transformer';
 
 import {
   IsArray,
@@ -11,10 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TranslationSourceDto {
   @ApiProperty({
@@ -85,39 +80,30 @@ export class ExistingTranslationDto {
 
 export class TranslationResourceScanDto {
   @ApiProperty({
-    example:
-      'gid://shopify/Product/8882758975625',
+    example: 'gid://shopify/Product/8882758975625',
   })
   @IsString()
   @IsNotEmpty()
   resourceId!: string;
 
   @ApiProperty({
-    type: [
-      TranslationSourceDto,
-    ],
+    type: [TranslationSourceDto],
   })
   @IsArray()
   @ValidateNested({
     each: true,
   })
-  @Type(
-    () => TranslationSourceDto,
-  )
+  @Type(() => TranslationSourceDto)
   content!: TranslationSourceDto[];
 
   @ApiProperty({
-    type: [
-      ExistingTranslationDto,
-    ],
+    type: [ExistingTranslationDto],
   })
   @IsArray()
   @ValidateNested({
     each: true,
   })
-  @Type(
-    () => ExistingTranslationDto,
-  )
+  @Type(() => ExistingTranslationDto)
   translations!: ExistingTranslationDto[];
 }
 
@@ -137,17 +123,13 @@ export class SyncTranslationScanDto {
   targetLocale!: string;
 
   @ApiProperty({
-    type: [
-      TranslationResourceScanDto,
-    ],
+    type: [TranslationResourceScanDto],
   })
   @IsArray()
   @ValidateNested({
     each: true,
   })
-  @Type(
-    () => TranslationResourceScanDto,
-  )
+  @Type(() => TranslationResourceScanDto)
   resources!: TranslationResourceScanDto[];
 
   @ApiPropertyOptional({

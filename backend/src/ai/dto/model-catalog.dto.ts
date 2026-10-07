@@ -1,7 +1,4 @@
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AiModelCatalogItemDto {
   @ApiProperty({
@@ -23,29 +20,19 @@ export class AiModelCatalogItemDto {
 
   @ApiPropertyOptional({
     nullable: true,
-    example:
-      '2026-09-01T00:00:00.000Z',
+    example: '2026-09-01T00:00:00.000Z',
   })
   createdAt?: string | null;
 }
 
 export class AiProviderModelCatalogDto {
   @ApiProperty({
-    enum: [
-      'openai',
-      'anthropic',
-      'google',
-      'deepl',
-    ],
+    enum: ['openai', 'anthropic', 'google', 'deepl'],
   })
   provider!: string;
 
   @ApiProperty({
-    enum: [
-      'OK',
-      'ERROR',
-      'NOT_CONFIGURED',
-    ],
+    enum: ['OK', 'ERROR', 'NOT_CONFIGURED'],
   })
   status!: string;
 
@@ -68,26 +55,19 @@ export class AiProviderModelCatalogDto {
   modelCount!: number;
 
   @ApiProperty({
-    type: [
-      AiModelCatalogItemDto,
-    ],
+    type: [AiModelCatalogItemDto],
   })
-  models!:
-    AiModelCatalogItemDto[];
+  models!: AiModelCatalogItemDto[];
 }
 
 export class AiModelCatalogDto {
   @ApiProperty({
-    example:
-      '2026-10-05T00:00:00.000Z',
+    example: '2026-10-05T00:00:00.000Z',
   })
   generatedAt!: string;
 
   @ApiProperty({
-    type: [
-      AiProviderModelCatalogDto,
-    ],
+    type: [AiProviderModelCatalogDto],
   })
-  providers!:
-    AiProviderModelCatalogDto[];
+  providers!: AiProviderModelCatalogDto[];
 }

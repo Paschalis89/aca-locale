@@ -1,6 +1,4 @@
-export type TranslationValidationSeverity =
-  | 'ERROR'
-  | 'WARNING';
+export type TranslationValidationSeverity = 'ERROR' | 'WARNING';
 
 export type TranslationValidationCode =
   | 'EMPTY_TRANSLATION'
@@ -15,58 +13,41 @@ export type TranslationValidationCode =
   | 'LENGTH_RATIO_HIGH';
 
 export type TranslationValidationIssue = {
-  code:
-    TranslationValidationCode;
+  code: TranslationValidationCode;
 
-  severity:
-    TranslationValidationSeverity;
+  severity: TranslationValidationSeverity;
 
-  message:
-    string;
+  message: string;
 
-  expected?:
-    string[];
+  expected?: string[];
 
-  actual?:
-    string[];
+  actual?: string[];
 };
 
 export type TranslationValidationInput = {
-  sourceValue:
-    string;
+  sourceValue: string;
 
-  translatedValue:
-    string;
+  translatedValue: string;
 
-  sourceLocale:
-    string;
+  sourceLocale: string;
 
-  targetLocale:
-    string;
+  targetLocale: string;
 
-  contentType?:
-    string;
+  contentType?: string;
 
-  resourceType?:
-    string;
+  resourceType?: string;
 
-  fieldKey?:
-    string;
+  fieldKey?: string;
 };
 
 export type TranslationValidationResult = {
-  version:
-    string;
+  version: string;
 
-  passed:
-    boolean;
+  passed: boolean;
 
-  errorCount:
-    number;
+  errorCount: number;
 
-  warningCount:
-    number;
+  warningCount: number;
 
-  issues:
-    TranslationValidationIssue[];
+  issues: TranslationValidationIssue[];
 };

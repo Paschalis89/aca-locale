@@ -5,92 +5,53 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  PrismaService,
-} from '../database/prisma.service.js';
+import { PrismaService } from '../database/prisma.service.js';
 
 @Injectable()
 export class TranslationPublicationService {
-  constructor(
-    private readonly prisma:
-      PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async prepare(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
 
-    itemId:
-      string,
+    itemId: string,
   ) {
-    const item =
-      await this.findItem(
-        shopifyDomain,
-        jobId,
-        itemId,
-      );
+    const item = await this.findItem(shopifyDomain, jobId, itemId);
 
-    if (
-      item.status ===
-      'PUBLISHED'
-    ) {
+    if (item.status === 'PUBLISHED') {
       return {
-        itemId:
-          item.id,
+        itemId: item.id,
 
-        jobId:
-          item.jobId,
+        jobId: item.jobId,
 
-        alreadyPublished:
-          true,
+        alreadyPublished: true,
 
-        resourceId:
-          item.field.resource
-            .shopifyResourceId,
+        resourceId: item.field.resource.shopifyResourceId,
 
-        resourceType:
-          item.field.resource
-            .resourceType,
+        resourceType: item.field.resource.resourceType,
 
-        key:
-          item.field.key,
+        key: item.field.key,
 
-        sourceLocale:
-          item.job.sourceLocale,
+        sourceLocale: item.job.sourceLocale,
 
-        targetLocale:
-          item.job.targetLocale,
+        targetLocale: item.job.targetLocale,
 
-        sourceDigest:
-          item.sourceDigest,
+        sourceDigest: item.sourceDigest,
 
-        value:
-          item.approvedValue,
+        value: item.approvedValue,
       };
     }
 
-    if (
-      item.status !==
-      'APPROVED'
-    ) {
+    if (item.status !== 'APPROVED') {
       throw new BadRequestException(
         `Translation item cannot be published from status "${item.status}".`,
       );
     }
 
-    if (
-      !item.approvedValue ||
-      item.approvedValue
-        .trim()
-        .length ===
-        0
-    ) {
-      throw new BadRequestException(
-        'Translation item has no approved value.',
-      );
+    if (!item.approvedValue || item.approvedValue.trim().length === 0) {
+      throw new BadRequestException('Translation item has no approved value.');
     }
 
     /*
@@ -102,295 +63,213 @@ export class TranslationPublicationService {
      * against LIVE Shopify immediately before
      * translationsRegister.
      */
-    if (
-      item.sourceDigest !==
-      item.field.sourceDigest
-    ) {
+    if (item.sourceDigest !== item.field.sourceDigest) {
       throw new ConflictException({
-        code:
-          'SOURCE_CHANGED',
+        code: 'SOURCE_CHANGED',
 
         message:
           'The Shopify source content changed after the translation job was created. Rescan and regenerate the translation.',
 
-        jobSourceDigest:
-          item.sourceDigest,
+        jobSourceDigest: item.sourceDigest,
 
-        currentScannerDigest:
-          item.field.sourceDigest,
+        currentScannerDigest: item.field.sourceDigest,
       });
     }
 
     return {
-      itemId:
-        item.id,
+      itemId: item.id,
 
-      jobId:
-        item.jobId,
+      jobId: item.jobId,
 
-      alreadyPublished:
-        false,
+      alreadyPublished: false,
 
-      resourceId:
-        item.field.resource
-          .shopifyResourceId,
+      resourceId: item.field.resource.shopifyResourceId,
 
-      resourceType:
-        item.field.resource
-          .resourceType,
+      resourceType: item.field.resource.resourceType,
 
-      key:
-        item.field.key,
+      key: item.field.key,
 
-      sourceLocale:
-        item.job.sourceLocale,
+      sourceLocale: item.job.sourceLocale,
 
-      targetLocale:
-        item.job.targetLocale,
+      targetLocale: item.job.targetLocale,
 
-      sourceDigest:
-        item.sourceDigest,
+      sourceDigest: item.sourceDigest,
 
-      value:
-        item.approvedValue,
+      value: item.approvedValue,
     };
   }
 
   async confirmPublished(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
 
-    itemId:
-      string,
+    itemId: string,
   ) {
-    const item =
-      await this.findItem(
-        shopifyDomain,
-        jobId,
-        itemId,
-      );
+    const item = await this.findItem(shopifyDomain, jobId, itemId);
 
     /*
      * Confirmation is idempotent.
      */
-    if (
-      item.status ===
-      'PUBLISHED'
-    ) {
+    if (item.status === 'PUBLISHED') {
       return item;
     }
 
-    if (
-      item.status !==
-      'APPROVED'
-    ) {
+    if (item.status !== 'APPROVED') {
       throw new BadRequestException(
         `Translation item cannot be marked as published from status "${item.status}".`,
       );
     }
 
-    if (
-      !item.approvedValue
-    ) {
-      throw new BadRequestException(
-        'Translation item has no approved value.',
-      );
+    if (!item.approvedValue) {
+      throw new BadRequestException('Translation item has no approved value.');
     }
 
-    const now =
-      new Date();
+    const now = new Date();
 
-    return this.prisma.$transaction(
-      async (
-        tx,
-      ) => {
-        await tx.translationJobItem.update({
-          where: {
-            id:
-              item.id,
-          },
-
-          data: {
-            status:
-              'PUBLISHED',
-
-            publishedAt:
-              now,
-          },
-        });
-
-        /*
-         * Shopify remains the real source
-         * of truth.
-         *
-         * This projection records the
-         * successful publication immediately.
-         * A future scan will independently
-         * confirm it again.
-         */
-        await tx.translationState.upsert({
-          where: {
-            fieldId_targetLocale: {
-              fieldId:
-                item.fieldId,
-
-              targetLocale:
-                item.job.targetLocale,
-            },
-          },
-
-          create: {
-            fieldId:
-              item.fieldId,
-
-            targetLocale:
-              item.job.targetLocale,
-
-            status:
-              'TRANSLATED',
-
-            translatedValue:
-              item.approvedValue,
-
-            translationUpdatedAt:
-              now,
-
-            scannedAt:
-              now,
-          },
-
-          update: {
-            status:
-              'TRANSLATED',
-
-            translatedValue:
-              item.approvedValue,
-
-            translationUpdatedAt:
-              now,
-
-            scannedAt:
-              now,
-          },
-        });
-
-        return tx.translationJobItem.findUnique({
-          where: {
-            id:
-              item.id,
-          },
-
-          include: {
-            field: {
-              select: {
-                key:
-                  true,
-
-                type:
-                  true,
-
-                sourceLocale:
-                  true,
-
-                resource: {
-                  select: {
-                    resourceType:
-                      true,
-
-                    shopifyResourceId:
-                      true,
-                  },
-                },
-              },
-            },
-          },
-        });
-      },
-    );
-  }
-
-  private async findItem(
-    shopifyDomain:
-      string,
-
-    jobId:
-      string,
-
-    itemId:
-      string,
-  ) {
-    const item =
-      await this.prisma.translationJobItem.findFirst({
+    return this.prisma.$transaction(async (tx) => {
+      await tx.translationJobItem.update({
         where: {
-          id:
-            itemId,
+          id: item.id,
+        },
 
-          jobId,
+        data: {
+          status: 'PUBLISHED',
 
-          job: {
-            shop: {
-              shopifyDomain,
-            },
+          publishedAt: now,
+        },
+      });
+
+      /*
+       * Shopify remains the real source
+       * of truth.
+       *
+       * This projection records the
+       * successful publication immediately.
+       * A future scan will independently
+       * confirm it again.
+       */
+      await tx.translationState.upsert({
+        where: {
+          fieldId_targetLocale: {
+            fieldId: item.fieldId,
+
+            targetLocale: item.job.targetLocale,
           },
         },
 
+        create: {
+          fieldId: item.fieldId,
+
+          targetLocale: item.job.targetLocale,
+
+          status: 'TRANSLATED',
+
+          translatedValue: item.approvedValue,
+
+          translationUpdatedAt: now,
+
+          scannedAt: now,
+        },
+
+        update: {
+          status: 'TRANSLATED',
+
+          translatedValue: item.approvedValue,
+
+          translationUpdatedAt: now,
+
+          scannedAt: now,
+        },
+      });
+
+      return tx.translationJobItem.findUnique({
+        where: {
+          id: item.id,
+        },
+
         include: {
-          job: {
-            select: {
-              id:
-                true,
-
-              sourceLocale:
-                true,
-
-              targetLocale:
-                true,
-            },
-          },
-
           field: {
             select: {
-              id:
-                true,
+              key: true,
 
-              key:
-                true,
+              type: true,
 
-              type:
-                true,
-
-              sourceLocale:
-                true,
-
-              sourceDigest:
-                true,
-
-              sourceValue:
-                true,
+              sourceLocale: true,
 
               resource: {
                 select: {
-                  resourceType:
-                    true,
+                  resourceType: true,
 
-                  shopifyResourceId:
-                    true,
+                  shopifyResourceId: true,
                 },
               },
             },
           },
         },
       });
+    });
+  }
 
-    if (
-      !item
-    ) {
-      throw new NotFoundException(
-        'Translation job item not found.',
-      );
+  private async findItem(
+    shopifyDomain: string,
+
+    jobId: string,
+
+    itemId: string,
+  ) {
+    const item = await this.prisma.translationJobItem.findFirst({
+      where: {
+        id: itemId,
+
+        jobId,
+
+        job: {
+          shop: {
+            shopifyDomain,
+          },
+        },
+      },
+
+      include: {
+        job: {
+          select: {
+            id: true,
+
+            sourceLocale: true,
+
+            targetLocale: true,
+          },
+        },
+
+        field: {
+          select: {
+            id: true,
+
+            key: true,
+
+            type: true,
+
+            sourceLocale: true,
+
+            sourceDigest: true,
+
+            sourceValue: true,
+
+            resource: {
+              select: {
+                resourceType: true,
+
+                shopifyResourceId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Translation job item not found.');
     }
 
     return item;

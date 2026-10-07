@@ -30,6 +30,86 @@
         ]
       }
     },
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "ReadinessController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Liveness check",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "ReadinessController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Readiness check for PostgreSQL and Redis",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/internal/shopify/app-uninstalled": {
+      "post": {
+        "operationId": "InternalShopifyController_appUninstalled",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopifyShopEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Handle verified Shopify app uninstall",
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
+    "/api/v1/internal/shopify/shop-redact": {
+      "post": {
+        "operationId": "InternalShopifyController_shopRedact",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopifyShopEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Permanently redact all ACA Locale shop data",
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
     "/api/v1/shops/current": {
       "get": {
         "operationId": "ShopsController_getCurrentShop",
@@ -652,26 +732,6 @@
         ]
       }
     },
-    "/api/v1/translations/jobs/queue/status": {
-      "get": {
-        "operationId": "TranslationJobsController_queueStatus",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get translation queue status",
-        "tags": [
-          "Translation Jobs"
-        ]
-      }
-    },
     "/api/v1/translations/jobs/{id}/queue": {
       "get": {
         "operationId": "TranslationJobsController_queueJobStatus",
@@ -695,7 +755,7 @@
             "bearer": []
           }
         ],
-        "summary": "Get BullMQ status for a translation job",
+        "summary": "Get BullMQ status for a translation job owned by the authenticated shop",
         "tags": [
           "Translation Jobs"
         ]
@@ -1174,6 +1234,10 @@
       }
     },
     "schemas": {
+      "ShopifyShopEventDto": {
+        "type": "object",
+        "properties": {}
+      },
       "AiProviderStatusDto": {
         "type": "object",
         "properties": {

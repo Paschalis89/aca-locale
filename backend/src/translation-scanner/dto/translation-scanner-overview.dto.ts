@@ -1,6 +1,4 @@
-import {
-  ApiProperty,
-} from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class TranslationResourceTypeSummaryDto {
   @ApiProperty({
@@ -9,14 +7,7 @@ export class TranslationResourceTypeSummaryDto {
   resourceType!: string;
 
   @ApiProperty({
-    enum: [
-      'CONTENT',
-      'CUSTOM_DATA',
-      'COMMERCE',
-      'THEME',
-      'SYSTEM',
-      'OTHER',
-    ],
+    enum: ['CONTENT', 'CUSTOM_DATA', 'COMMERCE', 'THEME', 'SYSTEM', 'OTHER'],
     example: 'CONTENT',
   })
   group!: string;
@@ -64,14 +55,7 @@ export class TranslationResourceTypeSummaryDto {
 
 export class TranslationGroupSummaryDto {
   @ApiProperty({
-    enum: [
-      'CONTENT',
-      'CUSTOM_DATA',
-      'COMMERCE',
-      'THEME',
-      'SYSTEM',
-      'OTHER',
-    ],
+    enum: ['CONTENT', 'CUSTOM_DATA', 'COMMERCE', 'THEME', 'SYSTEM', 'OTHER'],
     example: 'CONTENT',
   })
   group!: string;
@@ -181,8 +165,7 @@ export class TranslationOverallSummaryDto {
 
 export class TranslationScannerOverviewDto {
   @ApiProperty({
-    example:
-      'aca-locale-dev-cfoxunuo.myshopify.com',
+    example: 'aca-locale-dev-cfoxunuo.myshopify.com',
   })
   shopifyDomain!: string;
 
@@ -192,25 +175,19 @@ export class TranslationScannerOverviewDto {
   targetLocale!: string;
 
   @ApiProperty({
-    type:
-      TranslationOverallSummaryDto,
+    type: TranslationOverallSummaryDto,
   })
-  summary!:
-    TranslationOverallSummaryDto;
+  summary!: TranslationOverallSummaryDto;
 
   @ApiProperty({
-    type: [
-      TranslationGroupSummaryDto,
-    ],
+    type: [TranslationGroupSummaryDto],
   })
-  groups!:
-    TranslationGroupSummaryDto[];
+  groups!: TranslationGroupSummaryDto[];
 }
 
 export class TranslationResourceTypesOverviewDto {
   @ApiProperty({
-    example:
-      'aca-locale-dev-cfoxunuo.myshopify.com',
+    example: 'aca-locale-dev-cfoxunuo.myshopify.com',
   })
   shopifyDomain!: string;
 
@@ -220,10 +197,7 @@ export class TranslationResourceTypesOverviewDto {
   targetLocale!: string;
 
   @ApiProperty({
-    type: [
-      TranslationResourceTypeSummaryDto,
-    ],
+    type: [TranslationResourceTypeSummaryDto],
   })
-  resourceTypes!:
-    TranslationResourceTypeSummaryDto[];
+  resourceTypes!: TranslationResourceTypeSummaryDto[];
 }

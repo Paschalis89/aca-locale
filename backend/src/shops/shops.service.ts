@@ -1,17 +1,10 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import {
-  PrismaService,
-} from '../database/prisma.service.js';
+import { PrismaService } from '../database/prisma.service.js';
 
 @Injectable()
 export class ShopsService {
-  constructor(
-    private readonly prisma:
-      PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
     return this.prisma.shop.findMany({
@@ -29,8 +22,7 @@ export class ShopsService {
   bootstrapAcaLocaleDev() {
     return this.prisma.shop.upsert({
       where: {
-        shopifyDomain:
-          'aca-locale-dev-cfoxunuo.myshopify.com',
+        shopifyDomain: 'aca-locale-dev-cfoxunuo.myshopify.com',
       },
 
       update: {
@@ -56,8 +48,7 @@ export class ShopsService {
       },
 
       create: {
-        shopifyDomain:
-          'aca-locale-dev-cfoxunuo.myshopify.com',
+        shopifyDomain: 'aca-locale-dev-cfoxunuo.myshopify.com',
 
         name: 'ACA Locale Dev',
 
@@ -79,145 +70,122 @@ export class ShopsService {
     });
   }
 
-  ensureShop(
-    shopifyDomain: string,
-    ) {
+  ensureShop(shopifyDomain: string) {
     return this.prisma.shop.upsert({
-        where: {
+      where: {
         shopifyDomain,
-        },
+      },
 
-        update: {},
+      update: {},
 
-        create: {
+      create: {
         shopifyDomain,
 
         settings: {
-            create: {},
+          create: {},
         },
 
         aiConfiguration: {
-            create: {},
+          create: {},
         },
-        },
+      },
 
-        include: {
+      include: {
         settings: true,
         aiConfiguration: true,
-        },
+      },
     });
-    }
+  }
 
-    syncIdentity(
-  shopifyDomain: string,
-  identity: {
-    id: string;
-    name: string;
-    currencyCode: string;
-    ianaTimezone: string;
-
-    primaryDomain: {
-      host: string;
-      url: string;
-    };
-  },
-) {
-  return this.prisma.shop.upsert({
-    where: {
-      shopifyDomain,
-    },
-
-    update: {
-      shopifyShopId:
-        identity.id,
-
-      name:
-        identity.name,
-
-      currencyCode:
-        identity.currencyCode,
-
-      ianaTimezone:
-        identity.ianaTimezone,
-
-      primaryDomainHost:
-        identity.primaryDomain.host,
-
-      primaryDomainUrl:
-        identity.primaryDomain.url,
-
-      status:
-        'ACTIVE',
-
-      uninstalledAt:
-        null,
-    },
-
-    create: {
-      shopifyDomain,
-
-      shopifyShopId:
-        identity.id,
-
-      name:
-        identity.name,
-
-      currencyCode:
-        identity.currencyCode,
-
-      ianaTimezone:
-        identity.ianaTimezone,
-
-      primaryDomainHost:
-        identity.primaryDomain.host,
-
-      primaryDomainUrl:
-        identity.primaryDomain.url,
-
-      settings: {
-        create: {},
-      },
-
-      aiConfiguration: {
-        create: {},
-      },
-    },
-  });
-}
-
-findConfiguration(
+  syncIdentity(
     shopifyDomain: string,
+    identity: {
+      id: string;
+      name: string;
+      currencyCode: string;
+      ianaTimezone: string;
+
+      primaryDomain: {
+        host: string;
+        url: string;
+      };
+    },
   ) {
+    return this.prisma.shop.upsert({
+      where: {
+        shopifyDomain,
+      },
+
+      update: {
+        shopifyShopId: identity.id,
+
+        name: identity.name,
+
+        currencyCode: identity.currencyCode,
+
+        ianaTimezone: identity.ianaTimezone,
+
+        primaryDomainHost: identity.primaryDomain.host,
+
+        primaryDomainUrl: identity.primaryDomain.url,
+
+        status: 'ACTIVE',
+
+        uninstalledAt: null,
+      },
+
+      create: {
+        shopifyDomain,
+
+        shopifyShopId: identity.id,
+
+        name: identity.name,
+
+        currencyCode: identity.currencyCode,
+
+        ianaTimezone: identity.ianaTimezone,
+
+        primaryDomainHost: identity.primaryDomain.host,
+
+        primaryDomainUrl: identity.primaryDomain.url,
+
+        settings: {
+          create: {},
+        },
+
+        aiConfiguration: {
+          create: {},
+        },
+      },
+    });
+  }
+
+  findConfiguration(shopifyDomain: string) {
     return this.prisma.shop.findUnique({
       where: {
         shopifyDomain,
       },
 
       include: {
-        settings:
-          true,
+        settings: true,
 
-        aiConfiguration:
-          true,
+        aiConfiguration: true,
 
         languages: {
           include: {
-            language:
-              true,
+            language: true,
           },
 
           orderBy: {
             language: {
-              locale:
-                'asc',
+              locale: 'asc',
             },
           },
         },
 
         markets: {
           orderBy: {
-            name:
-              'asc',
+            name: 'asc',
           },
         },
       },

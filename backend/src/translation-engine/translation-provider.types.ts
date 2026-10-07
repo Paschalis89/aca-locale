@@ -1,8 +1,5 @@
 export type TranslationProviderName =
-  | 'OPENAI'
-  | 'ANTHROPIC'
-  | 'GOOGLE'
-  | 'DEEPL';
+  'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | 'DEEPL';
 
 export type TranslationProviderInput = {
   text: string;
@@ -35,8 +32,7 @@ export type TranslationProviderResult = {
 };
 
 export interface TranslationProviderAdapter {
-  readonly provider:
-    TranslationProviderName;
+  readonly provider: TranslationProviderName;
 
   translate(
     input: TranslationProviderInput,

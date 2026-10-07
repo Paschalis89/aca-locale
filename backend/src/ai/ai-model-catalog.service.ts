@@ -1,21 +1,10 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import {
-  ConfigService,
-} from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
-type ProviderName =
-  | 'openai'
-  | 'anthropic'
-  | 'google'
-  | 'deepl';
+type ProviderName = 'openai' | 'anthropic' | 'google' | 'deepl';
 
-type CatalogStatus =
-  | 'OK'
-  | 'ERROR'
-  | 'NOT_CONFIGURED';
+type CatalogStatus = 'OK' | 'ERROR' | 'NOT_CONFIGURED';
 
 type ModelCatalogItem = {
   id: string;
@@ -25,66 +14,45 @@ type ModelCatalogItem = {
 };
 
 type ProviderCatalog = {
-  provider:
-    ProviderName;
+  provider: ProviderName;
 
-  status:
-    CatalogStatus;
+  status: CatalogStatus;
 
-  configured:
-    boolean;
+  configured: boolean;
 
-  requiresModel:
-    boolean;
+  requiresModel: boolean;
 
-  message:
-    string;
+  message: string;
 
-  modelCount:
-    number;
+  modelCount: number;
 
-  models:
-    ModelCatalogItem[];
+  models: ModelCatalogItem[];
 };
 
 type ModelCatalog = {
-  generatedAt:
-    string;
+  generatedAt: string;
 
-  providers:
-    ProviderCatalog[];
+  providers: ProviderCatalog[];
 };
 
 @Injectable()
 export class AiModelCatalogService {
-  private readonly cacheTtlMs =
-    5 * 60 * 1000;
+  private readonly cacheTtlMs = 5 * 60 * 1000;
 
   private cache:
     | {
-        expiresAt:
-          number;
+        expiresAt: number;
 
-        value:
-          ModelCatalog;
+        value: ModelCatalog;
       }
     | undefined;
 
-  constructor(
-    private readonly configService:
-      ConfigService,
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
-  async getCatalog():
-    Promise<ModelCatalog> {
-    const now =
-      Date.now();
+  async getCatalog(): Promise<ModelCatalog> {
+    const now = Date.now();
 
-    if (
-      this.cache &&
-      this.cache.expiresAt >
-        now
-    ) {
+    if (this.cache && this.cache.expiresAt > now) {
       return this.cache.value;
     }
 
@@ -93,27 +61,21 @@ export class AiModelCatalogService {
      * prevent the other catalogs from
      * being returned.
      */
-    const providers =
-      await Promise.all([
-        this.getOpenAiCatalog(),
-        this.getAnthropicCatalog(),
-        this.getGoogleCatalog(),
-        this.getDeepLCatalog(),
-      ]);
+    const providers = await Promise.all([
+      this.getOpenAiCatalog(),
+      this.getAnthropicCatalog(),
+      this.getGoogleCatalog(),
+      this.getDeepLCatalog(),
+    ]);
 
-    const value:
-      ModelCatalog = {
-        generatedAt:
-          new Date()
-            .toISOString(),
+    const value: ModelCatalog = {
+      generatedAt: new Date().toISOString(),
 
-        providers,
-      };
+      providers,
+    };
 
     this.cache = {
-      expiresAt:
-        now +
-        this.cacheTtlMs,
+      expiresAt: now + this.cacheTtlMs,
 
       value,
     };
@@ -121,447 +83,261 @@ export class AiModelCatalogService {
     return value;
   }
 
-  private async getOpenAiCatalog():
-    Promise<ProviderCatalog> {
-    const apiKey =
-      this.getOptionalConfig(
-        'OPENAI_API_KEY',
-      );
+  private async getOpenAiCatalog(): Promise<ProviderCatalog> {
+    const apiKey = this.getOptionalConfig('OPENAI_API_KEY');
 
     if (!apiKey) {
-      return this.notConfigured(
-        'openai',
-        true,
-      );
+      return this.notConfigured('openai', true);
     }
 
     try {
-      const response =
-        await this.fetchWithTimeout(
-          'https://api.openai.com/v1/models',
-          {
-            headers: {
-              Authorization:
-                `Bearer ${apiKey}`,
-            },
+      const response = await this.fetchWithTimeout(
+        'https://api.openai.com/v1/models',
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
           },
-        );
+        },
+      );
 
-      const data =
-        await response.json() as {
-          data?: Array<{
-            id: string;
-            created?: number;
-          }>;
+      const data = (await response.json()) as {
+        data?: Array<{
+          id: string;
+          created?: number;
+        }>;
 
-          error?: {
-            message?: string;
-          };
+        error?: {
+          message?: string;
         };
+      };
 
       if (!response.ok) {
         return this.errorCatalog(
           'openai',
           true,
-          data.error?.message ??
-            `HTTP ${response.status}`,
+          data.error?.message ?? `HTTP ${response.status}`,
         );
       }
 
-      const models =
-        (
-          data.data ??
-          []
-        )
-          .map(
-            (
-              model,
-            ): ModelCatalogItem => ({
-              id:
-                model.id,
+      const models = (data.data ?? [])
+        .map((model): ModelCatalogItem => ({
+          id: model.id,
 
-              name:
-                model.id,
+          name: model.id,
 
-              selectable:
-                this.isOpenAiSelectable(
-                  model.id,
-                ),
+          selectable: this.isOpenAiSelectable(model.id),
 
-              createdAt:
-                model.created
-                  ? new Date(
-                      model.created *
-                        1000,
-                    ).toISOString()
-                  : null,
-            }),
-          )
-          .sort(
-            (
-              a,
-              b,
-            ) =>
-              (
-                b.createdAt ??
-                ''
-              ).localeCompare(
-                a.createdAt ??
-                  '',
-              ),
-          );
+          createdAt: model.created
+            ? new Date(model.created * 1000).toISOString()
+            : null,
+        }))
+        .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
       return {
-        provider:
-          'openai',
+        provider: 'openai',
 
-        status:
-          'OK',
+        status: 'OK',
 
-        configured:
-          true,
+        configured: true,
 
-        requiresModel:
-          true,
+        requiresModel: true,
 
-        message:
-          'OpenAI model catalog loaded.',
+        message: 'OpenAI model catalog loaded.',
 
-        modelCount:
-          models.length,
+        modelCount: models.length,
 
         models,
       };
     } catch (error) {
-      return this.errorCatalog(
-        'openai',
-        true,
-        this.errorMessage(
-          error,
-        ),
-      );
+      return this.errorCatalog('openai', true, this.errorMessage(error));
     }
   }
 
-  private async getAnthropicCatalog():
-    Promise<ProviderCatalog> {
-    const apiKey =
-      this.getOptionalConfig(
-        'ANTHROPIC_API_KEY',
-      );
+  private async getAnthropicCatalog(): Promise<ProviderCatalog> {
+    const apiKey = this.getOptionalConfig('ANTHROPIC_API_KEY');
 
     if (!apiKey) {
-      return this.notConfigured(
-        'anthropic',
-        true,
-      );
+      return this.notConfigured('anthropic', true);
     }
 
     try {
-      const response =
-        await this.fetchWithTimeout(
-          'https://api.anthropic.com/v1/models?limit=100',
-          {
-            headers: {
-              'x-api-key':
-                apiKey,
+      const response = await this.fetchWithTimeout(
+        'https://api.anthropic.com/v1/models?limit=100',
+        {
+          headers: {
+            'x-api-key': apiKey,
 
-              'anthropic-version':
-                '2023-06-01',
-            },
+            'anthropic-version': '2023-06-01',
           },
-        );
+        },
+      );
 
-      const data =
-        await response.json() as {
-          data?: Array<{
-            id: string;
+      const data = (await response.json()) as {
+        data?: Array<{
+          id: string;
 
-            display_name?: string;
+          display_name?: string;
 
-            created_at?: string;
-          }>;
+          created_at?: string;
+        }>;
 
-          error?: {
-            message?: string;
-          };
+        error?: {
+          message?: string;
         };
+      };
 
       if (!response.ok) {
         return this.errorCatalog(
           'anthropic',
           true,
-          data.error?.message ??
-            `HTTP ${response.status}`,
+          data.error?.message ?? `HTTP ${response.status}`,
         );
       }
 
-      const models =
-        (
-          data.data ??
-          []
-        )
-          .map(
-            (
-              model,
-            ): ModelCatalogItem => ({
-              id:
-                model.id,
+      const models = (data.data ?? [])
+        .map((model): ModelCatalogItem => ({
+          id: model.id,
 
-              name:
-                model.display_name ??
-                model.id,
+          name: model.display_name ?? model.id,
 
-              selectable:
-                model.id
-                  .toLowerCase()
-                  .startsWith(
-                    'claude-',
-                  ),
+          selectable: model.id.toLowerCase().startsWith('claude-'),
 
-              createdAt:
-                model.created_at ??
-                null,
-            }),
-          )
-          .sort(
-            (
-              a,
-              b,
-            ) =>
-              (
-                b.createdAt ??
-                ''
-              ).localeCompare(
-                a.createdAt ??
-                  '',
-              ),
-          );
+          createdAt: model.created_at ?? null,
+        }))
+        .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
       return {
-        provider:
-          'anthropic',
+        provider: 'anthropic',
 
-        status:
-          'OK',
+        status: 'OK',
 
-        configured:
-          true,
+        configured: true,
 
-        requiresModel:
-          true,
+        requiresModel: true,
 
-        message:
-          'Anthropic model catalog loaded.',
+        message: 'Anthropic model catalog loaded.',
 
-        modelCount:
-          models.length,
+        modelCount: models.length,
 
         models,
       };
     } catch (error) {
-      return this.errorCatalog(
-        'anthropic',
-        true,
-        this.errorMessage(
-          error,
-        ),
-      );
+      return this.errorCatalog('anthropic', true, this.errorMessage(error));
     }
   }
 
-  private async getGoogleCatalog():
-    Promise<ProviderCatalog> {
-    const apiKey =
-      this.getOptionalConfig(
-        'GOOGLE_GENERATIVE_AI_API_KEY',
-      );
+  private async getGoogleCatalog(): Promise<ProviderCatalog> {
+    const apiKey = this.getOptionalConfig('GOOGLE_GENERATIVE_AI_API_KEY');
 
     if (!apiKey) {
-      return this.notConfigured(
-        'google',
-        true,
-      );
+      return this.notConfigured('google', true);
     }
 
     try {
-      const models:
-        ModelCatalogItem[] = [];
+      const models: ModelCatalogItem[] = [];
 
-      let pageToken:
-        string |
-        undefined;
+      let pageToken: string | undefined;
 
       do {
-        const url =
-          new URL(
-            'https://generativelanguage.googleapis.com/v1beta/models',
-          );
-
-        url.searchParams.set(
-          'pageSize',
-          '100',
+        const url = new URL(
+          'https://generativelanguage.googleapis.com/v1beta/models',
         );
 
-        url.searchParams.set(
-          'key',
-          apiKey,
-        );
+        url.searchParams.set('pageSize', '100');
+
+        url.searchParams.set('key', apiKey);
 
         if (pageToken) {
-          url.searchParams.set(
-            'pageToken',
-            pageToken,
-          );
+          url.searchParams.set('pageToken', pageToken);
         }
 
-        const response =
-          await this.fetchWithTimeout(
-            url.toString(),
-          );
+        const response = await this.fetchWithTimeout(url.toString());
 
-        const data =
-          await response.json() as {
-            models?: Array<{
-              name: string;
+        const data = (await response.json()) as {
+          models?: Array<{
+            name: string;
 
-              displayName?: string;
+            displayName?: string;
 
-              supportedGenerationMethods?:
-                string[];
-            }>;
+            supportedGenerationMethods?: string[];
+          }>;
 
-            nextPageToken?: string;
+          nextPageToken?: string;
 
-            error?: {
-              message?: string;
-            };
+          error?: {
+            message?: string;
           };
+        };
 
         if (!response.ok) {
           return this.errorCatalog(
             'google',
             true,
-            data.error?.message ??
-              `HTTP ${response.status}`,
+            data.error?.message ?? `HTTP ${response.status}`,
           );
         }
 
-        for (
-          const model
-          of data.models ??
-          []
-        ) {
-          const id =
-            model.name.replace(
-              /^models\//,
-              '',
-            );
+        for (const model of data.models ?? []) {
+          const id = model.name.replace(/^models\//, '');
 
           models.push({
             id,
 
-            name:
-              model.displayName ??
-              id,
+            name: model.displayName ?? id,
 
-            selectable:
-              this.isGoogleSelectable(
-                id,
-                model
-                  .supportedGenerationMethods ??
-                  [],
-              ),
+            selectable: this.isGoogleSelectable(
+              id,
+              model.supportedGenerationMethods ?? [],
+            ),
           });
         }
 
-        pageToken =
-          data.nextPageToken;
-      } while (
-        pageToken
-      );
+        pageToken = data.nextPageToken;
+      } while (pageToken);
 
-      models.sort(
-        (
-          a,
-          b,
-        ) =>
-          a.name.localeCompare(
-            b.name,
-          ),
-      );
+      models.sort((a, b) => a.name.localeCompare(b.name));
 
       return {
-        provider:
-          'google',
+        provider: 'google',
 
-        status:
-          'OK',
+        status: 'OK',
 
-        configured:
-          true,
+        configured: true,
 
-        requiresModel:
-          true,
+        requiresModel: true,
 
-        message:
-          'Google Gemini model catalog loaded.',
+        message: 'Google Gemini model catalog loaded.',
 
-        modelCount:
-          models.length,
+        modelCount: models.length,
 
         models,
       };
     } catch (error) {
-      return this.errorCatalog(
-        'google',
-        true,
-        this.errorMessage(
-          error,
-        ),
-      );
+      return this.errorCatalog('google', true, this.errorMessage(error));
     }
   }
 
-  private getDeepLCatalog():
-    Promise<ProviderCatalog> {
-    const configured =
-      Boolean(
-        this.getOptionalConfig(
-          'DEEPL_API_KEY',
-        ),
-      );
+  private getDeepLCatalog(): Promise<ProviderCatalog> {
+    const configured = Boolean(this.getOptionalConfig('DEEPL_API_KEY'));
 
     if (!configured) {
-      return Promise.resolve(
-        this.notConfigured(
-          'deepl',
-          false,
-        ),
-      );
+      return Promise.resolve(this.notConfigured('deepl', false));
     }
 
     return Promise.resolve({
-      provider:
-        'deepl',
+      provider: 'deepl',
 
-      status:
-        'OK',
+      status: 'OK',
 
-      configured:
-        true,
+      configured: true,
 
-      requiresModel:
-        false,
+      requiresModel: false,
 
-      message:
-        'DeepL does not require a model selection.',
+      message: 'DeepL does not require a model selection.',
 
-      modelCount:
-        0,
+      modelCount: 0,
 
-      models:
-        [],
+      models: [],
     });
   }
 
@@ -574,213 +350,137 @@ export class AiModelCatalogService {
    * marks likely text-generation models
    * as selectable.
    */
-  private isOpenAiSelectable(
-    modelId:
-      string,
-  ) {
-    const id =
-      modelId.toLowerCase();
+  private isOpenAiSelectable(modelId: string) {
+    const id = modelId.toLowerCase();
 
     const excluded = [
-        'embedding',
-        'moderation',
-        'image',
-        'dall-e',
-        'tts',
-        'transcribe',
-        'whisper',
-        'realtime',
-        'live',
-        'audio',
-        'search',
-        'codex',
-        'computer-use',
-        'deep-research',
-        'cyber',
-        'sora',
+      'embedding',
+      'moderation',
+      'image',
+      'dall-e',
+      'tts',
+      'transcribe',
+      'whisper',
+      'realtime',
+      'live',
+      'audio',
+      'search',
+      'codex',
+      'computer-use',
+      'deep-research',
+      'cyber',
+      'sora',
     ];
 
-    if (
-      excluded.some(
-        (value) =>
-          id.includes(
-            value,
-          ),
-      )
-    ) {
+    if (excluded.some((value) => id.includes(value))) {
       return false;
     }
 
-    return (
-      id.startsWith(
-        'gpt-',
-      ) ||
-      /^o\d/.test(
-        id,
-      )
-    );
+    return id.startsWith('gpt-') || /^o\d/.test(id);
   }
 
   private isGoogleSelectable(
-    modelId:
-      string,
+    modelId: string,
 
-    supportedMethods:
-      string[],
+    supportedMethods: string[],
   ) {
-    if (
-      !supportedMethods.includes(
-        'generateContent',
-      )
-    ) {
+    if (!supportedMethods.includes('generateContent')) {
       return false;
     }
 
-    const id =
-      modelId.toLowerCase();
+    const id = modelId.toLowerCase();
 
     const excluded = [
-        'image',
-        'tts',
-        'live',
-        'transcribe',
-        'embedding',
-        'robotics',
-        'veo',
-        'lyria',
-        'deep-research',
-        'antigravity',
-        'computer-use',
-        'nano-banana',
+      'image',
+      'tts',
+      'live',
+      'transcribe',
+      'embedding',
+      'robotics',
+      'veo',
+      'lyria',
+      'deep-research',
+      'antigravity',
+      'computer-use',
+      'nano-banana',
     ];
 
-    return !excluded.some(
-      (value) =>
-        id.includes(
-          value,
-        ),
-    );
+    return !excluded.some((value) => id.includes(value));
   }
 
   private notConfigured(
-    provider:
-      ProviderName,
+    provider: ProviderName,
 
-    requiresModel:
-      boolean,
+    requiresModel: boolean,
   ): ProviderCatalog {
     return {
       provider,
 
-      status:
-        'NOT_CONFIGURED',
+      status: 'NOT_CONFIGURED',
 
-      configured:
-        false,
+      configured: false,
 
       requiresModel,
 
-      message:
-        'Provider credentials are not configured.',
+      message: 'Provider credentials are not configured.',
 
-      modelCount:
-        0,
+      modelCount: 0,
 
-      models:
-        [],
+      models: [],
     };
   }
 
   private errorCatalog(
-    provider:
-      ProviderName,
+    provider: ProviderName,
 
-    requiresModel:
-      boolean,
+    requiresModel: boolean,
 
-    message:
-      string,
+    message: string,
   ): ProviderCatalog {
     return {
       provider,
 
-      status:
-        'ERROR',
+      status: 'ERROR',
 
-      configured:
-        true,
+      configured: true,
 
       requiresModel,
 
       message,
 
-      modelCount:
-        0,
+      modelCount: 0,
 
-      models:
-        [],
+      models: [],
     };
   }
 
-  private async fetchWithTimeout(
-    url: string,
-    init?: RequestInit,
-  ) {
-    const controller =
-      new AbortController();
+  private async fetchWithTimeout(url: string, init?: RequestInit) {
+    const controller = new AbortController();
 
-    const timeout =
-      setTimeout(
-        () =>
-          controller.abort(),
-        10_000,
-      );
+    const timeout = setTimeout(() => controller.abort(), 10_000);
 
     try {
-      return await fetch(
-        url,
-        {
-          ...init,
+      return await fetch(url, {
+        ...init,
 
-          signal:
-            controller.signal,
-        },
-      );
+        signal: controller.signal,
+      });
     } finally {
-      clearTimeout(
-        timeout,
-      );
+      clearTimeout(timeout);
     }
   }
 
-  private getOptionalConfig(
-    name:
-      string,
-  ) {
-    const value =
-      this.configService
-        .get<string>(
-          name,
-        )
-        ?.trim();
+  private getOptionalConfig(name: string) {
+    const value = this.configService.get<string>(name)?.trim();
 
-    return value
-      ? value
-      : undefined;
+    return value ? value : undefined;
   }
 
-  private errorMessage(
-    error:
-      unknown,
-  ) {
-    if (
-      error instanceof Error
-    ) {
+  private errorMessage(error: unknown) {
+    if (error instanceof Error) {
       return error.message;
     }
 
-    return String(
-      error,
-    );
+    return String(error);
   }
 }

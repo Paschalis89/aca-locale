@@ -1,7 +1,4 @@
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import {
   ArrayMinSize,
@@ -15,14 +12,11 @@ import {
   Min,
 } from 'class-validator';
 
-import {
-  Type,
-} from 'class-transformer';
+import { Type } from 'class-transformer';
 
 export class CreateTranslationJobDto {
   @ApiProperty({
-    description:
-      'Target Shopify locale.',
+    description: 'Target Shopify locale.',
     example: 'it',
   })
   @IsString()
@@ -30,13 +24,8 @@ export class CreateTranslationJobDto {
   targetLocale!: string;
 
   @ApiProperty({
-    description:
-      'Shopify resource types to include in the translation job.',
-    example: [
-      'PRODUCT',
-      'COLLECTION',
-      'PAGE',
-    ],
+    description: 'Shopify resource types to include in the translation job.',
+    example: ['PRODUCT', 'COLLECTION', 'PAGE'],
     type: [String],
   })
   @IsArray()
@@ -51,8 +40,7 @@ export class CreateTranslationJobDto {
   resourceTypes!: string[];
 
   @ApiPropertyOptional({
-    description:
-      'Maximum number of translation fields to include in this job.',
+    description: 'Maximum number of translation fields to include in this job.',
     example: 100,
     default: 100,
     minimum: 1,

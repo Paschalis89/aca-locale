@@ -1,4 +1,5 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+# Learn more about configuring your app at:
+# https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "29e62e43d9461e28900806bb7fa959ff"
 name = "aca-locale"
@@ -10,11 +11,44 @@ automatically_update_urls_on_dev = true
 include_config_on_deploy = true
 
 [webhooks]
-api_version = "2027-01"
+api_version = "2026-10"
+
+# ------------------------------------------------------------
+# App lifecycle
+# ------------------------------------------------------------
+
+[[webhooks.subscriptions]]
+topics = [ "app/uninstalled" ]
+uri = "/webhooks/app/uninstalled"
+
+# ------------------------------------------------------------
+# Mandatory Shopify App Store privacy webhooks
+# ------------------------------------------------------------
+
+[[webhooks.subscriptions]]
+compliance_topics = [ "customers/data_request" ]
+uri = "/webhooks/customers/data-request"
+
+[[webhooks.subscriptions]]
+compliance_topics = [ "customers/redact" ]
+uri = "/webhooks/customers/redact"
+
+[[webhooks.subscriptions]]
+compliance_topics = [ "shop/redact" ]
+uri = "/webhooks/shop/redact"
+
+# ------------------------------------------------------------
+# Shopify API scopes
+# ------------------------------------------------------------
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_locales,read_markets,read_translations,write_translations"
 
+# ------------------------------------------------------------
+# OAuth
+# ------------------------------------------------------------
+
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://example.com/api/auth"
+]

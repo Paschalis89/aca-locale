@@ -1,74 +1,47 @@
-export type AiTranslationReviewSeverity =
-  | 'ERROR'
-  | 'WARNING';
+export type AiTranslationReviewSeverity = 'ERROR' | 'WARNING';
 
 export type AiTranslationReviewIssue = {
-  code:
-    string;
+  code: string;
 
-  severity:
-    AiTranslationReviewSeverity;
+  severity: AiTranslationReviewSeverity;
 
-  message:
-    string;
+  message: string;
 };
 
 export type AiTranslationReviewInput = {
-  sourceValue:
-    string;
+  sourceValue: string;
 
-  translatedValue:
-    string;
+  translatedValue: string;
 
-  sourceLocale:
-    string;
+  sourceLocale: string;
 
-  targetLocale:
-    string;
+  targetLocale: string;
 
-  resourceType?:
-    string;
+  resourceType?: string;
 
-  fieldKey?:
-    string;
+  fieldKey?: string;
 
-  contentType?:
-    string;
+  contentType?: string;
 
-  provider:
-    'OPENAI' |
-    'ANTHROPIC' |
-    'GOOGLE';
+  provider: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE';
 
-  model:
-    string;
+  model: string;
 };
 
 export type AiTranslationReviewResult = {
-  approved:
-    boolean;
+  approved: boolean;
 
-  score:
-    number;
+  score: number;
 
-  issues:
-    AiTranslationReviewIssue[];
+  issues: AiTranslationReviewIssue[];
 
-  suggestedTranslation:
-    string |
-    null;
+  suggestedTranslation: string | null;
 
-  provider:
-    'OPENAI' |
-    'ANTHROPIC' |
-    'GOOGLE';
+  provider: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE';
 
-  model:
-    string;
+  model: string;
 
-  inputTokens:
-    number;
+  inputTokens: number;
 
-  outputTokens:
-    number;
+  outputTokens: number;
 };

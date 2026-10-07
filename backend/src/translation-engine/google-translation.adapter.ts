@@ -1,10 +1,6 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import {
-  LlmTranslationService,
-} from './llm-translation.service.js';
+import { LlmTranslationService } from './llm-translation.service.js';
 
 import type {
   TranslationProviderAdapter,
@@ -13,24 +9,14 @@ import type {
 } from './translation-provider.types.js';
 
 @Injectable()
-export class GoogleTranslationAdapter
-  implements TranslationProviderAdapter
-{
-  readonly provider =
-    'GOOGLE' as const;
+export class GoogleTranslationAdapter implements TranslationProviderAdapter {
+  readonly provider = 'GOOGLE' as const;
 
-  constructor(
-    private readonly llm:
-      LlmTranslationService,
-  ) {}
+  constructor(private readonly llm: LlmTranslationService) {}
 
   translate(
-    input:
-      TranslationProviderInput,
+    input: TranslationProviderInput,
   ): Promise<TranslationProviderResult> {
-    return this.llm.translate(
-      'GOOGLE',
-      input,
-    );
+    return this.llm.translate('GOOGLE', input);
   }
 }

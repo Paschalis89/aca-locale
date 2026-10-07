@@ -4,61 +4,40 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  PrismaService,
-} from '../database/prisma.service.js';
+import { PrismaService } from '../database/prisma.service.js';
 
-import {
-  AiRegistryService,
-} from './ai-registry.service.js';
+import { AiRegistryService } from './ai-registry.service.js';
 
-import type {
-  UpdateAiConfigurationDto,
-} from './dto/update-ai-configuration.dto.js';
+import type { UpdateAiConfigurationDto } from './dto/update-ai-configuration.dto.js';
 
-type TranslationProvider =
-  | 'OPENAI'
-  | 'ANTHROPIC'
-  | 'GOOGLE'
-  | 'DEEPL';
+type TranslationProvider = 'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | 'DEEPL';
 
 @Injectable()
 export class AiConfigurationService {
   constructor(
-    private readonly prisma:
-      PrismaService,
+    private readonly prisma: PrismaService,
 
-    private readonly aiRegistry:
-      AiRegistryService,
+    private readonly aiRegistry: AiRegistryService,
   ) {}
 
-  async getConfiguration(
-    shopifyDomain: string,
-  ) {
-    const shop =
-      await this.prisma.shop.findUnique({
-        where: {
-          shopifyDomain,
-        },
+  async getConfiguration(shopifyDomain: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
 
-        select: {
-          id:
-            true,
+      select: {
+        id: true,
 
-          aiConfiguration:
-            true,
-        },
-      });
+        aiConfiguration: true,
+      },
+    });
 
     if (!shop) {
-      throw new NotFoundException(
-        'Shop is not registered.',
-      );
+      throw new NotFoundException('Shop is not registered.');
     }
 
-    if (
-      shop.aiConfiguration
-    ) {
+    if (shop.aiConfiguration) {
       return shop.aiConfiguration;
     }
 
@@ -70,8 +49,7 @@ export class AiConfigurationService {
      */
     return this.prisma.aiConfiguration.create({
       data: {
-        shopId:
-          shop.id,
+        shopId: shop.id,
       },
     });
   }
@@ -80,25 +58,20 @@ export class AiConfigurationService {
     shopifyDomain: string,
     body: UpdateAiConfigurationDto,
   ) {
-    const shop =
-      await this.prisma.shop.findUnique({
-        where: {
-          shopifyDomain,
-        },
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
 
-        select: {
-          id:
-            true,
+      select: {
+        id: true,
 
-          aiConfiguration:
-            true,
-        },
-      });
+        aiConfiguration: true,
+      },
+    });
 
     if (!shop) {
-      throw new NotFoundException(
-        'Shop is not registered.',
-      );
+      throw new NotFoundException('Shop is not registered.');
     }
 
     /*
@@ -106,17 +79,11 @@ export class AiConfigurationService {
      * a provider whose server-side
      * credentials are unavailable.
      */
-    this.validateProvider(
-      body.translationProvider,
-    );
+    this.validateProvider(body.translationProvider);
 
-    this.validateProvider(
-      body.reviewProvider,
-    );
+    this.validateProvider(body.reviewProvider);
 
-    this.validateProvider(
-      body.fallbackProvider,
-    );
+    this.validateProvider(body.fallbackProvider);
 
     /*
      * DeepL does not have an LLM model ID.
@@ -126,133 +93,83 @@ export class AiConfigurationService {
      * removed.
      */
     const translationModel =
-      body.translationProvider ===
-      'DEEPL'
-        ? null
-        : body.translationModel;
+      body.translationProvider === 'DEEPL' ? null : body.translationModel;
 
     const fallbackModel =
-      body.fallbackProvider ===
-      'DEEPL'
-        ? null
-        : body.fallbackModel;
+      body.fallbackProvider === 'DEEPL' ? null : body.fallbackModel;
 
     return this.prisma.aiConfiguration.upsert({
       where: {
-        shopId:
-          shop.id,
+        shopId: shop.id,
       },
 
       create: {
-        shopId:
-          shop.id,
+        shopId: shop.id,
 
-        translationProvider:
-          body.translationProvider ??
-          'OPENAI',
+        translationProvider: body.translationProvider ?? 'OPENAI',
 
-        translationModel:
-          translationModel ??
-          null,
+        translationModel: translationModel ?? null,
 
-        reviewProvider:
-          body.reviewProvider ??
-          'OPENAI',
+        reviewProvider: body.reviewProvider ?? 'OPENAI',
 
-        reviewModel:
-          body.reviewModel ??
-          null,
+        reviewModel: body.reviewModel ?? null,
 
-        fallbackProvider:
-          body.fallbackProvider ??
-          'OPENAI',
+        fallbackProvider: body.fallbackProvider ?? 'OPENAI',
 
-        fallbackModel:
-          fallbackModel ??
-          null,
+        fallbackModel: fallbackModel ?? null,
       },
 
       update: {
-        ...(body.translationProvider !==
-        undefined
+        ...(body.translationProvider !== undefined
           ? {
-              translationProvider:
-                body.translationProvider,
+              translationProvider: body.translationProvider,
             }
           : {}),
 
-        ...(body.translationModel !==
-          undefined ||
-        body.translationProvider ===
-          'DEEPL'
+        ...(body.translationModel !== undefined ||
+        body.translationProvider === 'DEEPL'
           ? {
-              translationModel:
-                translationModel ??
-                null,
+              translationModel: translationModel ?? null,
             }
           : {}),
 
-        ...(body.reviewProvider !==
-        undefined
+        ...(body.reviewProvider !== undefined
           ? {
-              reviewProvider:
-                body.reviewProvider,
+              reviewProvider: body.reviewProvider,
             }
           : {}),
 
-        ...(body.reviewModel !==
-        undefined
+        ...(body.reviewModel !== undefined
           ? {
-              reviewModel:
-                body.reviewModel ??
-                null,
+              reviewModel: body.reviewModel ?? null,
             }
           : {}),
 
-        ...(body.fallbackProvider !==
-        undefined
+        ...(body.fallbackProvider !== undefined
           ? {
-              fallbackProvider:
-                body.fallbackProvider,
+              fallbackProvider: body.fallbackProvider,
             }
           : {}),
 
-        ...(body.fallbackModel !==
-          undefined ||
-        body.fallbackProvider ===
-          'DEEPL'
+        ...(body.fallbackModel !== undefined ||
+        body.fallbackProvider === 'DEEPL'
           ? {
-              fallbackModel:
-                fallbackModel ??
-                null,
+              fallbackModel: fallbackModel ?? null,
             }
           : {}),
       },
     });
   }
 
-  private validateProvider(
-    provider:
-      TranslationProvider |
-      undefined,
-  ) {
+  private validateProvider(provider: TranslationProvider | undefined) {
     if (!provider) {
       return;
     }
 
-    const normalized =
-      provider.toLowerCase() as
-        | 'openai'
-        | 'anthropic'
-        | 'google'
-        | 'deepl';
+    const normalized = provider.toLowerCase() as
+      'openai' | 'anthropic' | 'google' | 'deepl';
 
-    if (
-      !this.aiRegistry
-        .isProviderConfigured(
-          normalized,
-        )
-    ) {
+    if (!this.aiRegistry.isProviderConfigured(normalized)) {
       throw new BadRequestException(
         `Provider "${provider}" is not configured on the ACA Locale backend.`,
       );

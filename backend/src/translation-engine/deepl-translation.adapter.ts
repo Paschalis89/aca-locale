@@ -1,10 +1,6 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import {
-  DeepLTranslationService,
-} from './deepl-translation.service.js';
+import { DeepLTranslationService } from './deepl-translation.service.js';
 
 import type {
   TranslationProviderAdapter,
@@ -13,48 +9,32 @@ import type {
 } from './translation-provider.types.js';
 
 @Injectable()
-export class DeepLTranslationAdapter
-  implements TranslationProviderAdapter
-{
-  readonly provider =
-    'DEEPL' as const;
+export class DeepLTranslationAdapter implements TranslationProviderAdapter {
+  readonly provider = 'DEEPL' as const;
 
-  constructor(
-    private readonly deepL:
-      DeepLTranslationService,
-  ) {}
+  constructor(private readonly deepL: DeepLTranslationService) {}
 
   async translate(
-    input:
-      TranslationProviderInput,
+    input: TranslationProviderInput,
   ): Promise<TranslationProviderResult> {
-    const result =
-      await this.deepL.translate({
-        text:
-          input.text,
+    const result = await this.deepL.translate({
+      text: input.text,
 
-        sourceLocale:
-          input.sourceLocale,
+      sourceLocale: input.sourceLocale,
 
-        targetLocale:
-          input.targetLocale,
+      targetLocale: input.targetLocale,
 
-        contentType:
-          input.contentType,
-      });
+      contentType: input.contentType,
+    });
 
     return {
-      text:
-        result.text,
+      text: result.text,
 
-      provider:
-        'DEEPL',
+      provider: 'DEEPL',
 
-      model:
-        null,
+      model: null,
 
-      billedCharacters:
-        result.billedCharacters,
+      billedCharacters: result.billedCharacters,
     };
   }
 }

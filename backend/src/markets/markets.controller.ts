@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 
 import {
   ApiBearerAuth,
@@ -14,66 +8,46 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
-import {
-  CurrentShop,
-} from '../shopify-auth/current-shop.decorator.js';
+import { CurrentShop } from '../shopify-auth/current-shop.decorator.js';
 
-import {
-  ShopifyAuthGuard,
-} from '../shopify-auth/shopify-auth.guard.js';
+import { ShopifyAuthGuard } from '../shopify-auth/shopify-auth.guard.js';
 
-import type {
-  ShopifyAuthContext,
-} from '../shopify-auth/shopify-auth.types.js';
+import type { ShopifyAuthContext } from '../shopify-auth/shopify-auth.types.js';
 
-import {
-  SyncShopifyMarketsDto,
-} from './dto/sync-shopify-markets.dto.js';
+import { SyncShopifyMarketsDto } from './dto/sync-shopify-markets.dto.js';
 
-import {
-  MarketsService,
-} from './markets.service.js';
+import { MarketsService } from './markets.service.js';
 
 @ApiTags('Markets')
 @ApiBearerAuth()
 @Controller('markets')
 @UseGuards(ShopifyAuthGuard)
 export class MarketsController {
-  constructor(
-    private readonly marketsService:
-      MarketsService,
-  ) {}
+  constructor(private readonly marketsService: MarketsService) {}
 
   @Get()
   @ApiOperation({
-    summary:
-      'List markets for the authenticated shop',
+    summary: 'List markets for the authenticated shop',
   })
   @ApiOkResponse({
-    description:
-      'Shop markets returned successfully.',
+    description: 'Shop markets returned successfully.',
   })
   @ApiUnauthorizedResponse({
-    description:
-      'Shopify ID token is missing or invalid.',
+    description: 'Shopify ID token is missing or invalid.',
   })
   findAll(
     @CurrentShop()
     shop: ShopifyAuthContext,
   ) {
-    return this.marketsService.findForShop(
-      shop.shopDomain,
-    );
+    return this.marketsService.findForShop(shop.shopDomain);
   }
 
   @Post('sync/shopify')
   @ApiOperation({
-    summary:
-      'Synchronize Shopify Markets',
+    summary: 'Synchronize Shopify Markets',
   })
   @ApiOkResponse({
-    description:
-      'Shopify Markets synchronized successfully.',
+    description: 'Shopify Markets synchronized successfully.',
   })
   syncShopify(
     @CurrentShop()
@@ -82,10 +56,9 @@ export class MarketsController {
     @Body()
     body: SyncShopifyMarketsDto,
   ) {
-    return this.marketsService
-      .syncShopifyMarkets(
-        shop.shopDomain,
-        body.markets,
-      );
+    return this.marketsService.syncShopifyMarkets(
+      shop.shopDomain,
+      body.markets,
+    );
   }
 }

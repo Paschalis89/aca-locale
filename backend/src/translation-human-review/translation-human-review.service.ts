@@ -4,66 +4,40 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  PrismaService,
-} from '../database/prisma.service.js';
+import { PrismaService } from '../database/prisma.service.js';
 
-import {
-  TranslationValidatorService,
-} from '../translation-validation/translation-validator.service.js';
+import { TranslationValidatorService } from '../translation-validation/translation-validator.service.js';
 
-import type {
-  ApproveTranslationItemDto,
-} from './dto/approve-translation-item.dto.js';
+import type { ApproveTranslationItemDto } from './dto/approve-translation-item.dto.js';
 
-import type {
-  RejectTranslationItemDto,
-} from './dto/reject-translation-item.dto.js';
+import type { RejectTranslationItemDto } from './dto/reject-translation-item.dto.js';
 
 @Injectable()
 export class TranslationHumanReviewService {
   constructor(
-    private readonly prisma:
-      PrismaService,
+    private readonly prisma: PrismaService,
 
-    private readonly validator:
-      TranslationValidatorService,
+    private readonly validator: TranslationValidatorService,
   ) {}
 
   async approve(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
 
-    itemId:
-      string,
+    itemId: string,
 
-    body:
-      ApproveTranslationItemDto,
+    body: ApproveTranslationItemDto,
   ) {
-    const item =
-      await this.findItem(
-        shopifyDomain,
-        jobId,
-        itemId,
-      );
+    const item = await this.findItem(shopifyDomain, jobId, itemId);
 
-    if (
-      item.status !==
-        'VALIDATED' &&
-      item.status !==
-        'NEEDS_REVIEW'
-    ) {
+    if (item.status !== 'VALIDATED' && item.status !== 'NEEDS_REVIEW') {
       throw new BadRequestException(
         `Translation item cannot be approved from status "${item.status}".`,
       );
     }
 
-    if (
-      !item.translatedValue
-    ) {
+    if (!item.translatedValue) {
       throw new BadRequestException(
         'Translation item has no generated translation.',
       );
@@ -81,183 +55,121 @@ export class TranslationHumanReviewService {
      * unchanged.
      */
     const approvedValue =
-      body.approvedValue !==
-        undefined
+      body.approvedValue !== undefined
         ? body.approvedValue
         : item.translatedValue;
 
-    if (
-      approvedValue
-        .trim()
-        .length ===
-      0
-    ) {
-      throw new BadRequestException(
-        'Approved translation cannot be empty.',
-      );
+    if (approvedValue.trim().length === 0) {
+      throw new BadRequestException('Approved translation cannot be empty.');
     }
 
     /*
      * Any human modification must pass the
      * deterministic validator again.
      */
-    const validation =
-      this.validator.validate({
-        sourceValue:
-          item.sourceValue,
+    const validation = this.validator.validate({
+      sourceValue: item.sourceValue,
 
-        translatedValue:
-          approvedValue,
+      translatedValue: approvedValue,
 
-        sourceLocale:
-          item.job.sourceLocale,
+      sourceLocale: item.job.sourceLocale,
 
-        targetLocale:
-          item.job.targetLocale,
+      targetLocale: item.job.targetLocale,
 
-        contentType:
-          item.field.type,
+      contentType: item.field.type,
 
-        resourceType:
-          item.field.resource
-            .resourceType,
+      resourceType: item.field.resource.resourceType,
 
-        fieldKey:
-          item.field.key,
-      });
+      fieldKey: item.field.key,
+    });
 
-    if (
-      !validation.passed
-    ) {
+    if (!validation.passed) {
       throw new BadRequestException({
-        message:
-          'The approved translation failed deterministic validation.',
+        message: 'The approved translation failed deterministic validation.',
 
         validation: {
-          version:
-            validation.version,
+          version: validation.version,
 
-          errors:
-            validation.errorCount,
+          errors: validation.errorCount,
 
-          warnings:
-            validation.warningCount,
+          warnings: validation.warningCount,
 
-          issues:
-            validation.issues,
+          issues: validation.issues,
         },
       });
     }
 
-    const now =
-      new Date();
+    const now = new Date();
 
     return this.prisma.translationJobItem.update({
       where: {
-        id:
-          item.id,
+        id: item.id,
       },
 
       data: {
-        status:
-          'APPROVED',
+        status: 'APPROVED',
 
         approvedValue,
 
-        approvedAt:
-          now,
+        approvedAt: now,
 
-        humanReviewedAt:
-          now,
+        humanReviewedAt: now,
 
-        humanReviewNote:
-          body.note?.trim() ||
-          null,
+        humanReviewNote: body.note?.trim() || null,
       },
 
-      include:
-        this.itemInclude(),
+      include: this.itemInclude(),
     });
   }
 
   async reject(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
 
-    itemId:
-      string,
+    itemId: string,
 
-    body:
-      RejectTranslationItemDto,
+    body: RejectTranslationItemDto,
   ) {
-    const item =
-      await this.findItem(
-        shopifyDomain,
-        jobId,
-        itemId,
-      );
+    const item = await this.findItem(shopifyDomain, jobId, itemId);
 
-    if (
-      item.status !==
-        'VALIDATED' &&
-      item.status !==
-        'NEEDS_REVIEW'
-    ) {
+    if (item.status !== 'VALIDATED' && item.status !== 'NEEDS_REVIEW') {
       throw new BadRequestException(
         `Translation item cannot be rejected from status "${item.status}".`,
       );
     }
 
-    const now =
-      new Date();
+    const now = new Date();
 
     return this.prisma.translationJobItem.update({
       where: {
-        id:
-          item.id,
+        id: item.id,
       },
 
       data: {
-        status:
-          'REJECTED',
+        status: 'REJECTED',
 
-        approvedValue:
-          null,
+        approvedValue: null,
 
-        approvedAt:
-          null,
+        approvedAt: null,
 
-        humanReviewedAt:
-          now,
+        humanReviewedAt: now,
 
-        humanReviewNote:
-          body.note.trim(),
+        humanReviewNote: body.note.trim(),
       },
 
-      include:
-        this.itemInclude(),
+      include: this.itemInclude(),
     });
   }
 
   async regenerate(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
 
-    itemId:
-      string,
+    itemId: string,
   ) {
-    const item =
-      await this.findItem(
-        shopifyDomain,
-        jobId,
-        itemId,
-      );
+    const item = await this.findItem(shopifyDomain, jobId, itemId);
 
     /*
      * Human regeneration is intentionally
@@ -267,12 +179,9 @@ export class TranslationHumanReviewService {
      * silently regenerated.
      */
     if (
-      item.status !==
-        'VALIDATED' &&
-      item.status !==
-        'NEEDS_REVIEW' &&
-      item.status !==
-        'REJECTED'
+      item.status !== 'VALIDATED' &&
+      item.status !== 'NEEDS_REVIEW' &&
+      item.status !== 'REJECTED'
     ) {
       throw new BadRequestException(
         `Translation item cannot be regenerated from status "${item.status}".`,
@@ -283,34 +192,25 @@ export class TranslationHumanReviewService {
      * Prevent double-clicks from creating
      * multiple active regeneration jobs.
      */
-    const activeRegeneration =
-      await this.prisma.translationJobItem.findFirst({
-        where: {
-          regeneratedFromItemId:
-            item.id,
+    const activeRegeneration = await this.prisma.translationJobItem.findFirst({
+      where: {
+        regeneratedFromItemId: item.id,
 
-          job: {
-            status: {
-              in: [
-                'QUEUED',
-                'RUNNING',
-              ],
-            },
+        job: {
+          status: {
+            in: ['QUEUED', 'RUNNING'],
           },
         },
+      },
 
-        select: {
-          id:
-            true,
+      select: {
+        id: true,
 
-          jobId:
-            true,
-        },
-      });
+        jobId: true,
+      },
+    });
 
-    if (
-      activeRegeneration
-    ) {
+    if (activeRegeneration) {
       throw new BadRequestException(
         `An active regeneration already exists in job "${activeRegeneration.jobId}".`,
       );
@@ -325,73 +225,53 @@ export class TranslationHumanReviewService {
      */
     return this.prisma.translationJob.create({
       data: {
-        shopId:
-          item.job.shopId,
+        shopId: item.job.shopId,
 
-        sourceLocale:
-          item.job.sourceLocale,
+        sourceLocale: item.job.sourceLocale,
 
-        targetLocale:
-          item.job.targetLocale,
+        targetLocale: item.job.targetLocale,
 
-        status:
-          'QUEUED',
+        status: 'QUEUED',
 
-        provider:
-          item.job.provider,
+        provider: item.job.provider,
 
-        model:
-          item.job.model,
+        model: item.job.model,
 
-        fallbackProvider:
-          item.job.fallbackProvider,
+        fallbackProvider: item.job.fallbackProvider,
 
-        fallbackModel:
-          item.job.fallbackModel,
+        fallbackModel: item.job.fallbackModel,
 
-        reviewProvider:
-          item.job.reviewProvider,
+        reviewProvider: item.job.reviewProvider,
 
-        reviewModel:
-          item.job.reviewModel,
+        reviewModel: item.job.reviewModel,
 
-        totalItems:
-          1,
+        totalItems: 1,
 
         items: {
           create: {
-            fieldId:
-              item.fieldId,
+            fieldId: item.fieldId,
 
-            sourceDigest:
-              item.sourceDigest,
+            sourceDigest: item.sourceDigest,
 
-            sourceValue:
-              item.sourceValue,
+            sourceValue: item.sourceValue,
 
-            status:
-              'PENDING',
+            status: 'PENDING',
 
-            provider:
-              item.job.provider,
+            provider: item.job.provider,
 
-            model:
-              item.job.model,
+            model: item.job.model,
 
-            regeneratedFromItemId:
-              item.id,
+            regeneratedFromItemId: item.id,
           },
         },
       },
 
       include: {
         items: {
-          include:
-            this.itemInclude(),
+          include: this.itemInclude(),
 
           orderBy: {
-            createdAt:
-              'asc',
+            createdAt: 'asc',
           },
         },
       },
@@ -399,216 +279,152 @@ export class TranslationHumanReviewService {
   }
 
   async markPublished(
-  shopifyDomain:
-    string,
+    shopifyDomain: string,
 
-  jobId:
-    string,
+    jobId: string,
 
-  itemId:
-    string,
-) {
-  const item =
-    await this.findItem(
-      shopifyDomain,
-      jobId,
-      itemId,
-    );
-
-  if (
-    item.status !==
-      'APPROVED' &&
-    item.status !==
-      'PUBLISHED'
+    itemId: string,
   ) {
-    throw new BadRequestException(
-      `Translation item cannot be marked as published from status "${item.status}".`,
-    );
-  }
+    const item = await this.findItem(shopifyDomain, jobId, itemId);
 
-  if (
-    !item.approvedValue
-  ) {
-    throw new BadRequestException(
-      'Translation item has no approved value.',
-    );
-  }
+    if (item.status !== 'APPROVED' && item.status !== 'PUBLISHED') {
+      throw new BadRequestException(
+        `Translation item cannot be marked as published from status "${item.status}".`,
+      );
+    }
 
-  const now =
-    new Date();
+    if (!item.approvedValue) {
+      throw new BadRequestException('Translation item has no approved value.');
+    }
 
-  return this.prisma.$transaction(
-    async (
-      tx,
-    ) => {
-      const updatedItem =
-        await tx.translationJobItem.update({
-          where: {
-            id:
-              item.id,
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedItem = await tx.translationJobItem.update({
+        where: {
+          id: item.id,
+        },
+
+        data: {
+          status: 'PUBLISHED',
+
+          publishedAt: item.publishedAt ?? now,
+        },
+
+        include: this.itemInclude(),
+      });
+
+      const translationState = await tx.translationState.upsert({
+        where: {
+          fieldId_targetLocale: {
+            fieldId: item.fieldId,
+
+            targetLocale: item.job.targetLocale,
           },
+        },
 
-          data: {
-            status:
-              'PUBLISHED',
+        create: {
+          fieldId: item.fieldId,
 
-            publishedAt:
-              item.publishedAt ??
-              now,
-          },
+          targetLocale: item.job.targetLocale,
 
-          include:
-            this.itemInclude(),
-        });
+          status: 'TRANSLATED',
 
-      const translationState =
-        await tx.translationState.upsert({
-          where: {
-            fieldId_targetLocale: {
-              fieldId:
-                item.fieldId,
+          translatedValue: item.approvedValue,
 
-              targetLocale:
-                item.job.targetLocale,
-            },
-          },
+          translationUpdatedAt: now,
 
-          create: {
-            fieldId:
-              item.fieldId,
+          scannedAt: now,
+        },
 
-            targetLocale:
-              item.job.targetLocale,
+        update: {
+          status: 'TRANSLATED',
 
-            status:
-              'TRANSLATED',
+          translatedValue: item.approvedValue,
 
-            translatedValue:
-              item.approvedValue,
+          translationUpdatedAt: now,
 
-            translationUpdatedAt:
-              now,
-
-            scannedAt:
-              now,
-          },
-
-          update: {
-            status:
-              'TRANSLATED',
-
-            translatedValue:
-              item.approvedValue,
-
-            translationUpdatedAt:
-              now,
-
-            scannedAt:
-              now,
-          },
-        });
+          scannedAt: now,
+        },
+      });
 
       return {
         ...updatedItem,
 
         translationState,
       };
-    },
-  );
-}
+    });
+  }
 
   private async findItem(
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
 
-    jobId:
-      string,
+    jobId: string,
 
-    itemId:
-      string,
+    itemId: string,
   ) {
-    const item =
-      await this.prisma.translationJobItem.findFirst({
-        where: {
-          id:
-            itemId,
+    const item = await this.prisma.translationJobItem.findFirst({
+      where: {
+        id: itemId,
 
-          jobId,
+        jobId,
 
-          job: {
-            shop: {
-              shopifyDomain,
-            },
+        job: {
+          shop: {
+            shopifyDomain,
+          },
+        },
+      },
+
+      include: {
+        job: {
+          select: {
+            id: true,
+
+            shopId: true,
+
+            sourceLocale: true,
+
+            targetLocale: true,
+
+            status: true,
+
+            provider: true,
+
+            model: true,
+
+            fallbackProvider: true,
+
+            fallbackModel: true,
+
+            reviewProvider: true,
+
+            reviewModel: true,
           },
         },
 
-        include: {
-          job: {
-            select: {
-              id:
-                true,
+        field: {
+          select: {
+            key: true,
 
-              shopId:
-                true,
+            type: true,
 
-              sourceLocale:
-                true,
+            sourceLocale: true,
 
-              targetLocale:
-                true,
+            resource: {
+              select: {
+                resourceType: true,
 
-              status:
-                true,
-
-              provider:
-                true,
-
-              model:
-                true,
-
-              fallbackProvider:
-                true,
-
-              fallbackModel:
-                true,
-
-              reviewProvider:
-                true,
-
-              reviewModel:
-                true,
-            },
-          },
-
-          field: {
-            select: {
-              key:
-                true,
-
-              type:
-                true,
-
-              sourceLocale:
-                true,
-
-              resource: {
-                select: {
-                  resourceType:
-                    true,
-
-                  shopifyResourceId:
-                    true,
-                },
+                shopifyResourceId: true,
               },
             },
           },
         },
-      });
+      },
+    });
 
     if (!item) {
-      throw new NotFoundException(
-        'Translation job item not found.',
-      );
+      throw new NotFoundException('Translation job item not found.');
     }
 
     return item;
@@ -618,22 +434,17 @@ export class TranslationHumanReviewService {
     return {
       field: {
         select: {
-          key:
-            true,
+          key: true,
 
-          type:
-            true,
+          type: true,
 
-          sourceLocale:
-            true,
+          sourceLocale: true,
 
           resource: {
             select: {
-              resourceType:
-                true,
+              resourceType: true,
 
-              shopifyResourceId:
-                true,
+              shopifyResourceId: true,
             },
           },
         },

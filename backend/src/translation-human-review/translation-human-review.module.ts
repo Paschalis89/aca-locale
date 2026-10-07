@@ -1,31 +1,16 @@
-import {
-  Module,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
-import {
-  DatabaseModule,
-} from '../database/database.module.js';
+import { DatabaseModule } from '../database/database.module.js';
 
-import {
-  TranslationValidationModule,
-} from '../translation-validation/translation-validation.module.js';
+import { TranslationValidationModule } from '../translation-validation/translation-validation.module.js';
 
-import {
-  TranslationHumanReviewService,
-} from './translation-human-review.service.js';
+import { TranslationHumanReviewService } from './translation-human-review.service.js';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    TranslationValidationModule,
-  ],
+  imports: [DatabaseModule, TranslationValidationModule],
 
-  providers: [
-    TranslationHumanReviewService,
-  ],
+  providers: [TranslationHumanReviewService],
 
-  exports: [
-    TranslationHumanReviewService,
-  ],
+  exports: [TranslationHumanReviewService],
 })
 export class TranslationHumanReviewModule {}

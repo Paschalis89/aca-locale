@@ -5,29 +5,17 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 
-import {
-  ConfigService,
-} from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
-import {
-  Job,
-  Queue,
-  Worker,
-} from 'bullmq';
+import { Job, Queue, Worker } from 'bullmq';
 
-import {
-  TranslationExecutorService,
-} from '../translation-engine/translation-executor.service.js';
+import { TranslationExecutorService } from '../translation-engine/translation-executor.service.js';
 
-import {
-  TranslationJobsService,
-} from './translation-jobs.service.js';
+import { TranslationJobsService } from './translation-jobs.service.js';
 
-const TRANSLATION_QUEUE_NAME =
-  'aca-locale-translation-jobs';
+const TRANSLATION_QUEUE_NAME = 'aca-locale-translation-jobs';
 
-const TRANSLATION_QUEUE_JOB_NAME =
-  'execute-translation-job';
+const TRANSLATION_QUEUE_JOB_NAME = 'execute-translation-job';
 
 type TranslationQueuePayload = {
   jobId: string;
@@ -35,151 +23,93 @@ type TranslationQueuePayload = {
 };
 
 @Injectable()
-export class TranslationQueueService
-implements OnModuleInit, OnModuleDestroy {
-  private readonly logger =
-    new Logger(
-      TranslationQueueService.name,
-    );
+export class TranslationQueueService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TranslationQueueService.name);
 
-  private queue?:
-    Queue<TranslationQueuePayload>;
+  private queue?: Queue<TranslationQueuePayload>;
 
-  private worker?:
-    Worker<TranslationQueuePayload>;
+  private worker?: Worker<TranslationQueuePayload>;
 
   constructor(
-    private readonly config:
-      ConfigService,
+    private readonly config: ConfigService,
 
-    private readonly translationExecutorService:
-      TranslationExecutorService,
+    private readonly translationExecutorService: TranslationExecutorService,
 
-    private readonly translationJobsService:
-      TranslationJobsService,
+    private readonly translationJobsService: TranslationJobsService,
   ) {}
 
   async onModuleInit() {
-    const connection =
-      this.redisConnection();
+    const connection = this.redisConnection();
 
     const prefix =
-      this.config.get<string>(
-        'TRANSLATION_QUEUE_PREFIX',
-      )?.trim() ||
+      this.config.get<string>('TRANSLATION_QUEUE_PREFIX')?.trim() ||
       'aca-locale';
 
-    const concurrency =
-      this.positiveInteger(
-        this.config.get<string>(
-          'TRANSLATION_QUEUE_CONCURRENCY',
-        ),
-        2,
-      );
+    const concurrency = this.positiveInteger(
+      this.config.get<string>('TRANSLATION_QUEUE_CONCURRENCY'),
+      2,
+    );
 
-    this.queue =
-      new Queue<TranslationQueuePayload>(
-        TRANSLATION_QUEUE_NAME,
-        {
-          connection,
-          prefix,
-        },
-      );
+    this.queue = new Queue<TranslationQueuePayload>(TRANSLATION_QUEUE_NAME, {
+      connection,
+      prefix,
+    });
 
-    this.worker =
-      new Worker<TranslationQueuePayload>(
-        TRANSLATION_QUEUE_NAME,
-        async (
-          job,
-        ) =>
-          this.processJob(
-            job,
-          ),
-        {
-          connection,
-          prefix,
-          concurrency,
-        },
-      );
-
-    this.worker.on(
-      'completed',
-      (
-        job,
-      ) => {
-        this.logger.log(
-          `Queue job ${job.id ?? 'unknown'} completed for translation job ${job.data.jobId}.`,
-        );
+    this.worker = new Worker<TranslationQueuePayload>(
+      TRANSLATION_QUEUE_NAME,
+      async (job) => this.processJob(job),
+      {
+        connection,
+        prefix,
+        concurrency,
       },
     );
 
-    this.worker.on(
-      'failed',
-      (
-        job,
-        error,
-      ) => {
-        this.logger.error(
-          `Queue job ${job?.id ?? 'unknown'} failed for translation job ${job?.data.jobId ?? 'unknown'}: ${error.message}`,
-        );
-      },
-    );
+    this.worker.on('completed', (job) => {
+      this.logger.log(
+        `Queue job ${job.id ?? 'unknown'} completed for translation job ${job.data.jobId}.`,
+      );
+    });
 
-    this.worker.on(
-      'error',
-      (
-        error,
-      ) => {
-        this.logger.error(
-          `BullMQ worker error: ${error.message}`,
-        );
-      },
-    );
+    this.worker.on('failed', (job, error) => {
+      this.logger.error(
+        `Queue job ${job?.id ?? 'unknown'} failed for translation job ${job?.data.jobId ?? 'unknown'}: ${error.message}`,
+      );
+    });
+
+    this.worker.on('error', (error) => {
+      this.logger.error(`BullMQ worker error: ${error.message}`);
+    });
 
     await Promise.all([
       this.queue.waitUntilReady(),
       this.worker.waitUntilReady(),
     ]);
 
-    this.logger.log(
-      `Translation queue ready with concurrency ${concurrency}.`,
-    );
+    this.logger.log(`Translation queue ready with concurrency ${concurrency}.`);
   }
 
   async onModuleDestroy() {
-    if (
-      this.worker
-    ) {
+    if (this.worker) {
       await this.worker.close();
     }
 
-    if (
-      this.queue
-    ) {
+    if (this.queue) {
       await this.queue.close();
     }
   }
 
   async enqueue(
-    jobId:
-      string,
+    jobId: string,
 
-    shopifyDomain:
-      string,
+    shopifyDomain: string,
   ) {
-    const queue =
-      this.requireQueue();
+    const queue = this.requireQueue();
 
-    const existing =
-      await queue.getJob(
-        jobId,
-      );
+    const existing = await queue.getJob(jobId);
 
-    if (
-      existing
-    ) {
-      const state =
-        await existing.getState();
+    if (existing) {
+      const state = await existing.getState();
 
       if (
         [
@@ -188,24 +118,16 @@ implements OnModuleInit, OnModuleDestroy {
           'delayed',
           'prioritized',
           'waiting-children',
-        ].includes(
-          state,
-        )
+        ].includes(state)
       ) {
         return {
-          queue:
-            TRANSLATION_QUEUE_NAME,
+          queue: TRANSLATION_QUEUE_NAME,
 
-          queueJobId:
-            String(
-              existing.id,
-            ),
+          queueJobId: String(existing.id),
 
-          enqueued:
-            false,
+          enqueued: false,
 
-          duplicate:
-            true,
+          duplicate: true,
 
           state,
         };
@@ -213,133 +135,91 @@ implements OnModuleInit, OnModuleDestroy {
 
       try {
         await existing.remove();
-      } catch (
-        error
-      ) {
+      } catch (error) {
         this.logger.warn(
           `Unable to remove previous queue job ${jobId}: ${this.errorMessage(error)}`,
         );
       }
     }
 
-    const attempts =
-      this.positiveInteger(
-        this.config.get<string>(
-          'TRANSLATION_QUEUE_ATTEMPTS',
-        ),
-        40,
-      );
+    const attempts = this.positiveInteger(
+      this.config.get<string>('TRANSLATION_QUEUE_ATTEMPTS'),
+      40,
+    );
 
-    const backoffMs =
-      this.positiveInteger(
-        this.config.get<string>(
-          'TRANSLATION_QUEUE_BACKOFF_MS',
-        ),
-        10_000,
-      );
+    const backoffMs = this.positiveInteger(
+      this.config.get<string>('TRANSLATION_QUEUE_BACKOFF_MS'),
+      10_000,
+    );
 
-    const job =
-      await queue.add(
-        TRANSLATION_QUEUE_JOB_NAME,
-        {
-          jobId,
-          shopifyDomain,
+    const job = await queue.add(
+      TRANSLATION_QUEUE_JOB_NAME,
+      {
+        jobId,
+        shopifyDomain,
+      },
+      {
+        jobId,
+
+        attempts,
+
+        backoff: {
+          type: 'fixed',
+
+          delay: backoffMs,
         },
-        {
-          jobId,
 
-          attempts,
+        removeOnComplete: true,
 
-          backoff: {
-            type:
-              'fixed',
+        removeOnFail: {
+          age: 24 * 60 * 60,
 
-            delay:
-              backoffMs,
-          },
-
-          removeOnComplete:
-            true,
-
-          removeOnFail: {
-            age:
-              24 * 60 * 60,
-
-            count:
-              1000,
-          },
+          count: 1000,
         },
-      );
+      },
+    );
 
     return {
-      queue:
-        TRANSLATION_QUEUE_NAME,
+      queue: TRANSLATION_QUEUE_NAME,
 
-      queueJobId:
-        String(
-          job.id,
-        ),
+      queueJobId: String(job.id),
 
-      enqueued:
-        true,
+      enqueued: true,
 
-      duplicate:
-        false,
+      duplicate: false,
 
-      state:
-        'waiting',
+      state: 'waiting',
     };
   }
 
-  async cancel(
-    jobId:
-      string,
-  ) {
-    const queue =
-      this.requireQueue();
+  async cancel(jobId: string) {
+    const queue = this.requireQueue();
 
-    const queuedJob =
-      await queue.getJob(
-        jobId,
-      );
+    const queuedJob = await queue.getJob(jobId);
 
-    if (
-      !queuedJob
-    ) {
+    if (!queuedJob) {
       return {
-        queue:
-          TRANSLATION_QUEUE_NAME,
+        queue: TRANSLATION_QUEUE_NAME,
 
-        queueJobId:
-          jobId,
+        queueJobId: jobId,
 
-        removed:
-          false,
+        removed: false,
 
-        state:
-          'not-found',
+        state: 'not-found',
       };
     }
 
-    const state =
-      await queuedJob.getState();
+    const state = await queuedJob.getState();
 
-    if (
-      state ===
-      'active'
-    ) {
+    if (state === 'active') {
       return {
-        queue:
-          TRANSLATION_QUEUE_NAME,
+        queue: TRANSLATION_QUEUE_NAME,
 
-        queueJobId:
-          jobId,
+        queueJobId: jobId,
 
-        removed:
-          false,
+        removed: false,
 
-        cooperative:
-          true,
+        cooperative: true,
 
         state,
       };
@@ -349,160 +229,108 @@ implements OnModuleInit, OnModuleDestroy {
       await queuedJob.remove();
 
       return {
-        queue:
-          TRANSLATION_QUEUE_NAME,
+        queue: TRANSLATION_QUEUE_NAME,
 
-        queueJobId:
-          jobId,
+        queueJobId: jobId,
 
-        removed:
-          true,
+        removed: true,
 
-        cooperative:
-          false,
+        cooperative: false,
 
         state,
       };
-    } catch (
-      error
-    ) {
+    } catch (error) {
       return {
-        queue:
-          TRANSLATION_QUEUE_NAME,
+        queue: TRANSLATION_QUEUE_NAME,
 
-        queueJobId:
-          jobId,
+        queueJobId: jobId,
 
-        removed:
-          false,
+        removed: false,
 
-        cooperative:
-          true,
+        cooperative: true,
 
         state,
 
-        error:
-          this.errorMessage(
-            error,
-          ),
+        error: this.errorMessage(error),
       };
     }
   }
 
   async status() {
-    const queue =
-      this.requireQueue();
+    const queue = this.requireQueue();
 
-    const counts =
-      await queue.getJobCounts(
-        'waiting',
-        'active',
-        'delayed',
-        'prioritized',
-        'completed',
-        'failed',
-        'paused',
-      );
+    const counts = await queue.getJobCounts(
+      'waiting',
+      'active',
+      'delayed',
+      'prioritized',
+      'completed',
+      'failed',
+      'paused',
+    );
 
     return {
-      queue:
-        TRANSLATION_QUEUE_NAME,
+      queue: TRANSLATION_QUEUE_NAME,
 
       counts,
     };
   }
 
-  async jobStatus(
-    jobId:
-      string,
-  ) {
-    const queue =
-      this.requireQueue();
+  async jobStatus(jobId: string) {
+    const queue = this.requireQueue();
 
-    const queuedJob =
-      await queue.getJob(
-        jobId,
-      );
+    const queuedJob = await queue.getJob(jobId);
 
-    if (
-      !queuedJob
-    ) {
+    if (!queuedJob) {
       return {
-        queue:
-          TRANSLATION_QUEUE_NAME,
+        queue: TRANSLATION_QUEUE_NAME,
 
-        queueJobId:
-          jobId,
+        queueJobId: jobId,
 
-        state:
-          'not-found',
+        state: 'not-found',
       };
     }
 
     return {
-      queue:
-        TRANSLATION_QUEUE_NAME,
+      queue: TRANSLATION_QUEUE_NAME,
 
-      queueJobId:
-        String(
-          queuedJob.id,
-        ),
+      queueJobId: String(queuedJob.id),
 
-      state:
-        await queuedJob.getState(),
+      state: await queuedJob.getState(),
 
-      attemptsMade:
-        queuedJob.attemptsMade,
+      attemptsMade: queuedJob.attemptsMade,
 
-      progress:
-        queuedJob.progress,
+      progress: queuedJob.progress,
 
-      failedReason:
-        queuedJob.failedReason ??
-        null,
+      failedReason: queuedJob.failedReason ?? null,
     };
   }
 
-  private async processJob(
-    job:
-      Job<TranslationQueuePayload>,
-  ) {
-    if (
-      job.name !==
-      TRANSLATION_QUEUE_JOB_NAME
-    ) {
-      throw new Error(
-        `Unsupported queue job "${job.name}".`,
-      );
+  private async processJob(job: Job<TranslationQueuePayload>) {
+    if (job.name !== TRANSLATION_QUEUE_JOB_NAME) {
+      throw new Error(`Unsupported queue job "${job.name}".`);
     }
 
     await job.updateProgress({
-      stage:
-        'starting',
+      stage: 'starting',
 
-      translationJobId:
-        job.data.jobId,
+      translationJobId: job.data.jobId,
     });
 
-    const result =
-      await this.translationExecutorService.execute(
-        job.data.shopifyDomain,
-        job.data.jobId,
-      );
+    const result = await this.translationExecutorService.execute(
+      job.data.shopifyDomain,
+      job.data.jobId,
+    );
 
-    const reason =
-      (
-        result as {
-          execution?: {
-            reason?: string;
-          };
-        }
-      ).execution?.reason;
+    const reason = (
+      result as {
+        execution?: {
+          reason?: string;
+        };
+      }
+    ).execution?.reason;
 
-    if (
-      reason ===
-      'ALREADY_RUNNING'
-    ) {
+    if (reason === 'ALREADY_RUNNING') {
       /*
        * BullMQ may retry an interrupted active job
        * after a process crash while PostgreSQL still
@@ -511,22 +339,16 @@ implements OnModuleInit, OnModuleDestroy {
        * the queue item.
        */
       try {
-        const resumed =
-          await this.translationJobsService.resume(
-            job.data.shopifyDomain,
-            job.data.jobId,
-          );
+        const resumed = await this.translationJobsService.resume(
+          job.data.shopifyDomain,
+          job.data.jobId,
+        );
 
-        if (
-          resumed.status ===
-          'QUEUED'
-        ) {
+        if (resumed.status === 'QUEUED') {
           await job.updateProgress({
-            stage:
-              'recovered-stale-job',
+            stage: 'recovered-stale-job',
 
-            translationJobId:
-              job.data.jobId,
+            translationJobId: job.data.jobId,
           });
 
           return this.translationExecutorService.execute(
@@ -534,9 +356,7 @@ implements OnModuleInit, OnModuleDestroy {
             job.data.jobId,
           );
         }
-      } catch (
-        error
-      ) {
+      } catch (error) {
         throw new Error(
           `Translation job is still marked RUNNING: ${this.errorMessage(error)}`,
         );
@@ -544,23 +364,17 @@ implements OnModuleInit, OnModuleDestroy {
     }
 
     await job.updateProgress({
-      stage:
-        'finished',
+      stage: 'finished',
 
-      translationJobId:
-        job.data.jobId,
+      translationJobId: job.data.jobId,
     });
 
     return result;
   }
 
   private requireQueue() {
-    if (
-      !this.queue
-    ) {
-      throw new Error(
-        'Translation queue is not initialized.',
-      );
+    if (!this.queue) {
+      throw new Error('Translation queue is not initialized.');
     }
 
     return this.queue;
@@ -568,50 +382,20 @@ implements OnModuleInit, OnModuleDestroy {
 
   private redisConnection() {
     const value =
-      this.config.get<string>(
-        'REDIS_URL',
-      )?.trim() ||
-      'redis://127.0.0.1:6380';
+      this.config.get<string>('REDIS_URL')?.trim() || 'redis://127.0.0.1:6380';
 
-    const url =
-      new URL(
-        value,
-      );
+    const url = new URL(value);
 
-    if (
-      url.protocol !==
-        'redis:' &&
-      url.protocol !==
-        'rediss:'
-    ) {
-      throw new Error(
-        'REDIS_URL must use redis:// or rediss://.',
-      );
+    if (url.protocol !== 'redis:' && url.protocol !== 'rediss:') {
+      throw new Error('REDIS_URL must use redis:// or rediss://.');
     }
 
-    const dbText =
-      url.pathname.replace(
-        /^\//,
-        '',
-      );
+    const dbText = url.pathname.replace(/^\//, '');
 
-    const db =
-      dbText
-        ? Number(
-            dbText,
-          )
-        : 0;
+    const db = dbText ? Number(dbText) : 0;
 
-    if (
-      !Number.isInteger(
-        db,
-      ) ||
-      db <
-        0
-    ) {
-      throw new Error(
-        'REDIS_URL contains an invalid database number.',
-      );
+    if (!Number.isInteger(db) || db < 0) {
+      throw new Error('REDIS_URL contains an invalid database number.');
     }
 
     const connection: {
@@ -622,81 +406,43 @@ implements OnModuleInit, OnModuleDestroy {
       password?: string;
       tls?: Record<string, never>;
     } = {
-      host:
-        url.hostname,
+      host: url.hostname,
 
-      port:
-        Number(
-          url.port ||
-          '6379',
-        ),
+      port: Number(url.port || '6379'),
 
       db,
     };
 
-    if (
-      url.username
-    ) {
-      connection.username =
-        decodeURIComponent(
-          url.username,
-        );
+    if (url.username) {
+      connection.username = decodeURIComponent(url.username);
     }
 
-    if (
-      url.password
-    ) {
-      connection.password =
-        decodeURIComponent(
-          url.password,
-        );
+    if (url.password) {
+      connection.password = decodeURIComponent(url.password);
     }
 
-    if (
-      url.protocol ===
-      'rediss:'
-    ) {
-      connection.tls =
-        {};
+    if (url.protocol === 'rediss:') {
+      connection.tls = {};
     }
 
     return connection;
   }
 
   private positiveInteger(
-    value:
-      string |
-      undefined,
+    value: string | undefined,
 
-    fallback:
-      number,
+    fallback: number,
   ) {
-    const parsed =
-      Number(
-        value,
-      );
+    const parsed = Number(value);
 
-    return Number.isInteger(
-      parsed,
-    ) &&
-      parsed >
-        0
-      ? parsed
-      : fallback;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
   }
 
-  private errorMessage(
-    error:
-      unknown,
-  ) {
-    if (
-      error instanceof Error
-    ) {
+  private errorMessage(error: unknown) {
+    if (error instanceof Error) {
       return error.message;
     }
 
-    return String(
-      error,
-    );
+    return String(error);
   }
 }

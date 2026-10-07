@@ -1,34 +1,18 @@
-import {
-  Module,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
-import {
-  ShopifyAuthModule,
-} from '../shopify-auth/shopify-auth.module.js';
+import { ShopifyAuthModule } from '../shopify-auth/shopify-auth.module.js';
 
-import {
-  TranslationScannerController,
-} from './translation-scanner.controller.js';
+import { TranslationScannerController } from './translation-scanner.controller.js';
 
-import {
-  TranslationScannerService,
-} from './translation-scanner.service.js';
+import { TranslationScannerService } from './translation-scanner.service.js';
 
 @Module({
-  imports: [
-    ShopifyAuthModule,
-  ],
+  imports: [ShopifyAuthModule],
 
-  controllers: [
-    TranslationScannerController,
-  ],
+  controllers: [TranslationScannerController],
 
-  providers: [
-    TranslationScannerService,
-  ],
+  providers: [TranslationScannerService],
 
-  exports: [
-    TranslationScannerService,
-  ],
+  exports: [TranslationScannerService],
 })
 export class TranslationScannerModule {}
