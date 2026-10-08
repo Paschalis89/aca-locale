@@ -22,6 +22,18 @@ export class TranslationJobDto {
   })
   status!: string;
 
+  @ApiProperty({
+    enum: ['MANUAL', 'SHOPIFY_CHANGE'],
+    example: 'MANUAL',
+  })
+  origin!: string;
+
+  @ApiPropertyOptional({
+    example: 'cmv1234567890',
+    nullable: true,
+  })
+  changeEventId!: string | null;
+
   @ApiPropertyOptional({
     enum: ['OPENAI', 'ANTHROPIC', 'GOOGLE'],
     example: 'OPENAI',

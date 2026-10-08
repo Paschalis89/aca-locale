@@ -11,6 +11,10 @@ import {
 } from '../translation-scanner/translation-scanner.module.js';
 
 import {
+  TranslationJobsModule,
+} from '../translation-jobs/translation-jobs.module.js';
+
+import {
   InternalAuthGuard,
 } from './internal-auth.guard.js';
 
@@ -30,6 +34,7 @@ import {
   imports: [
     DatabaseModule,
     TranslationScannerModule,
+    TranslationJobsModule,
   ],
 
   controllers: [

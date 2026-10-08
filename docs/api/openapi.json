@@ -772,378 +772,6 @@
         ]
       }
     },
-    "/api/v1/shops/current": {
-      "get": {
-        "operationId": "ShopsController_getCurrentShop",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Returns the tenant identified by the Shopify ID token."
-          },
-          "401": {
-            "description": "Shopify ID token is missing, invalid or expired."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get current authenticated shop",
-        "tags": [
-          "Shops"
-        ]
-      }
-    },
-    "/api/v1/demo/ping": {
-      "get": {
-        "description": "Development endpoint used to verify Swagger, OpenAPI and API connectivity.",
-        "operationId": "DemoController_ping",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Demo API is reachable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "status": "ok",
-                    "message": "ACA Locale demo API is reachable.",
-                    "timestamp": "2026-10-03T21:00:00.000Z"
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Demo endpoints are disabled."
-          }
-        },
-        "summary": "Demo API ping",
-        "tags": [
-          "Demo"
-        ]
-      }
-    },
-    "/api/v1/demo/bootstrap-shop": {
-      "post": {
-        "description": "Creates or updates the ACA Locale development Shopify store together with its default settings and AI configuration. Development/demo only.",
-        "operationId": "DemoController_bootstrapShop",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": "Development shop successfully bootstrapped."
-          },
-          "404": {
-            "description": "Demo endpoints are disabled."
-          }
-        },
-        "summary": "Bootstrap ACA Locale development shop",
-        "tags": [
-          "Demo"
-        ]
-      }
-    },
-    "/api/v1/demo/shops": {
-      "get": {
-        "operationId": "DemoController_listShops",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Returns all registered shops. Development/demo only."
-          }
-        },
-        "summary": "List all demo shops",
-        "tags": [
-          "Demo"
-        ]
-      }
-    },
-    "/api/v1/ai/providers": {
-      "get": {
-        "operationId": "AiController_getProviders",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiProvidersStatusDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get AI and translation provider availability",
-        "tags": [
-          "AI Providers"
-        ]
-      }
-    },
-    "/api/v1/ai/providers/health": {
-      "get": {
-        "operationId": "AiController_getProviderHealth",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProvidersHealthDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Verify configured provider credentials",
-        "tags": [
-          "AI Providers"
-        ]
-      }
-    },
-    "/api/v1/ai/models": {
-      "get": {
-        "description": "Returns models currently available through the configured OpenAI, Anthropic and Google accounts. DeepL does not require a model selection.",
-        "operationId": "AiController_getModels",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiModelCatalogDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get the available AI model catalog",
-        "tags": [
-          "AI Providers"
-        ]
-      }
-    },
-    "/api/v1/ai/configuration": {
-      "get": {
-        "operationId": "AiController_getConfiguration",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiConfigurationDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get AI configuration for the authenticated shop",
-        "tags": [
-          "AI Providers"
-        ]
-      },
-      "patch": {
-        "operationId": "AiController_updateConfiguration",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateAiConfigurationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiConfigurationDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Update AI configuration for the authenticated shop",
-        "tags": [
-          "AI Providers"
-        ]
-      }
-    },
-    "/api/v1/languages": {
-      "get": {
-        "operationId": "LanguagesController_findAll",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Shop languages returned successfully."
-          },
-          "401": {
-            "description": "Shopify ID token is missing or invalid."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List languages for the authenticated shop",
-        "tags": [
-          "Languages"
-        ]
-      }
-    },
-    "/api/v1/languages/sync/shopify": {
-      "post": {
-        "description": "Synchronizes Shopify locales with ACA Locale and updates the shop source locale from the Shopify primary locale.",
-        "operationId": "LanguagesController_syncShopify",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SyncShopifyLocalesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Shopify locales synchronized successfully."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Synchronize Shopify locales",
-        "tags": [
-          "Languages"
-        ]
-      }
-    },
-    "/api/v1/markets": {
-      "get": {
-        "operationId": "MarketsController_findAll",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Shop markets returned successfully."
-          },
-          "401": {
-            "description": "Shopify ID token is missing or invalid."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List markets for the authenticated shop",
-        "tags": [
-          "Markets"
-        ]
-      }
-    },
-    "/api/v1/markets/sync/shopify": {
-      "post": {
-        "operationId": "MarketsController_syncShopify",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SyncShopifyMarketsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Shopify Markets synchronized successfully."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Synchronize Shopify Markets",
-        "tags": [
-          "Markets"
-        ]
-      }
-    },
-    "/api/v1/shopify/configuration/sync": {
-      "post": {
-        "description": "Synchronizes the authenticated Shopify store identity, locales and markets with ACA Locale.",
-        "operationId": "ShopifySyncController_sync",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SyncShopifyConfigurationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Shopify configuration synchronized successfully."
-          },
-          "401": {
-            "description": "Shopify ID token is missing, invalid or expired."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Synchronize Shopify configuration",
-        "tags": [
-          "Shopify Configuration"
-        ]
-      }
-    },
     "/api/v1/translations/jobs": {
       "post": {
         "description": "Creates the PostgreSQL translation job and immediately enqueues it for background execution through BullMQ.",
@@ -1693,6 +1321,378 @@
           "Translation Jobs"
         ]
       }
+    },
+    "/api/v1/shops/current": {
+      "get": {
+        "operationId": "ShopsController_getCurrentShop",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns the tenant identified by the Shopify ID token."
+          },
+          "401": {
+            "description": "Shopify ID token is missing, invalid or expired."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current authenticated shop",
+        "tags": [
+          "Shops"
+        ]
+      }
+    },
+    "/api/v1/demo/ping": {
+      "get": {
+        "description": "Development endpoint used to verify Swagger, OpenAPI and API connectivity.",
+        "operationId": "DemoController_ping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Demo API is reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "ok",
+                    "message": "ACA Locale demo API is reachable.",
+                    "timestamp": "2026-10-03T21:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Demo endpoints are disabled."
+          }
+        },
+        "summary": "Demo API ping",
+        "tags": [
+          "Demo"
+        ]
+      }
+    },
+    "/api/v1/demo/bootstrap-shop": {
+      "post": {
+        "description": "Creates or updates the ACA Locale development Shopify store together with its default settings and AI configuration. Development/demo only.",
+        "operationId": "DemoController_bootstrapShop",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Development shop successfully bootstrapped."
+          },
+          "404": {
+            "description": "Demo endpoints are disabled."
+          }
+        },
+        "summary": "Bootstrap ACA Locale development shop",
+        "tags": [
+          "Demo"
+        ]
+      }
+    },
+    "/api/v1/demo/shops": {
+      "get": {
+        "operationId": "DemoController_listShops",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns all registered shops. Development/demo only."
+          }
+        },
+        "summary": "List all demo shops",
+        "tags": [
+          "Demo"
+        ]
+      }
+    },
+    "/api/v1/ai/providers": {
+      "get": {
+        "operationId": "AiController_getProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProvidersStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get AI and translation provider availability",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/ai/providers/health": {
+      "get": {
+        "operationId": "AiController_getProviderHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify configured provider credentials",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/ai/models": {
+      "get": {
+        "description": "Returns models currently available through the configured OpenAI, Anthropic and Google accounts. DeepL does not require a model selection.",
+        "operationId": "AiController_getModels",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiModelCatalogDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the available AI model catalog",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/ai/configuration": {
+      "get": {
+        "operationId": "AiController_getConfiguration",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigurationDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get AI configuration for the authenticated shop",
+        "tags": [
+          "AI Providers"
+        ]
+      },
+      "patch": {
+        "operationId": "AiController_updateConfiguration",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAiConfigurationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigurationDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update AI configuration for the authenticated shop",
+        "tags": [
+          "AI Providers"
+        ]
+      }
+    },
+    "/api/v1/languages": {
+      "get": {
+        "operationId": "LanguagesController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Shop languages returned successfully."
+          },
+          "401": {
+            "description": "Shopify ID token is missing or invalid."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List languages for the authenticated shop",
+        "tags": [
+          "Languages"
+        ]
+      }
+    },
+    "/api/v1/languages/sync/shopify": {
+      "post": {
+        "description": "Synchronizes Shopify locales with ACA Locale and updates the shop source locale from the Shopify primary locale.",
+        "operationId": "LanguagesController_syncShopify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncShopifyLocalesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shopify locales synchronized successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize Shopify locales",
+        "tags": [
+          "Languages"
+        ]
+      }
+    },
+    "/api/v1/markets": {
+      "get": {
+        "operationId": "MarketsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Shop markets returned successfully."
+          },
+          "401": {
+            "description": "Shopify ID token is missing or invalid."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List markets for the authenticated shop",
+        "tags": [
+          "Markets"
+        ]
+      }
+    },
+    "/api/v1/markets/sync/shopify": {
+      "post": {
+        "operationId": "MarketsController_syncShopify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncShopifyMarketsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shopify Markets synchronized successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize Shopify Markets",
+        "tags": [
+          "Markets"
+        ]
+      }
+    },
+    "/api/v1/shopify/configuration/sync": {
+      "post": {
+        "description": "Synchronizes the authenticated Shopify store identity, locales and markets with ACA Locale.",
+        "operationId": "ShopifySyncController_sync",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncShopifyConfigurationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shopify configuration synchronized successfully."
+          },
+          "401": {
+            "description": "Shopify ID token is missing, invalid or expired."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize Shopify configuration",
+        "tags": [
+          "Shopify Configuration"
+        ]
+      }
     }
   },
   "info": {
@@ -2108,6 +2108,391 @@
           "shopifyDomain",
           "targetLocale",
           "resourceTypes"
+        ]
+      },
+      "CreateTranslationJobDto": {
+        "type": "object",
+        "properties": {
+          "targetLocale": {
+            "type": "string",
+            "description": "Target Shopify locale.",
+            "example": "it"
+          },
+          "resourceTypes": {
+            "description": "Shopify resource types to include in the translation job.",
+            "example": [
+              "PRODUCT",
+              "COLLECTION",
+              "PAGE"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "maxItems": {
+            "type": "number",
+            "description": "Maximum number of translation fields to include in this job.",
+            "example": 100,
+            "default": 100,
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "targetLocale",
+          "resourceTypes"
+        ]
+      },
+      "TranslationJobResourceDto": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "example": "PRODUCT"
+          },
+          "shopifyResourceId": {
+            "type": "string",
+            "example": "gid://shopify/Product/123456789"
+          }
+        },
+        "required": [
+          "resourceType",
+          "shopifyResourceId"
+        ]
+      },
+      "TranslationJobFieldDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "title"
+          },
+          "type": {
+            "type": "string",
+            "example": "STRING"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "example": "en"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/TranslationJobResourceDto"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "sourceLocale",
+          "resource"
+        ]
+      },
+      "TranslationJobItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fieldId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "GENERATING",
+              "GENERATED",
+              "VALIDATED",
+              "NEEDS_REVIEW",
+              "APPROVED",
+              "PUBLISHED",
+              "FAILED"
+            ],
+            "example": "PENDING"
+          },
+          "sourceDigest": {
+            "type": "string"
+          },
+          "sourceValue": {
+            "type": "string",
+            "example": "Example product title"
+          },
+          "translatedValue": {
+            "type": "object",
+            "nullable": true
+          },
+          "provider": {
+            "type": "object",
+            "nullable": true
+          },
+          "model": {
+            "type": "object",
+            "nullable": true
+          },
+          "generatedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "object",
+            "nullable": true
+          },
+          "field": {
+            "$ref": "#/components/schemas/TranslationJobFieldDto"
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "status",
+          "sourceDigest",
+          "sourceValue",
+          "field"
+        ]
+      },
+      "TranslationJobDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "cmv1234567890"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "example": "en"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "PARTIAL",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "example": "QUEUED"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "SHOPIFY_CHANGE"
+            ],
+            "example": "MANUAL"
+          },
+          "changeEventId": {
+            "type": "object",
+            "example": "cmv1234567890",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE"
+            ],
+            "example": "OPENAI",
+            "nullable": true
+          },
+          "model": {
+            "type": "object",
+            "example": "gpt-5.6-luna",
+            "nullable": true
+          },
+          "totalItems": {
+            "type": "number",
+            "example": 100
+          },
+          "completedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "failedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "startedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationJobItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sourceLocale",
+          "targetLocale",
+          "status",
+          "origin",
+          "totalItems",
+          "completedItems",
+          "failedItems",
+          "createdAt",
+          "updatedAt",
+          "items"
+        ]
+      },
+      "TranslationJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "cmv1234567890"
+          },
+          "sourceLocale": {
+            "type": "string",
+            "example": "en"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "PARTIAL",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "example": "QUEUED"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "SHOPIFY_CHANGE"
+            ],
+            "example": "MANUAL"
+          },
+          "changeEventId": {
+            "type": "object",
+            "example": "cmv1234567890",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "OPENAI",
+              "ANTHROPIC",
+              "GOOGLE"
+            ],
+            "example": "OPENAI",
+            "nullable": true
+          },
+          "model": {
+            "type": "object",
+            "example": "gpt-5.6-luna",
+            "nullable": true
+          },
+          "totalItems": {
+            "type": "number",
+            "example": 100
+          },
+          "completedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "failedItems": {
+            "type": "number",
+            "example": 0
+          },
+          "startedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceLocale",
+          "targetLocale",
+          "status",
+          "origin",
+          "totalItems",
+          "completedItems",
+          "failedItems",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ApproveTranslationItemDto": {
+        "type": "object",
+        "properties": {
+          "approvedValue": {
+            "type": "string",
+            "description": "Optional manually edited translation. If omitted, the generated translatedValue is approved as-is.",
+            "example": "Snowboard con inventario non monitorato"
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional human review note.",
+            "example": "Terminology adjusted for the Italian storefront."
+          }
+        }
+      },
+      "RejectTranslationItemDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Reason why the generated translation was rejected.",
+            "example": "Terminology is not suitable for the Italian market."
+          }
+        },
+        "required": [
+          "note"
         ]
       },
       "AiProviderStatusDto": {
@@ -2611,363 +2996,6 @@
           "shop",
           "locales",
           "markets"
-        ]
-      },
-      "CreateTranslationJobDto": {
-        "type": "object",
-        "properties": {
-          "targetLocale": {
-            "type": "string",
-            "description": "Target Shopify locale.",
-            "example": "it"
-          },
-          "resourceTypes": {
-            "description": "Shopify resource types to include in the translation job.",
-            "example": [
-              "PRODUCT",
-              "COLLECTION",
-              "PAGE"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "maxItems": {
-            "type": "number",
-            "description": "Maximum number of translation fields to include in this job.",
-            "example": 100,
-            "default": 100,
-            "minimum": 1,
-            "maximum": 500
-          }
-        },
-        "required": [
-          "targetLocale",
-          "resourceTypes"
-        ]
-      },
-      "TranslationJobResourceDto": {
-        "type": "object",
-        "properties": {
-          "resourceType": {
-            "type": "string",
-            "example": "PRODUCT"
-          },
-          "shopifyResourceId": {
-            "type": "string",
-            "example": "gid://shopify/Product/123456789"
-          }
-        },
-        "required": [
-          "resourceType",
-          "shopifyResourceId"
-        ]
-      },
-      "TranslationJobFieldDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "example": "title"
-          },
-          "type": {
-            "type": "string",
-            "example": "STRING"
-          },
-          "sourceLocale": {
-            "type": "string",
-            "example": "en"
-          },
-          "resource": {
-            "$ref": "#/components/schemas/TranslationJobResourceDto"
-          }
-        },
-        "required": [
-          "key",
-          "type",
-          "sourceLocale",
-          "resource"
-        ]
-      },
-      "TranslationJobItemDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "fieldId": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "GENERATING",
-              "GENERATED",
-              "VALIDATED",
-              "NEEDS_REVIEW",
-              "APPROVED",
-              "PUBLISHED",
-              "FAILED"
-            ],
-            "example": "PENDING"
-          },
-          "sourceDigest": {
-            "type": "string"
-          },
-          "sourceValue": {
-            "type": "string",
-            "example": "Example product title"
-          },
-          "translatedValue": {
-            "type": "object",
-            "nullable": true
-          },
-          "provider": {
-            "type": "object",
-            "nullable": true
-          },
-          "model": {
-            "type": "object",
-            "nullable": true
-          },
-          "generatedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "approvedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "publishedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "errorMessage": {
-            "type": "object",
-            "nullable": true
-          },
-          "field": {
-            "$ref": "#/components/schemas/TranslationJobFieldDto"
-          }
-        },
-        "required": [
-          "id",
-          "fieldId",
-          "status",
-          "sourceDigest",
-          "sourceValue",
-          "field"
-        ]
-      },
-      "TranslationJobDetailDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "cmv1234567890"
-          },
-          "sourceLocale": {
-            "type": "string",
-            "example": "en"
-          },
-          "targetLocale": {
-            "type": "string",
-            "example": "it"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "QUEUED",
-              "RUNNING",
-              "COMPLETED",
-              "PARTIAL",
-              "FAILED",
-              "CANCELLED"
-            ],
-            "example": "QUEUED"
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "OPENAI",
-              "ANTHROPIC",
-              "GOOGLE"
-            ],
-            "example": "OPENAI",
-            "nullable": true
-          },
-          "model": {
-            "type": "object",
-            "example": "gpt-5.6-luna",
-            "nullable": true
-          },
-          "totalItems": {
-            "type": "number",
-            "example": 100
-          },
-          "completedItems": {
-            "type": "number",
-            "example": 0
-          },
-          "failedItems": {
-            "type": "number",
-            "example": 0
-          },
-          "startedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "completedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "errorMessage": {
-            "type": "object",
-            "nullable": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TranslationJobItemDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "sourceLocale",
-          "targetLocale",
-          "status",
-          "totalItems",
-          "completedItems",
-          "failedItems",
-          "createdAt",
-          "updatedAt",
-          "items"
-        ]
-      },
-      "TranslationJobDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "cmv1234567890"
-          },
-          "sourceLocale": {
-            "type": "string",
-            "example": "en"
-          },
-          "targetLocale": {
-            "type": "string",
-            "example": "it"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "QUEUED",
-              "RUNNING",
-              "COMPLETED",
-              "PARTIAL",
-              "FAILED",
-              "CANCELLED"
-            ],
-            "example": "QUEUED"
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "OPENAI",
-              "ANTHROPIC",
-              "GOOGLE"
-            ],
-            "example": "OPENAI",
-            "nullable": true
-          },
-          "model": {
-            "type": "object",
-            "example": "gpt-5.6-luna",
-            "nullable": true
-          },
-          "totalItems": {
-            "type": "number",
-            "example": 100
-          },
-          "completedItems": {
-            "type": "number",
-            "example": 0
-          },
-          "failedItems": {
-            "type": "number",
-            "example": 0
-          },
-          "startedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "completedAt": {
-            "type": "object",
-            "nullable": true
-          },
-          "errorMessage": {
-            "type": "object",
-            "nullable": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "sourceLocale",
-          "targetLocale",
-          "status",
-          "totalItems",
-          "completedItems",
-          "failedItems",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "ApproveTranslationItemDto": {
-        "type": "object",
-        "properties": {
-          "approvedValue": {
-            "type": "string",
-            "description": "Optional manually edited translation. If omitted, the generated translatedValue is approved as-is.",
-            "example": "Snowboard con inventario non monitorato"
-          },
-          "note": {
-            "type": "string",
-            "description": "Optional human review note.",
-            "example": "Terminology adjusted for the Italian storefront."
-          }
-        }
-      },
-      "RejectTranslationItemDto": {
-        "type": "object",
-        "properties": {
-          "note": {
-            "type": "string",
-            "description": "Reason why the generated translation was rejected.",
-            "example": "Terminology is not suitable for the Italian market."
-          }
-        },
-        "required": [
-          "note"
         ]
       }
     }

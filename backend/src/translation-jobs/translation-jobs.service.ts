@@ -197,6 +197,8 @@ export class TranslationJobsService {
 
         status: 'QUEUED',
 
+        origin: 'MANUAL',
+
         provider,
         model,
         fallbackProvider,
@@ -224,6 +226,318 @@ export class TranslationJobsService {
 
       include: this.jobInclude(),
     });
+  }
+
+
+  /**
+   * 10C - Create a translation job for one Shopify resource change.
+   *
+   * This method intentionally does NOT enqueue the job. 10C is only
+   * responsible for deterministic job creation. Automatic BullMQ
+   * execution is introduced in 10D so enabling 10C cannot unexpectedly
+   * consume provider quota while we are still validating automation.
+   */
+  async createFromShopifyChange(
+    shopifyDomain: string,
+
+    input: {
+      changeEventId: string;
+      resourceType: string;
+      shopifyResourceId: string;
+      targetLocale: string;
+    },
+  ) {
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
+
+      include: {
+        settings: true,
+        aiConfiguration: true,
+
+        languages: {
+          include: {
+            language: true,
+          },
+        },
+      },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop is not registered.');
+    }
+
+    const targetLocale = input.targetLocale.trim();
+
+    if (!shop.settings?.autoTranslate) {
+      return {
+        created: false,
+        reason: 'AUTO_TRANSLATE_DISABLED',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    if (shop.status !== 'ACTIVE') {
+      return {
+        created: false,
+        reason: 'SHOP_NOT_ACTIVE',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    if (!shop.sourceLocale) {
+      return {
+        created: false,
+        reason: 'SOURCE_LOCALE_NOT_CONFIGURED',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    if (targetLocale === shop.sourceLocale) {
+      return {
+        created: false,
+        reason: 'SOURCE_LOCALE',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    const targetLanguage = shop.languages.find(
+      (shopLanguage) =>
+        shopLanguage.language.locale === targetLocale,
+    );
+
+    if (!targetLanguage) {
+      return {
+        created: false,
+        reason: 'TARGET_LOCALE_NOT_CONFIGURED',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    if (!targetLanguage.published) {
+      return {
+        created: false,
+        reason: 'TARGET_LOCALE_NOT_PUBLISHED',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    const resourceType = input.resourceType.trim().toUpperCase();
+    const automationKey = `SHOPIFY_CHANGE:${input.changeEventId}:${targetLocale}`;
+
+    const existingAutomaticJob =
+      await this.prisma.translationJob.findUnique({
+        where: {
+          automationKey,
+        },
+
+        select: {
+          id: true,
+          totalItems: true,
+        },
+      });
+
+    if (existingAutomaticJob) {
+      return {
+        created: false,
+        reason: 'DUPLICATE_CHANGE_EVENT',
+        targetLocale,
+        jobId: existingAutomaticJob.id,
+        totalItems: existingAutomaticJob.totalItems,
+      };
+    }
+
+    const changeEvent =
+      await this.prisma.translationChangeEvent.findFirst({
+        where: {
+          id: input.changeEventId,
+          shopId: shop.id,
+          resourceType,
+          shopifyResourceId: input.shopifyResourceId,
+          action: 'UPSERT',
+        },
+
+        select: {
+          id: true,
+        },
+      });
+
+    if (!changeEvent) {
+      throw new NotFoundException(
+        'Matching Shopify translation change event was not found.',
+      );
+    }
+
+    const states = await this.prisma.translationState.findMany({
+      where: {
+        targetLocale,
+
+        status: {
+          in: ['MISSING', 'OUTDATED'],
+        },
+
+        field: {
+          sourceLocale: shop.sourceLocale,
+          deletedAt: null,
+
+          type: {
+            not: 'URI',
+          },
+
+          resource: {
+            shopId: shop.id,
+            resourceType,
+            shopifyResourceId: input.shopifyResourceId,
+            deletedAt: null,
+          },
+        },
+      },
+
+      select: {
+        status: true,
+
+        field: {
+          select: {
+            id: true,
+            sourceValue: true,
+            sourceDigest: true,
+          },
+        },
+      },
+
+      orderBy: {
+        updatedAt: 'asc',
+      },
+    });
+
+    if (states.length === 0) {
+      return {
+        created: false,
+        reason: 'NO_ELIGIBLE_FIELDS',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    /*
+     * A Shopify event can be delivered more than once and a different
+     * event can also arrive without changing a given translatable field.
+     * Do not create a second automatic job for the same field/sourceDigest
+     * and target locale if that exact snapshot already exists anywhere in
+     * job history (manual or automatic).
+     */
+    const existingSnapshots =
+      await this.prisma.translationJobItem.findMany({
+        where: {
+          job: {
+            shopId: shop.id,
+            targetLocale,
+          },
+
+          OR: states.map((state) => ({
+            fieldId: state.field.id,
+            sourceDigest: state.field.sourceDigest,
+          })),
+        },
+
+        select: {
+          fieldId: true,
+          sourceDigest: true,
+        },
+      });
+
+    const existingSnapshotKeys = new Set(
+      existingSnapshots.map(
+        (item) => `${item.fieldId}:${item.sourceDigest}`,
+      ),
+    );
+
+    const eligibleStates = states.filter(
+      (state) =>
+        !existingSnapshotKeys.has(
+          `${state.field.id}:${state.field.sourceDigest}`,
+        ),
+    );
+
+    if (eligibleStates.length === 0) {
+      return {
+        created: false,
+        reason: 'SOURCE_SNAPSHOT_ALREADY_JOBBED',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
+    const provider = shop.aiConfiguration?.translationProvider ?? null;
+    const model = shop.aiConfiguration?.translationModel ?? null;
+    const fallbackProvider =
+      shop.aiConfiguration?.fallbackProvider ?? null;
+    const fallbackModel =
+      fallbackProvider === 'DEEPL'
+        ? null
+        : (shop.aiConfiguration?.fallbackModel ?? null);
+    const reviewProvider = shop.aiConfiguration?.reviewProvider ?? null;
+    const reviewModel = shop.aiConfiguration?.reviewModel ?? null;
+
+    const job = await this.prisma.translationJob.create({
+      data: {
+        shopId: shop.id,
+        sourceLocale: shop.sourceLocale,
+        targetLocale,
+        status: 'QUEUED',
+        origin: 'SHOPIFY_CHANGE',
+        automationKey,
+        changeEventId: changeEvent.id,
+
+        provider,
+        model,
+        fallbackProvider,
+        fallbackModel,
+        reviewProvider,
+        reviewModel,
+
+        totalItems: eligibleStates.length,
+
+        items: {
+          create: eligibleStates.map((state) => ({
+            fieldId: state.field.id,
+            sourceDigest: state.field.sourceDigest,
+            sourceValue: state.field.sourceValue,
+            status: 'PENDING',
+            provider,
+            model,
+          })),
+        },
+      },
+
+      select: {
+        id: true,
+        totalItems: true,
+      },
+    });
+
+    return {
+      created: true,
+      reason: 'CREATED',
+      targetLocale,
+      jobId: job.id,
+      totalItems: job.totalItems,
+    };
   }
 
   async findAll(shopifyDomain: string) {

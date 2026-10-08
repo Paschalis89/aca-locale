@@ -8,6 +8,8 @@ import { PrismaService } from '../database/prisma.service.js';
 
 import { TranslationScannerService } from '../translation-scanner/translation-scanner.service.js';
 
+import { TranslationJobsService } from '../translation-jobs/translation-jobs.service.js';
+
 import type {
   ClaimShopifyContentChangeDto,
   FailShopifyContentChangeDto,
@@ -26,6 +28,9 @@ export class InternalTranslationChangeService {
 
     private readonly scanner:
       TranslationScannerService,
+
+    private readonly translationJobs:
+      TranslationJobsService,
   ) {}
 
   async claim(
@@ -282,6 +287,7 @@ export class InternalTranslationChangeService {
     );
 
     const summaries = [];
+    const automaticJobs = [];
 
     for (
       const locale
@@ -318,6 +324,28 @@ export class InternalTranslationChangeService {
       summaries.push(
         summary,
       );
+
+      const automaticJob =
+        await this.translationJobs.createFromShopifyChange(
+          input.shopifyDomain,
+          {
+            changeEventId:
+              event.id,
+
+            resourceType:
+              input.resourceType,
+
+            shopifyResourceId:
+              input.shopifyResourceId,
+
+            targetLocale:
+              locale.targetLocale,
+          },
+        );
+
+      automaticJobs.push(
+        automaticJob,
+      );
     }
 
     await this.completeEvent(
@@ -341,6 +369,8 @@ export class InternalTranslationChangeService {
         input.locales.length,
 
       summaries,
+
+      automaticJobs,
     };
   }
 

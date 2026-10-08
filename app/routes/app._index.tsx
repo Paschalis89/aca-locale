@@ -79,6 +79,8 @@ type TranslationJob = {
   sourceLocale: string;
   targetLocale: string;
   status: JobStatus;
+  origin?: "MANUAL" | "SHOPIFY_CHANGE";
+  changeEventId?: string | null;
   provider?: string | null;
   model?: string | null;
   fallbackProvider?: string | null;
@@ -2494,6 +2496,7 @@ function JobListItem({
       </div>
       <div className="aca-job-meta">
         <span>{job.sourceLocale} → {job.targetLocale}</span>
+        <span>{job.origin === "SHOPIFY_CHANGE" ? "Automatic · Shopify change" : "Manual"}</span>
         <span>{job.provider ?? "—"}{job.model ? ` · ${job.model}` : ""}</span>
         <span>{job.completedItems}/{job.totalItems} completed · {job.failedItems} failed</span>
         <span>{formatDateTime(job.createdAt)}</span>

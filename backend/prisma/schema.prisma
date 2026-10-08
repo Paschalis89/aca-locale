@@ -43,6 +43,11 @@ enum TranslationJobStatus {
   CANCELLED
 }
 
+enum TranslationJobOrigin {
+  MANUAL
+  SHOPIFY_CHANGE
+}
+
 enum TranslationJobItemStatus {
   PENDING
   GENERATING
@@ -292,6 +297,20 @@ model TranslationJob {
   targetLocale String
 
   status TranslationJobStatus @default(QUEUED)
+  origin TranslationJobOrigin @default(MANUAL)
+
+  /**
+   * Stable idempotency key used by automatic Shopify-change jobs.
+   * Manual jobs leave this null. PostgreSQL allows multiple null values
+   * under a unique constraint, while automatic jobs remain race-safe.
+   */
+  automationKey String? @unique
+
+  /**
+   * Shopify change event that caused this automatic job.
+   * Null for manually-created jobs.
+   */
+  changeEventId String?
 
   provider TranslationProvider?
   model    String?
@@ -316,11 +335,15 @@ model TranslationJob {
 
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
+  changeEvent TranslationChangeEvent? @relation(fields: [changeEventId], references: [id], onDelete: SetNull)
+
   items       TranslationJobItem[]
   usageEvents TranslationUsageEvent[]
 
   @@index([shopId, status])
   @@index([shopId, targetLocale])
+  @@index([shopId, origin, createdAt])
+  @@index([changeEventId])
   @@index([createdAt])
 }
 
@@ -479,6 +502,8 @@ model TranslationChangeEvent {
   updatedAt DateTime @updatedAt
 
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  translationJobs TranslationJob[]
 
   @@unique([shopId, webhookId])
   @@index([shopId, status, createdAt])
