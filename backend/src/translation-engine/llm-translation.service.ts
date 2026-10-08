@@ -8,6 +8,8 @@ import { generateText } from 'ai';
 
 import { AiRegistryService } from '../ai/ai-registry.service.js';
 
+import { formatGlossaryRulesForPrompt } from '../glossary/glossary-rule.utils.js';
+
 import type {
   TranslationProviderInput,
   TranslationProviderName,
@@ -115,6 +117,11 @@ export class LlmTranslationService {
   }
 
   private buildUserPrompt(input: TranslationProviderInput) {
+    const glossaryInstructions =
+      formatGlossaryRulesForPrompt(
+        input.glossaryRules ?? [],
+      );
+
     return [
       `Source locale: ${input.sourceLocale}`,
       `Target locale: ${input.targetLocale}`,
@@ -122,6 +129,8 @@ export class LlmTranslationService {
       `Field key: ${input.fieldKey ?? 'UNKNOWN'}`,
       `Content type: ${input.contentType ?? 'TEXT'}`,
       '',
+      ...glossaryInstructions,
+      ...(glossaryInstructions.length > 0 ? [''] : []),
       'Translate the content between <source> and </source>.',
       '',
       '<source>',

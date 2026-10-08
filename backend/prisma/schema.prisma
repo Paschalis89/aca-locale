@@ -60,6 +60,23 @@ enum TranslationUsageStage {
   AI_REVIEW
 }
 
+enum GlossaryRuleType {
+  DO_NOT_TRANSLATE
+  PREFERRED_TRANSLATION
+  FORBIDDEN_TRANSLATION
+}
+
+enum TranslationChangeEventAction {
+  UPSERT
+  DELETE
+}
+
+enum TranslationChangeEventStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model Shop {
   id String @id @default(cuid())
 
@@ -90,9 +107,11 @@ model Shop {
   languages ShopLanguage[]
   markets   ShopMarket[]
 
-  translationResources   TranslationResource[]
-  translationJobs        TranslationJob[]
-  translationUsageEvents TranslationUsageEvent[]
+  translationResources    TranslationResource[]
+  translationJobs         TranslationJob[]
+  translationUsageEvents  TranslationUsageEvent[]
+  translationChangeEvents TranslationChangeEvent[]
+  glossaries              Glossary[]
 
   @@index([status])
 }
@@ -198,8 +217,9 @@ model TranslationResource {
   shopifyResourceId String
   resourceType      String
 
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  deletedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -210,6 +230,7 @@ model TranslationResource {
 
   @@unique([shopId, resourceType, shopifyResourceId])
   @@index([shopId, resourceType])
+  @@index([shopId, resourceType, deletedAt])
 }
 
 model TranslationField {
@@ -224,6 +245,8 @@ model TranslationField {
   sourceValue  String @db.Text
   sourceDigest String
 
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -234,6 +257,7 @@ model TranslationField {
 
   @@unique([resourceId, key])
   @@index([resourceId])
+  @@index([resourceId, deletedAt])
 }
 
 model TranslationState {
@@ -427,4 +451,95 @@ model TranslationUsageEvent {
   @@index([itemId, createdAt])
   @@index([provider, createdAt])
   @@index([stage, createdAt])
+}
+
+model TranslationChangeEvent {
+  id String @id @default(cuid())
+
+  shopId String
+
+  webhookId String
+  topic     String
+
+  resourceType      String
+  shopifyResourceId String
+
+  action TranslationChangeEventAction
+  status TranslationChangeEventStatus @default(PROCESSING)
+
+  attempts Int @default(1)
+
+  triggeredAt DateTime?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  errorMessage String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, webhookId])
+  @@index([shopId, status, createdAt])
+  @@index([shopId, resourceType, shopifyResourceId, createdAt])
+}
+
+model Glossary {
+  id String @id @default(cuid())
+
+  shopId String
+
+  name        String
+  description String? @db.Text
+
+  sourceLocale String
+
+  enabled   Boolean @default(true)
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  entries GlossaryEntry[]
+
+  @@unique([shopId, name])
+  @@index([shopId, enabled])
+  @@index([shopId, isDefault])
+}
+
+model GlossaryEntry {
+  id String @id @default(cuid())
+
+  glossaryId String
+
+  sourceTerm String
+
+  /**
+   * "*" means the rule applies to every
+   * target locale. Otherwise this contains
+   * a normalized locale such as it, de, ja.
+   */
+  targetLocale String @default("*")
+
+  targetTerm String? @db.Text
+
+  ruleType GlossaryRuleType
+
+  caseSensitive Boolean @default(false)
+  enabled       Boolean @default(true)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  glossary Glossary @relation(fields: [glossaryId], references: [id], onDelete: Cascade)
+
+  @@unique([glossaryId, sourceTerm, targetLocale, ruleType])
+  @@index([glossaryId, enabled])
+  @@index([targetLocale, ruleType])
+  @@index([sourceTerm])
 }

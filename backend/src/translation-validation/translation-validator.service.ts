@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { glossaryTermMatches } from '../glossary/glossary-rule.utils.js';
+
 import type {
   TranslationValidationInput,
   TranslationValidationIssue,
@@ -8,7 +10,7 @@ import type {
 
 @Injectable()
 export class TranslationValidatorService {
-  private readonly version = 'deterministic-v1';
+  private readonly version = 'deterministic-v2-glossary';
 
   validate(input: TranslationValidationInput): TranslationValidationResult {
     const issues: TranslationValidationIssue[] = [];
@@ -49,11 +51,129 @@ export class TranslationValidatorService {
 
     this.validateNumbers(source, translated, issues);
 
+    this.validateGlossary(input, source, translated, issues);
+
     this.validateSameAsSource(source, translated, issues);
 
     this.validateLengthRatio(source, translated, issues);
 
     return this.result(issues);
+  }
+
+
+  getVersion() {
+    return this.version;
+  }
+
+  private validateGlossary(
+    input: TranslationValidationInput,
+
+    source: string,
+
+    translated: string,
+
+    issues: TranslationValidationIssue[],
+  ) {
+    for (const rule of input.glossaryRules ?? []) {
+      if (
+        !glossaryTermMatches(
+          source,
+          rule.sourceTerm,
+          rule.caseSensitive,
+        )
+      ) {
+        continue;
+      }
+
+      if (rule.ruleType === 'DO_NOT_TRANSLATE') {
+        if (
+          !glossaryTermMatches(
+            translated,
+            rule.sourceTerm,
+            rule.caseSensitive,
+          )
+        ) {
+          issues.push({
+            code: 'GLOSSARY_PROTECTED_TERM_CHANGED',
+
+            severity: 'ERROR',
+
+            message: `Protected glossary term "${rule.sourceTerm}" must remain unchanged.`,
+
+            expected: [rule.sourceTerm],
+
+            actual: [],
+
+            glossaryEntryId: rule.id,
+
+            sourceTerm: rule.sourceTerm,
+
+            targetTerm: null,
+          });
+        }
+
+        continue;
+      }
+
+      if (rule.ruleType === 'PREFERRED_TRANSLATION') {
+        if (
+          rule.targetTerm &&
+          !glossaryTermMatches(
+            translated,
+            rule.targetTerm,
+            rule.caseSensitive,
+          )
+        ) {
+          issues.push({
+            code: 'GLOSSARY_REQUIRED_TERM_MISSING',
+
+            severity: 'ERROR',
+
+            message: `Glossary requires "${rule.targetTerm}" for source term "${rule.sourceTerm}".`,
+
+            expected: [rule.targetTerm],
+
+            actual: [],
+
+            glossaryEntryId: rule.id,
+
+            sourceTerm: rule.sourceTerm,
+
+            targetTerm: rule.targetTerm,
+          });
+        }
+
+        continue;
+      }
+
+      if (
+        rule.ruleType === 'FORBIDDEN_TRANSLATION' &&
+        rule.targetTerm &&
+        glossaryTermMatches(
+          translated,
+          rule.targetTerm,
+          rule.caseSensitive,
+        )
+      ) {
+        issues.push({
+          code: 'GLOSSARY_FORBIDDEN_TERM_USED',
+
+          severity: 'ERROR',
+
+          message: `Glossary forbids "${rule.targetTerm}" for source term "${rule.sourceTerm}".`,
+
+          expected: [],
+
+          actual: [rule.targetTerm],
+
+          glossaryEntryId: rule.id,
+
+          sourceTerm: rule.sourceTerm,
+
+          targetTerm: rule.targetTerm,
+        });
+      }
+    }
   }
 
   private validateLiquid(

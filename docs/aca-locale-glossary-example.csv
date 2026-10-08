@@ -1,0 +1,6 @@
+source_term,target_locale,target_term,rule_type,case_sensitive,enabled,notes
+ACA,*,,DO_NOT_TRANSLATE,true,true,Brand acronym
+Amalfi Coast Artistry,*,,DO_NOT_TRANSLATE,true,true,Brand name
+Vietri sul Mare,*,,DO_NOT_TRANSLATE,true,true,Place name
+Handmade,it,Fatto a mano,PREFERRED_TRANSLATION,false,true,Preferred Italian terminology
+Handmade,ja,手作り,PREFERRED_TRANSLATION,false,true,Preferred Japanese terminology

@@ -30,6 +30,384 @@
         ]
       }
     },
+    "/api/v1/glossaries": {
+      "get": {
+        "operationId": "GlossaryController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List glossaries for the authenticated shop",
+        "tags": [
+          "Glossary"
+        ]
+      },
+      "post": {
+        "operationId": "GlossaryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGlossaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a glossary",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
+    "/api/v1/glossaries/default": {
+      "get": {
+        "operationId": "GlossaryController_getDefault",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get or create the shop default glossary",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
+    "/api/v1/glossaries/default/entries": {
+      "post": {
+        "operationId": "GlossaryController_createDefaultEntry",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGlossaryEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an entry to the default glossary",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
+    "/api/v1/glossaries/default/entries/{entryId}": {
+      "patch": {
+        "operationId": "GlossaryController_updateDefaultEntry",
+        "parameters": [
+          {
+            "name": "entryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGlossaryEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update an entry in the default glossary",
+        "tags": [
+          "Glossary"
+        ]
+      },
+      "delete": {
+        "operationId": "GlossaryController_removeDefaultEntry",
+        "parameters": [
+          {
+            "name": "entryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an entry from the default glossary",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
+    "/api/v1/glossaries/{id}": {
+      "get": {
+        "operationId": "GlossaryController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a glossary",
+        "tags": [
+          "Glossary"
+        ]
+      },
+      "patch": {
+        "operationId": "GlossaryController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGlossaryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a glossary",
+        "tags": [
+          "Glossary"
+        ]
+      },
+      "delete": {
+        "operationId": "GlossaryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a glossary",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
+    "/api/v1/glossaries/{id}/entries": {
+      "post": {
+        "operationId": "GlossaryController_createEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGlossaryEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an entry to a glossary",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
+    "/api/v1/glossaries/{id}/entries/{entryId}": {
+      "patch": {
+        "operationId": "GlossaryController_updateEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGlossaryEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a glossary entry",
+        "tags": [
+          "Glossary"
+        ]
+      },
+      "delete": {
+        "operationId": "GlossaryController_removeEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a glossary entry",
+        "tags": [
+          "Glossary"
+        ]
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "operationId": "ReadinessController_live",
@@ -107,6 +485,290 @@
         "summary": "Permanently redact all ACA Locale shop data",
         "tags": [
           "Internal"
+        ]
+      }
+    },
+    "/api/v1/internal/shopify/content-change/claim": {
+      "post": {
+        "operationId": "InternalShopifyController_claimContentChange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimShopifyContentChangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Claim a verified Shopify translation content change",
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
+    "/api/v1/internal/shopify/content-change/process-upsert": {
+      "post": {
+        "operationId": "InternalShopifyController_processContentUpsert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessShopifyContentUpsertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Persist one incremental Shopify translation resource scan",
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
+    "/api/v1/internal/shopify/content-change/process-delete": {
+      "post": {
+        "operationId": "InternalShopifyController_processContentDelete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessShopifyContentDeleteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Tombstone one deleted Shopify translation resource",
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
+    "/api/v1/internal/shopify/content-change/fail": {
+      "post": {
+        "operationId": "InternalShopifyController_failContentChange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailShopifyContentChangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Record a failed Shopify translation content change",
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/sync": {
+      "post": {
+        "operationId": "TranslationScannerController_sync",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncTranslationScanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Translation scan synchronized successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Synchronize a Shopify translation scan",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/summary": {
+      "get": {
+        "operationId": "TranslationScannerController_summary",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "PRODUCT",
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Translation scan summary returned successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get translation scan summary for one resource type",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/overview": {
+      "get": {
+        "description": "Returns the translation status grouped into content, custom data, commerce, theme and system resources.",
+        "operationId": "TranslationScannerController_overview",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Global translation scanner overview returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationScannerOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the global translation scanner overview",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/scanner/resource-types": {
+      "get": {
+        "description": "Returns scanner statistics for every supported Shopify translatable resource type, including resource types with zero content.",
+        "operationId": "TranslationScannerController_resourceTypesOverview",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resource type translation statistics returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationResourceTypesOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get translation scanner statistics by Shopify resource type",
+        "tags": [
+          "Translation Scanner"
+        ]
+      }
+    },
+    "/api/v1/translations/resources": {
+      "get": {
+        "operationId": "TranslationScannerController_resources",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "PRODUCT",
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "it",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scanned translation resources returned successfully."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List scanned translation resources",
+        "tags": [
+          "Translation Scanner"
         ]
       }
     },
@@ -479,190 +1141,6 @@
         "summary": "Synchronize Shopify configuration",
         "tags": [
           "Shopify Configuration"
-        ]
-      }
-    },
-    "/api/v1/translations/scanner/sync": {
-      "post": {
-        "operationId": "TranslationScannerController_sync",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SyncTranslationScanDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Translation scan synchronized successfully."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Synchronize a Shopify translation scan",
-        "tags": [
-          "Translation Scanner"
-        ]
-      }
-    },
-    "/api/v1/translations/scanner/summary": {
-      "get": {
-        "operationId": "TranslationScannerController_summary",
-        "parameters": [
-          {
-            "name": "resourceType",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": "PRODUCT",
-              "type": "string"
-            }
-          },
-          {
-            "name": "locale",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": "it",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Translation scan summary returned successfully."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get translation scan summary for one resource type",
-        "tags": [
-          "Translation Scanner"
-        ]
-      }
-    },
-    "/api/v1/translations/scanner/overview": {
-      "get": {
-        "description": "Returns the translation status grouped into content, custom data, commerce, theme and system resources.",
-        "operationId": "TranslationScannerController_overview",
-        "parameters": [
-          {
-            "name": "locale",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": "it",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Global translation scanner overview returned successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TranslationScannerOverviewDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get the global translation scanner overview",
-        "tags": [
-          "Translation Scanner"
-        ]
-      }
-    },
-    "/api/v1/translations/scanner/resource-types": {
-      "get": {
-        "description": "Returns scanner statistics for every supported Shopify translatable resource type, including resource types with zero content.",
-        "operationId": "TranslationScannerController_resourceTypesOverview",
-        "parameters": [
-          {
-            "name": "locale",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": "it",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Resource type translation statistics returned successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TranslationResourceTypesOverviewDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get translation scanner statistics by Shopify resource type",
-        "tags": [
-          "Translation Scanner"
-        ]
-      }
-    },
-    "/api/v1/translations/resources": {
-      "get": {
-        "operationId": "TranslationScannerController_resources",
-        "parameters": [
-          {
-            "name": "resourceType",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": "PRODUCT",
-              "type": "string"
-            }
-          },
-          {
-            "name": "locale",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": "it",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Scanned translation resources returned successfully."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List scanned translation resources",
-        "tags": [
-          "Translation Scanner"
         ]
       }
     },
@@ -1234,9 +1712,403 @@
       }
     },
     "schemas": {
+      "CreateGlossaryEntryDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateGlossaryEntryDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateGlossaryDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateGlossaryDto": {
+        "type": "object",
+        "properties": {}
+      },
       "ShopifyShopEventDto": {
         "type": "object",
         "properties": {}
+      },
+      "ClaimShopifyContentChangeDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ProcessShopifyContentUpsertDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ProcessShopifyContentDeleteDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "FailShopifyContentChangeDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "TranslationSourceDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "title"
+          },
+          "type": {
+            "type": "string",
+            "example": "SINGLE_LINE_TEXT_FIELD"
+          },
+          "locale": {
+            "type": "string",
+            "example": "en"
+          },
+          "value": {
+            "type": "string",
+            "example": "Gift Card"
+          },
+          "digest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "locale",
+          "value",
+          "digest"
+        ]
+      },
+      "ExistingTranslationDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "title"
+          },
+          "locale": {
+            "type": "string",
+            "example": "it"
+          },
+          "value": {
+            "type": "string"
+          },
+          "outdated": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "market": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "locale",
+          "value",
+          "outdated"
+        ]
+      },
+      "TranslationResourceScanDto": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "example": "gid://shopify/Product/8882758975625"
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationSourceDto"
+            }
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExistingTranslationDto"
+            }
+          }
+        },
+        "required": [
+          "resourceId",
+          "content",
+          "translations"
+        ]
+      },
+      "SyncTranslationScanDto": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "example": "PRODUCT"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationResourceScanDto"
+            }
+          },
+          "completeScan": {
+            "type": "boolean",
+            "description": "Indicates that the payload contains the complete Shopify result set for this resource type. When true, stale local resources are tombstoned so historical translation jobs remain auditable.",
+            "example": true,
+            "default": false
+          }
+        },
+        "required": [
+          "resourceType",
+          "targetLocale",
+          "resources"
+        ]
+      },
+      "TranslationOverallSummaryDto": {
+        "type": "object",
+        "properties": {
+          "resourceTypes": {
+            "type": "number",
+            "example": 30
+          },
+          "resourceTypesWithContent": {
+            "type": "number",
+            "example": 22
+          },
+          "resources": {
+            "type": "number",
+            "example": 126
+          },
+          "fields": {
+            "type": "number",
+            "example": 9173
+          },
+          "actionableFields": {
+            "type": "number",
+            "example": 9163
+          },
+          "emptySource": {
+            "type": "number",
+            "example": 10
+          },
+          "missing": {
+            "type": "number",
+            "example": 9163
+          },
+          "translated": {
+            "type": "number",
+            "example": 0
+          },
+          "outdated": {
+            "type": "number",
+            "example": 0
+          },
+          "coverage": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "resourceTypes",
+          "resourceTypesWithContent",
+          "resources",
+          "fields",
+          "actionableFields",
+          "emptySource",
+          "missing",
+          "translated",
+          "outdated",
+          "coverage"
+        ]
+      },
+      "TranslationGroupSummaryDto": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string",
+            "enum": [
+              "CONTENT",
+              "CUSTOM_DATA",
+              "COMMERCE",
+              "THEME",
+              "SYSTEM",
+              "OTHER"
+            ],
+            "example": "CONTENT"
+          },
+          "resourceTypes": {
+            "type": "number",
+            "example": 12
+          },
+          "resourceTypesWithContent": {
+            "type": "number",
+            "example": 8
+          },
+          "resources": {
+            "type": "number",
+            "example": 96
+          },
+          "fields": {
+            "type": "number",
+            "example": 145
+          },
+          "actionableFields": {
+            "type": "number",
+            "example": 143
+          },
+          "emptySource": {
+            "type": "number",
+            "example": 2
+          },
+          "missing": {
+            "type": "number",
+            "example": 143
+          },
+          "translated": {
+            "type": "number",
+            "example": 0
+          },
+          "outdated": {
+            "type": "number",
+            "example": 0
+          },
+          "coverage": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "group",
+          "resourceTypes",
+          "resourceTypesWithContent",
+          "resources",
+          "fields",
+          "actionableFields",
+          "emptySource",
+          "missing",
+          "translated",
+          "outdated",
+          "coverage"
+        ]
+      },
+      "TranslationScannerOverviewDto": {
+        "type": "object",
+        "properties": {
+          "shopifyDomain": {
+            "type": "string",
+            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TranslationOverallSummaryDto"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationGroupSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "shopifyDomain",
+          "targetLocale",
+          "summary",
+          "groups"
+        ]
+      },
+      "TranslationResourceTypeSummaryDto": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "example": "PRODUCT"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "CONTENT",
+              "CUSTOM_DATA",
+              "COMMERCE",
+              "THEME",
+              "SYSTEM",
+              "OTHER"
+            ],
+            "example": "CONTENT"
+          },
+          "resources": {
+            "type": "number",
+            "example": 17
+          },
+          "fields": {
+            "type": "number",
+            "example": 57
+          },
+          "actionableFields": {
+            "type": "number",
+            "example": 56
+          },
+          "emptySource": {
+            "type": "number",
+            "example": 1
+          },
+          "missing": {
+            "type": "number",
+            "example": 56
+          },
+          "translated": {
+            "type": "number",
+            "example": 0
+          },
+          "outdated": {
+            "type": "number",
+            "example": 0
+          },
+          "coverage": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "resourceType",
+          "group",
+          "resources",
+          "fields",
+          "actionableFields",
+          "emptySource",
+          "missing",
+          "translated",
+          "outdated",
+          "coverage"
+        ]
+      },
+      "TranslationResourceTypesOverviewDto": {
+        "type": "object",
+        "properties": {
+          "shopifyDomain": {
+            "type": "string",
+            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
+          },
+          "targetLocale": {
+            "type": "string",
+            "example": "it"
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationResourceTypeSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "shopifyDomain",
+          "targetLocale",
+          "resourceTypes"
+        ]
       },
       "AiProviderStatusDto": {
         "type": "object",
@@ -1739,368 +2611,6 @@
           "shop",
           "locales",
           "markets"
-        ]
-      },
-      "TranslationSourceDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "example": "title"
-          },
-          "type": {
-            "type": "string",
-            "example": "SINGLE_LINE_TEXT_FIELD"
-          },
-          "locale": {
-            "type": "string",
-            "example": "en"
-          },
-          "value": {
-            "type": "string",
-            "example": "Gift Card"
-          },
-          "digest": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "type",
-          "locale",
-          "value",
-          "digest"
-        ]
-      },
-      "ExistingTranslationDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "example": "title"
-          },
-          "locale": {
-            "type": "string",
-            "example": "it"
-          },
-          "value": {
-            "type": "string"
-          },
-          "outdated": {
-            "type": "boolean"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "market": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "key",
-          "locale",
-          "value",
-          "outdated"
-        ]
-      },
-      "TranslationResourceScanDto": {
-        "type": "object",
-        "properties": {
-          "resourceId": {
-            "type": "string",
-            "example": "gid://shopify/Product/8882758975625"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TranslationSourceDto"
-            }
-          },
-          "translations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ExistingTranslationDto"
-            }
-          }
-        },
-        "required": [
-          "resourceId",
-          "content",
-          "translations"
-        ]
-      },
-      "SyncTranslationScanDto": {
-        "type": "object",
-        "properties": {
-          "resourceType": {
-            "type": "string",
-            "example": "PRODUCT"
-          },
-          "targetLocale": {
-            "type": "string",
-            "example": "it"
-          },
-          "resources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TranslationResourceScanDto"
-            }
-          },
-          "completeScan": {
-            "type": "boolean",
-            "description": "Indicates that the payload contains the complete Shopify result set for this resource type. When true, stale local resources are removed.",
-            "example": true,
-            "default": false
-          }
-        },
-        "required": [
-          "resourceType",
-          "targetLocale",
-          "resources"
-        ]
-      },
-      "TranslationOverallSummaryDto": {
-        "type": "object",
-        "properties": {
-          "resourceTypes": {
-            "type": "number",
-            "example": 30
-          },
-          "resourceTypesWithContent": {
-            "type": "number",
-            "example": 22
-          },
-          "resources": {
-            "type": "number",
-            "example": 126
-          },
-          "fields": {
-            "type": "number",
-            "example": 9173
-          },
-          "actionableFields": {
-            "type": "number",
-            "example": 9163
-          },
-          "emptySource": {
-            "type": "number",
-            "example": 10
-          },
-          "missing": {
-            "type": "number",
-            "example": 9163
-          },
-          "translated": {
-            "type": "number",
-            "example": 0
-          },
-          "outdated": {
-            "type": "number",
-            "example": 0
-          },
-          "coverage": {
-            "type": "number",
-            "example": 0
-          }
-        },
-        "required": [
-          "resourceTypes",
-          "resourceTypesWithContent",
-          "resources",
-          "fields",
-          "actionableFields",
-          "emptySource",
-          "missing",
-          "translated",
-          "outdated",
-          "coverage"
-        ]
-      },
-      "TranslationGroupSummaryDto": {
-        "type": "object",
-        "properties": {
-          "group": {
-            "type": "string",
-            "enum": [
-              "CONTENT",
-              "CUSTOM_DATA",
-              "COMMERCE",
-              "THEME",
-              "SYSTEM",
-              "OTHER"
-            ],
-            "example": "CONTENT"
-          },
-          "resourceTypes": {
-            "type": "number",
-            "example": 12
-          },
-          "resourceTypesWithContent": {
-            "type": "number",
-            "example": 8
-          },
-          "resources": {
-            "type": "number",
-            "example": 96
-          },
-          "fields": {
-            "type": "number",
-            "example": 145
-          },
-          "actionableFields": {
-            "type": "number",
-            "example": 143
-          },
-          "emptySource": {
-            "type": "number",
-            "example": 2
-          },
-          "missing": {
-            "type": "number",
-            "example": 143
-          },
-          "translated": {
-            "type": "number",
-            "example": 0
-          },
-          "outdated": {
-            "type": "number",
-            "example": 0
-          },
-          "coverage": {
-            "type": "number",
-            "example": 0
-          }
-        },
-        "required": [
-          "group",
-          "resourceTypes",
-          "resourceTypesWithContent",
-          "resources",
-          "fields",
-          "actionableFields",
-          "emptySource",
-          "missing",
-          "translated",
-          "outdated",
-          "coverage"
-        ]
-      },
-      "TranslationScannerOverviewDto": {
-        "type": "object",
-        "properties": {
-          "shopifyDomain": {
-            "type": "string",
-            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
-          },
-          "targetLocale": {
-            "type": "string",
-            "example": "it"
-          },
-          "summary": {
-            "$ref": "#/components/schemas/TranslationOverallSummaryDto"
-          },
-          "groups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TranslationGroupSummaryDto"
-            }
-          }
-        },
-        "required": [
-          "shopifyDomain",
-          "targetLocale",
-          "summary",
-          "groups"
-        ]
-      },
-      "TranslationResourceTypeSummaryDto": {
-        "type": "object",
-        "properties": {
-          "resourceType": {
-            "type": "string",
-            "example": "PRODUCT"
-          },
-          "group": {
-            "type": "string",
-            "enum": [
-              "CONTENT",
-              "CUSTOM_DATA",
-              "COMMERCE",
-              "THEME",
-              "SYSTEM",
-              "OTHER"
-            ],
-            "example": "CONTENT"
-          },
-          "resources": {
-            "type": "number",
-            "example": 17
-          },
-          "fields": {
-            "type": "number",
-            "example": 57
-          },
-          "actionableFields": {
-            "type": "number",
-            "example": 56
-          },
-          "emptySource": {
-            "type": "number",
-            "example": 1
-          },
-          "missing": {
-            "type": "number",
-            "example": 56
-          },
-          "translated": {
-            "type": "number",
-            "example": 0
-          },
-          "outdated": {
-            "type": "number",
-            "example": 0
-          },
-          "coverage": {
-            "type": "number",
-            "example": 0
-          }
-        },
-        "required": [
-          "resourceType",
-          "group",
-          "resources",
-          "fields",
-          "actionableFields",
-          "emptySource",
-          "missing",
-          "translated",
-          "outdated",
-          "coverage"
-        ]
-      },
-      "TranslationResourceTypesOverviewDto": {
-        "type": "object",
-        "properties": {
-          "shopifyDomain": {
-            "type": "string",
-            "example": "aca-locale-dev-cfoxunuo.myshopify.com"
-          },
-          "targetLocale": {
-            "type": "string",
-            "example": "it"
-          },
-          "resourceTypes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TranslationResourceTypeSummaryDto"
-            }
-          }
-        },
-        "required": [
-          "shopifyDomain",
-          "targetLocale",
-          "resourceTypes"
         ]
       },
       "CreateTranslationJobDto": {

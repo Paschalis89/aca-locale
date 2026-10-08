@@ -2,13 +2,16 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
 
+import { GlossaryService } from '../glossary/glossary.service.js';
+
 import { estimateUsageCost } from '../translation-usage/translation-usage-cost.js';
 
-import { AiTranslationReviewerService } from './ai-translation-reviewer.service.js';
+import { AiTranslationReviewerService } from '../translation-review/ai-translation-reviewer.service.js';
 
 @Injectable()
 export class TranslationReviewExecutorService {
@@ -16,6 +19,9 @@ export class TranslationReviewExecutorService {
     private readonly prisma: PrismaService,
 
     private readonly reviewer: AiTranslationReviewerService,
+
+    @Optional()
+    private readonly glossary?: GlossaryService,
   ) {}
 
   async reviewJob(
@@ -107,6 +113,15 @@ export class TranslationReviewExecutorService {
       }
 
       try {
+        const glossaryRules = this.glossary
+          ? await this.glossary.resolveRulesForText(
+              shopifyDomain,
+              job.sourceLocale,
+              job.targetLocale,
+              item.sourceValue,
+            )
+          : [];
+
         const result = await this.reviewer.review({
           sourceValue: item.sourceValue,
 
@@ -125,6 +140,8 @@ export class TranslationReviewExecutorService {
           provider: job.reviewProvider,
 
           model: job.reviewModel,
+
+          glossaryRules,
         });
 
         inputTokens += result.inputTokens;

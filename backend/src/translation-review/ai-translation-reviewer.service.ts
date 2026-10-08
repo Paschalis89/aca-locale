@@ -4,6 +4,8 @@ import { generateText } from 'ai';
 
 import { AiRegistryService } from '../ai/ai-registry.service.js';
 
+import { formatGlossaryRulesForPrompt } from '../glossary/glossary-rule.utils.js';
+
 import type {
   AiTranslationReviewInput,
   AiTranslationReviewIssue,
@@ -125,6 +127,11 @@ export class AiTranslationReviewerService {
   }
 
   private buildUserPrompt(input: AiTranslationReviewInput) {
+    const glossaryInstructions =
+      formatGlossaryRulesForPrompt(
+        input.glossaryRules ?? [],
+      );
+
     return [
       `Source locale: ${input.sourceLocale}`,
       `Target locale: ${input.targetLocale}`,
@@ -132,6 +139,14 @@ export class AiTranslationReviewerService {
       `Field key: ${input.fieldKey ?? 'unknown'}`,
       `Content type: ${input.contentType ?? 'unknown'}`,
       '',
+      ...glossaryInstructions,
+      ...(glossaryInstructions.length > 0
+        ? [
+            'Treat every glossary rule as mandatory. If a rule is violated, set approved=false, add a GLOSSARY issue, and provide a corrected suggestedTranslation.',
+            'Any suggestedTranslation must also satisfy every glossary rule.',
+            '',
+          ]
+        : []),
       '<source>',
       input.sourceValue,
       '</source>',

@@ -89,6 +89,8 @@ export class TranslationJobsService {
         field: {
           sourceLocale: shop.sourceLocale,
 
+          deletedAt: null,
+
           type: {
             not: 'URI',
           },
@@ -99,6 +101,8 @@ export class TranslationJobsService {
             resourceType: {
               in: resourceTypes,
             },
+
+            deletedAt: null,
           },
 
           jobItems: {

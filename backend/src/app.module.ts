@@ -27,6 +27,10 @@ import {
 } from './health/health.module.js';
 
 import {
+  GlossaryModule,
+} from './glossary/glossary.module.js';
+
+import {
   InternalModule,
 } from './internal/internal.module.js';
 
@@ -73,6 +77,7 @@ import {
 
     DatabaseModule,
     HealthModule,
+    GlossaryModule,
     ReadinessModule,
     InternalModule,
     ShopsModule,

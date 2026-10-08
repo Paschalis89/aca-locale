@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ChangeEvent, CSSProperties, ReactNode } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -17,6 +17,7 @@ type AppTab =
   | "jobs"
   | "review"
   | "languages"
+  | "glossary"
   | "usage"
   | "settings";
 
@@ -153,6 +154,55 @@ type AiConfigurationForm = {
   fallbackModel: string;
 };
 
+type GlossaryRuleType =
+  | "DO_NOT_TRANSLATE"
+  | "PREFERRED_TRANSLATION"
+  | "FORBIDDEN_TRANSLATION";
+
+type GlossaryEntry = {
+  id: string;
+  glossaryId: string;
+  sourceTerm: string;
+  targetLocale: string;
+  targetTerm?: string | null;
+  ruleType: GlossaryRuleType;
+  caseSensitive: boolean;
+  notes?: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type GlossaryData = {
+  id: string;
+  name: string;
+  description?: string | null;
+  sourceLocale: string;
+  enabled: boolean;
+  isDefault: boolean;
+  entries: GlossaryEntry[];
+};
+
+type GlossaryDraft = {
+  sourceTerm: string;
+  targetLocale: string;
+  targetTerm: string;
+  ruleType: GlossaryRuleType;
+  caseSensitive: boolean;
+  notes: string;
+  enabled: boolean;
+};
+
+const emptyGlossaryDraft = (): GlossaryDraft => ({
+  sourceTerm: "",
+  targetLocale: "*",
+  targetTerm: "",
+  ruleType: "DO_NOT_TRANSLATE",
+  caseSensitive: true,
+  notes: "",
+  enabled: true,
+});
+
 const ACA = {
   blue: "#133C99",
   green: "#28B58D",
@@ -177,6 +227,7 @@ const tabs: Array<{ id: AppTab; label: string; short: string }> = [
   { id: "jobs", label: "Jobs", short: "Jobs" },
   { id: "review", label: "Review", short: "Review" },
   { id: "languages", label: "Languages", short: "Lang" },
+  { id: "glossary", label: "Glossary", short: "Terms" },
   { id: "usage", label: "Usage", short: "Usage" },
   { id: "settings", label: "Settings", short: "Settings" },
 ];
@@ -223,6 +274,14 @@ export default function Index() {
   const [scannerResult, setScannerResult] = useState<ScannerResult | null>(null);
 
   const [syncResult, setSyncResult] = useState<any>(null);
+
+  const [glossary, setGlossary] = useState<GlossaryData | null>(null);
+  const [loadingGlossary, setLoadingGlossary] = useState(false);
+  const [glossaryError, setGlossaryError] = useState<string | null>(null);
+  const [glossarySearch, setGlossarySearch] = useState("");
+  const [glossaryLocaleFilter, setGlossaryLocaleFilter] = useState("ALL");
+  const [editingGlossaryEntryId, setEditingGlossaryEntryId] = useState<string | null>(null);
+  const [glossaryDraft, setGlossaryDraft] = useState<GlossaryDraft>(emptyGlossaryDraft);
 
   const [aiConfiguration, setAiConfiguration] = useState<AiConfigurationForm>({
     translationProvider: "DEEPL",
@@ -363,6 +422,27 @@ export default function Index() {
     return data;
   };
 
+  const loadGlossary = async () => {
+    setLoadingGlossary(true);
+    setGlossaryError(null);
+
+    try {
+      const data = (await apiCall(
+        "/api/backend/glossary",
+        {},
+        false,
+      )) as GlossaryData;
+      setGlossary(data);
+    } catch (error) {
+      console.error(error);
+      setGlossaryError(
+        error instanceof Error ? error.message : "Unable to load glossary.",
+      );
+    } finally {
+      setLoadingGlossary(false);
+    }
+  };
+
   const loadUsage = async () => {
     setLoadingUsage(true);
     setUsageError(null);
@@ -391,6 +471,13 @@ export default function Index() {
     void loadUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "glossary" && !glossary && !loadingGlossary) {
+      void loadGlossary();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const activeJobKey = jobs
     .filter((job) => job.status === "QUEUED" || job.status === "RUNNING")
@@ -511,6 +598,40 @@ export default function Index() {
         .includes(search);
     });
   }, [jobs, jobSearch, jobStatusFilter]);
+
+  const glossaryLocales = useMemo(() => {
+    const values = new Set<string>();
+    for (const entry of glossary?.entries ?? []) {
+      values.add(entry.targetLocale);
+    }
+    return Array.from(values).sort();
+  }, [glossary]);
+
+  const filteredGlossaryEntries = useMemo(() => {
+    const search = glossarySearch.trim().toLowerCase();
+
+    return (glossary?.entries ?? []).filter((entry) => {
+      if (
+        glossaryLocaleFilter !== "ALL" &&
+        entry.targetLocale !== glossaryLocaleFilter
+      ) {
+        return false;
+      }
+
+      if (!search) return true;
+
+      return [
+        entry.sourceTerm,
+        entry.targetTerm ?? "",
+        entry.targetLocale,
+        entry.ruleType,
+        entry.notes ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(search);
+    });
+  }, [glossary, glossaryLocaleFilter, glossarySearch]);
 
   const formatDateTime = (value?: string | null) => {
     if (!value) return "—";
@@ -780,7 +901,24 @@ export default function Index() {
           )}&locale=${encodeURIComponent(scannerLocale)}`,
           { method: "POST" },
         );
-        setScannerResult(data);
+
+        const summary =
+          data?.summary ??
+          {
+            resources: data?.resources,
+            fields: data?.fields,
+            actionableFields: data?.actionableFields,
+            emptySource: data?.emptySource,
+            missing: data?.missing,
+            translated: data?.translated,
+            outdated: data?.outdated,
+            coverage: data?.coverage,
+          };
+
+        setScannerResult({
+          ...data,
+          summary,
+        });
       },
       "Shopify scan completed.",
     );
@@ -823,6 +961,218 @@ export default function Index() {
       },
       "AI configuration saved.",
     );
+  };
+
+  const resetGlossaryForm = () => {
+    setEditingGlossaryEntryId(null);
+    setGlossaryDraft(emptyGlossaryDraft());
+  };
+
+  const editGlossaryEntry = (entry: GlossaryEntry) => {
+    setEditingGlossaryEntryId(entry.id);
+    setGlossaryDraft({
+      sourceTerm: entry.sourceTerm,
+      targetLocale: entry.targetLocale,
+      targetTerm: entry.targetTerm ?? "",
+      ruleType: entry.ruleType,
+      caseSensitive: entry.caseSensitive,
+      notes: entry.notes ?? "",
+      enabled: entry.enabled,
+    });
+  };
+
+  const saveGlossaryEntry = async () => {
+    await runAction(
+      "save-glossary-entry",
+      async () => {
+        if (!glossaryDraft.sourceTerm.trim()) {
+          throw new Error("Source term is required.");
+        }
+
+        const payload = {
+          sourceTerm: glossaryDraft.sourceTerm.trim(),
+          targetLocale: glossaryDraft.targetLocale.trim() || "*",
+          targetTerm:
+            glossaryDraft.ruleType === "DO_NOT_TRANSLATE"
+              ? null
+              : glossaryDraft.targetTerm.trim() || null,
+          ruleType: glossaryDraft.ruleType,
+          caseSensitive: glossaryDraft.caseSensitive,
+          notes: glossaryDraft.notes.trim() || null,
+          enabled: glossaryDraft.enabled,
+        };
+
+        await apiCall(
+          editingGlossaryEntryId
+            ? `/api/backend/glossary/entries/${editingGlossaryEntryId}`
+            : "/api/backend/glossary/entries",
+          {
+            method: editingGlossaryEntryId ? "PATCH" : "POST",
+            body: JSON.stringify(payload),
+          },
+        );
+
+        resetGlossaryForm();
+        await loadGlossary();
+      },
+      editingGlossaryEntryId ? "Glossary term updated." : "Glossary term added.",
+    );
+  };
+
+  const toggleGlossaryEntry = async (entry: GlossaryEntry) => {
+    await runAction(
+      `toggle-glossary-${entry.id}`,
+      async () => {
+        await apiCall(`/api/backend/glossary/entries/${entry.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ enabled: !entry.enabled }),
+        });
+        await loadGlossary();
+      },
+      entry.enabled ? "Glossary term disabled." : "Glossary term enabled.",
+    );
+  };
+
+  const deleteGlossaryEntry = async (entry: GlossaryEntry) => {
+    if (!window.confirm(`Delete glossary term "${entry.sourceTerm}"?`)) {
+      return;
+    }
+
+    await runAction(
+      `delete-glossary-${entry.id}`,
+      async () => {
+        await apiCall(`/api/backend/glossary/entries/${entry.id}`, {
+          method: "DELETE",
+        });
+        if (editingGlossaryEntryId === entry.id) {
+          resetGlossaryForm();
+        }
+        await loadGlossary();
+      },
+      "Glossary term deleted.",
+    );
+  };
+
+  const exportGlossaryCsv = () => {
+    const rows = [
+      [
+        "source_term",
+        "target_locale",
+        "target_term",
+        "rule_type",
+        "case_sensitive",
+        "enabled",
+        "notes",
+      ],
+      ...(glossary?.entries ?? []).map((entry) => [
+        entry.sourceTerm,
+        entry.targetLocale,
+        entry.targetTerm ?? "",
+        entry.ruleType,
+        String(entry.caseSensitive),
+        String(entry.enabled),
+        entry.notes ?? "",
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map(escapeCsvCell).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "aca-locale-glossary.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const importGlossaryCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    await runAction("import-glossary", async () => {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length < 2) {
+        throw new Error("CSV contains no glossary rows.");
+      }
+
+      const header = rows[0].map((value) => value.trim().toLowerCase());
+      const indexOf = (name: string) => header.indexOf(name);
+      const sourceIndex = indexOf("source_term");
+      const localeIndex = indexOf("target_locale");
+      const targetIndex = indexOf("target_term");
+      const ruleIndex = indexOf("rule_type");
+      const caseIndex = indexOf("case_sensitive");
+      const enabledIndex = indexOf("enabled");
+      const notesIndex = indexOf("notes");
+
+      if (sourceIndex < 0 || ruleIndex < 0) {
+        throw new Error("CSV requires source_term and rule_type columns.");
+      }
+
+      let imported = 0;
+      let skipped = 0;
+
+      for (const row of rows.slice(1)) {
+        const sourceTerm = row[sourceIndex]?.trim();
+        if (!sourceTerm) continue;
+
+        const rawRule = (row[ruleIndex] ?? "DO_NOT_TRANSLATE")
+          .trim()
+          .toUpperCase();
+
+        if (
+          rawRule !== "DO_NOT_TRANSLATE" &&
+          rawRule !== "PREFERRED_TRANSLATION" &&
+          rawRule !== "FORBIDDEN_TRANSLATION"
+        ) {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          await apiCall(
+            "/api/backend/glossary/entries",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                sourceTerm,
+                targetLocale:
+                  localeIndex >= 0 ? row[localeIndex]?.trim() || "*" : "*",
+                targetTerm:
+                  targetIndex >= 0 ? row[targetIndex]?.trim() || null : null,
+                ruleType: rawRule,
+                caseSensitive:
+                  caseIndex >= 0
+                    ? parseCsvBoolean(row[caseIndex], false)
+                    : false,
+                enabled:
+                  enabledIndex >= 0
+                    ? parseCsvBoolean(row[enabledIndex], true)
+                    : true,
+                notes:
+                  notesIndex >= 0 ? row[notesIndex]?.trim() || null : null,
+              }),
+            },
+            false,
+          );
+          imported += 1;
+        } catch {
+          skipped += 1;
+        }
+      }
+
+      await loadGlossary();
+      shopify.toast.show(
+        `CSV import completed: ${imported} imported, ${skipped} skipped.`,
+      );
+    });
   };
 
   const progress = selectedJob?.totalItems
@@ -1451,6 +1801,326 @@ export default function Index() {
           </div>
         ) : null}
 
+        {activeTab === "glossary" ? (
+          <div className="aca-layout-glossary">
+            <div className="aca-column-stack">
+              <Card
+                title={editingGlossaryEntryId ? "Edit Glossary Term" : "Add Glossary Term"}
+                subtitle="Define protected terminology and preferred translations without hardcoding ACA-specific rules into the app."
+              >
+                <div className="aca-column-stack">
+                  <Field label="Source term">
+                    <input
+                      value={glossaryDraft.sourceTerm}
+                      onChange={(event) =>
+                        setGlossaryDraft((current) => ({
+                          ...current,
+                          sourceTerm: event.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Vietri sul Mare"
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <div className="aca-form-grid-2">
+                    <Field label="Rule type">
+                      <select
+                        value={glossaryDraft.ruleType}
+                        onChange={(event) =>
+                          setGlossaryDraft((current) => ({
+                            ...current,
+                            ruleType: event.target.value as GlossaryRuleType,
+                            targetTerm:
+                              event.target.value === "DO_NOT_TRANSLATE"
+                                ? ""
+                                : current.targetTerm,
+                          }))
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="DO_NOT_TRANSLATE">Do not translate</option>
+                        <option value="PREFERRED_TRANSLATION">Preferred translation</option>
+                        <option value="FORBIDDEN_TRANSLATION">Forbidden translation</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Target locale">
+                      <input
+                        value={glossaryDraft.targetLocale}
+                        onChange={(event) =>
+                          setGlossaryDraft((current) => ({
+                            ...current,
+                            targetLocale: event.target.value,
+                          }))
+                        }
+                        placeholder="* / it / de / ja"
+                        style={inputStyle}
+                      />
+                    </Field>
+                  </div>
+
+                  <Field
+                    label={
+                      glossaryDraft.ruleType === "FORBIDDEN_TRANSLATION"
+                        ? "Forbidden target term"
+                        : "Target term"
+                    }
+                  >
+                    <input
+                      value={glossaryDraft.targetTerm}
+                      disabled={glossaryDraft.ruleType === "DO_NOT_TRANSLATE"}
+                      onChange={(event) =>
+                        setGlossaryDraft((current) => ({
+                          ...current,
+                          targetTerm: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        glossaryDraft.ruleType === "DO_NOT_TRANSLATE"
+                          ? "Not required"
+                          : "Required for this rule"
+                      }
+                      style={{
+                        ...inputStyle,
+                        opacity: glossaryDraft.ruleType === "DO_NOT_TRANSLATE" ? 0.6 : 1,
+                      }}
+                    />
+                  </Field>
+
+                  <Field label="Notes">
+                    <textarea
+                      value={glossaryDraft.notes}
+                      onChange={(event) =>
+                        setGlossaryDraft((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                      style={{ ...inputStyle, minHeight: 88, resize: "vertical" }}
+                      placeholder="Brand, artisan terminology, cultural note…"
+                    />
+                  </Field>
+
+                  <div className="aca-glossary-checks">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={glossaryDraft.caseSensitive}
+                        onChange={(event) =>
+                          setGlossaryDraft((current) => ({
+                            ...current,
+                            caseSensitive: event.target.checked,
+                          }))
+                        }
+                      />
+                      Case sensitive
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={glossaryDraft.enabled}
+                        onChange={(event) =>
+                          setGlossaryDraft((current) => ({
+                            ...current,
+                            enabled: event.target.checked,
+                          }))
+                        }
+                      />
+                      Enabled
+                    </label>
+                  </div>
+
+                  <div className="aca-actions">
+                    <ActionButton
+                      label={editingGlossaryEntryId ? "Save Changes" : "Add Term"}
+                      actionKey="save-glossary-entry"
+                      busyAction={busyAction}
+                      onClick={saveGlossaryEntry}
+                      primary
+                    />
+                    {editingGlossaryEntryId ? (
+                      <button
+                        type="button"
+                        className="aca-action-button"
+                        onClick={resetGlossaryForm}
+                        style={{
+                          border: `1px solid ${ACA.line}`,
+                          background: ACA.white,
+                          color: ACA.ink,
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                title="CSV Import / Export"
+                subtitle="Share terminology with marketing or maintain larger glossaries in a spreadsheet."
+              >
+                <div className="aca-actions">
+                  <label className="aca-file-button">
+                    {busyAction === "import-glossary" ? "Importing…" : "Import CSV"}
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={importGlossaryCsv}
+                      disabled={Boolean(busyAction)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="aca-action-button"
+                    onClick={exportGlossaryCsv}
+                    disabled={!glossary || Boolean(busyAction)}
+                    style={{
+                      border: `1px solid ${ACA.line}`,
+                      background: ACA.white,
+                      color: ACA.ink,
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <InfoCallout tone="blue">
+                    CSV columns: source_term, target_locale, target_term, rule_type, case_sensitive, enabled, notes. Use * for all target locales.
+                  </InfoCallout>
+                </div>
+              </Card>
+            </div>
+
+            <Card
+              title={glossary?.name ?? "Master Glossary"}
+              subtitle={
+                glossary
+                  ? `${glossary.entries.length} terminology rules · source ${glossary.sourceLocale}`
+                  : "Shop-specific terminology rules."
+              }
+            >
+              <div className="aca-filter-row">
+                <input
+                  value={glossarySearch}
+                  onChange={(event) => setGlossarySearch(event.target.value)}
+                  placeholder="Search source term, translation, note…"
+                  style={inputStyle}
+                />
+                <select
+                  value={glossaryLocaleFilter}
+                  onChange={(event) => setGlossaryLocaleFilter(event.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="ALL">All locales</option>
+                  {glossaryLocales.map((locale) => (
+                    <option key={locale} value={locale}>
+                      {locale === "*" ? "* · All locales" : locale}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="aca-actions" style={{ marginBottom: 14 }}>
+                <ActionButton
+                  label="Refresh"
+                  actionKey="refresh-glossary"
+                  busyAction={busyAction}
+                  onClick={() =>
+                    void runAction(
+                      "refresh-glossary",
+                      loadGlossary,
+                      "Glossary refreshed.",
+                    )
+                  }
+                />
+              </div>
+
+              {loadingGlossary ? (
+                <p style={mutedTextStyle}>Loading glossary…</p>
+              ) : glossaryError ? (
+                <p style={{ ...mutedTextStyle, color: ACA.danger }}>{glossaryError}</p>
+              ) : filteredGlossaryEntries.length === 0 ? (
+                <EmptyState
+                  title="No glossary terms found"
+                  text="Add a protected term, preferred translation or forbidden translation."
+                />
+              ) : (
+                <div className="aca-item-table-wrap">
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={tableHeadCellStyle}>Source</th>
+                        <th style={tableHeadCellStyle}>Locale</th>
+                        <th style={tableHeadCellStyle}>Target / Forbidden</th>
+                        <th style={tableHeadCellStyle}>Rule</th>
+                        <th style={tableHeadCellStyle}>State</th>
+                        <th style={tableHeadCellStyle}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredGlossaryEntries.map((entry) => (
+                        <tr key={entry.id}>
+                          <td style={tableBodyCellStyle}>
+                            <strong>{entry.sourceTerm}</strong>
+                            {entry.notes ? (
+                              <div className="aca-muted-small">{entry.notes}</div>
+                            ) : null}
+                          </td>
+                          <td style={tableBodyCellStyle}>
+                            {entry.targetLocale === "*" ? "All" : entry.targetLocale}
+                          </td>
+                          <td style={tableBodyCellStyle}>
+                            {entry.ruleType === "DO_NOT_TRANSLATE"
+                              ? "Keep source unchanged"
+                              : entry.targetTerm ?? "—"}
+                          </td>
+                          <td style={tableBodyCellStyle}>
+                            <GlossaryRuleBadge rule={entry.ruleType} />
+                            {entry.caseSensitive ? (
+                              <div className="aca-muted-small">Case sensitive</div>
+                            ) : null}
+                          </td>
+                          <td style={tableBodyCellStyle}>
+                            <Pill
+                              text={entry.enabled ? "Enabled" : "Disabled"}
+                              tone={entry.enabled ? "green" : "orange"}
+                            />
+                          </td>
+                          <td style={tableBodyCellStyle}>
+                            <div className="aca-glossary-actions">
+                              <button
+                                type="button"
+                                onClick={() => editGlossaryEntry(entry)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void toggleGlossaryEntry(entry)}
+                              >
+                                {entry.enabled ? "Disable" : "Enable"}
+                              </button>
+                              <button
+                                type="button"
+                                className="aca-danger-link"
+                                onClick={() => void deleteGlossaryEntry(entry)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        ) : null}
+
         {activeTab === "usage" ? (
           <Card
             title="Usage & Cost Monitoring"
@@ -1932,6 +2602,24 @@ function Pill({ text, tone }: { text: string; tone: "blue" | "green" | "orange" 
   return <span className="aca-pill" style={styleMap[tone]}>{text}</span>;
 }
 
+function GlossaryRuleBadge({ rule }: { rule: GlossaryRuleType }) {
+  const map: Record<GlossaryRuleType, { label: string; bg: string; fg: string }> = {
+    DO_NOT_TRANSLATE: { label: "Keep", bg: ACA.blueSoft, fg: ACA.blue },
+    PREFERRED_TRANSLATION: { label: "Prefer", bg: ACA.greenSoft, fg: ACA.success },
+    FORBIDDEN_TRANSLATION: { label: "Forbid", bg: "#FDEAEA", fg: ACA.danger },
+  };
+  const value = map[rule];
+
+  return (
+    <span
+      className="aca-pill"
+      style={{ background: value.bg, color: value.fg }}
+    >
+      {value.label}
+    </span>
+  );
+}
+
 function InfoCallout({
   children,
   tone,
@@ -2023,6 +2711,62 @@ function ActionButton({
       {isBusy ? `${label}…` : label}
     </button>
   );
+}
+
+function escapeCsvCell(value: string) {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function parseCsvBoolean(value: string | undefined, fallback: boolean) {
+  if (value === undefined || value.trim() === "") return fallback;
+  return ["true", "1", "yes", "y"].includes(value.trim().toLowerCase());
+}
+
+function parseCsv(text: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"') {
+      if (quoted && next === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      if (row.some((value) => value.length > 0)) rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  row.push(cell);
+  if (row.some((value) => value.length > 0)) rows.push(row);
+
+  return rows;
 }
 
 const mutedTextStyle: CSSProperties = {
@@ -2260,6 +3004,7 @@ const responsiveCss = `
   .aca-layout-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
   .aca-layout-jobs { display: grid; grid-template-columns: minmax(390px, 0.92fr) minmax(560px, 1.45fr); gap: 18px; }
   .aca-layout-review { display: grid; grid-template-columns: minmax(320px, 0.72fr) minmax(600px, 1.55fr); gap: 18px; }
+  .aca-layout-glossary { display: grid; grid-template-columns: minmax(330px, 0.78fr) minmax(650px, 1.55fr); gap: 18px; }
   .aca-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 
   .aca-card {
@@ -2285,6 +3030,13 @@ const responsiveCss = `
   .aca-field > span { color: ${ACA.ink}; font-size: 12px; font-weight: 800; }
   .aca-field-action { display: flex; align-items: end; }
   .aca-actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+  .aca-glossary-checks { display: flex; gap: 18px; flex-wrap: wrap; color: ${ACA.ink}; font-size: 12px; font-weight: 700; }
+  .aca-glossary-checks label { display: inline-flex; gap: 7px; align-items: center; }
+  .aca-file-button { display: inline-flex; align-items: center; min-height: 38px; padding: 9px 13px; border-radius: 11px; border: 1px solid transparent; background: ${ACA.green}; color: ${ACA.white}; font-size: 12px; font-weight: 800; cursor: pointer; }
+  .aca-file-button input { display: none; }
+  .aca-glossary-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+  .aca-glossary-actions button { padding: 0; border: 0; background: transparent; color: ${ACA.blue}; font-family: inherit; font-size: 11px; font-weight: 800; cursor: pointer; text-decoration: underline; }
+  .aca-glossary-actions .aca-danger-link { color: ${ACA.danger}; }
 
   .aca-action-button {
     min-height: 38px;
@@ -2415,7 +3167,7 @@ const responsiveCss = `
   @media (max-width: 1180px) {
     .aca-header { grid-template-columns: 1fr; }
     .aca-header-stats { grid-template-columns: repeat(4, 1fr); }
-    .aca-layout-jobs, .aca-layout-review, .aca-overview-grid { grid-template-columns: 1fr; }
+    .aca-layout-jobs, .aca-layout-review, .aca-layout-glossary, .aca-overview-grid { grid-template-columns: 1fr; }
     .aca-layout-two { grid-template-columns: 1fr; }
   }
 

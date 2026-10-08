@@ -2,9 +2,12 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
+
+import { GlossaryService } from '../glossary/glossary.service.js';
 
 import { TranslationValidatorService } from '../translation-validation/translation-validator.service.js';
 
@@ -25,6 +28,9 @@ export class TranslationExecutorService {
     private readonly providers: TranslationProviderRegistryService,
 
     private readonly validator: TranslationValidatorService,
+
+    @Optional()
+    private readonly glossary?: GlossaryService,
   ) {}
 
   async execute(
@@ -165,6 +171,8 @@ export class TranslationExecutorService {
 
     let validationWarnings = 0;
 
+    let validationVersion = 'deterministic-v2-glossary';
+
     let cancelled = false;
 
     for (const item of job.items) {
@@ -205,6 +213,15 @@ export class TranslationExecutorService {
           throw new Error('Source value is empty.');
         }
 
+        const glossaryRules = this.glossary
+          ? await this.glossary.resolveRulesForText(
+              shopifyDomain,
+              job.sourceLocale,
+              job.targetLocale,
+              item.sourceValue,
+            )
+          : [];
+
         let result: TranslationProviderResult;
 
         let primaryError: string | null = null;
@@ -226,6 +243,8 @@ export class TranslationExecutorService {
             fieldKey: item.field.key,
 
             model: item.model ?? job.model,
+
+            glossaryRules,
           });
 
           await this.recordUsage({
@@ -301,6 +320,8 @@ export class TranslationExecutorService {
               fieldKey: item.field.key,
 
               model: job.fallbackModel,
+
+              glossaryRules,
             });
 
             await this.recordUsage({
@@ -388,7 +409,11 @@ export class TranslationExecutorService {
           resourceType: item.field.resource.resourceType,
 
           fieldKey: item.field.key,
+
+          glossaryRules,
         });
+
+        validationVersion = validation.version;
 
         if (await this.isCancelled(job.id)) {
           await this.resetGeneratingItem(item.id);
@@ -540,7 +565,7 @@ export class TranslationExecutorService {
           outputTokens,
 
           validation: {
-            version: 'deterministic-v1',
+            version: validationVersion,
 
             validatedItems,
             needsReviewItems,
@@ -596,7 +621,7 @@ export class TranslationExecutorService {
         outputTokens,
 
         validation: {
-          version: 'deterministic-v1',
+          version: validationVersion,
 
           validatedItems,
           needsReviewItems,

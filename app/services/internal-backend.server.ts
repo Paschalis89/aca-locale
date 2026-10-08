@@ -51,3 +51,34 @@ export async function callInternalBackend(
 
   return response;
 }
+
+export async function callInternalBackendJson<T>(
+  path:
+    string,
+
+  body:
+    Record<string, unknown>,
+): Promise<T> {
+  const response =
+    await callInternalBackend(
+      path,
+      body,
+    );
+
+  const text =
+    await response.text();
+
+  if (!text) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(
+      text,
+    ) as T;
+  } catch {
+    throw new Error(
+      `ACA Locale backend returned invalid JSON for ${path}.`,
+    );
+  }
+}

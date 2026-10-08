@@ -134,7 +134,7 @@ export class SyncTranslationScanDto {
 
   @ApiPropertyOptional({
     description:
-      'Indicates that the payload contains the complete Shopify result set for this resource type. When true, stale local resources are removed.',
+      'Indicates that the payload contains the complete Shopify result set for this resource type. When true, stale local resources are tombstoned so historical translation jobs remain auditable.',
     example: true,
     default: false,
   })

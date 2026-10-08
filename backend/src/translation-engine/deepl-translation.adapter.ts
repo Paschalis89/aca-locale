@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
+import {
+  protectGlossaryTerms,
+  restoreGlossaryTerms,
+} from '../glossary/glossary-rule.utils.js';
+
 import { DeepLTranslationService } from './deepl-translation.service.js';
 
 import type {
@@ -17,8 +22,14 @@ export class DeepLTranslationAdapter implements TranslationProviderAdapter {
   async translate(
     input: TranslationProviderInput,
   ): Promise<TranslationProviderResult> {
+    const protectedInput =
+      protectGlossaryTerms(
+        input.text,
+        input.glossaryRules ?? [],
+      );
+
     const result = await this.deepL.translate({
-      text: input.text,
+      text: protectedInput.text,
 
       sourceLocale: input.sourceLocale,
 
@@ -28,7 +39,10 @@ export class DeepLTranslationAdapter implements TranslationProviderAdapter {
     });
 
     return {
-      text: result.text,
+      text: restoreGlossaryTerms(
+        result.text,
+        protectedInput.protections,
+      ),
 
       provider: 'DEEPL',
 

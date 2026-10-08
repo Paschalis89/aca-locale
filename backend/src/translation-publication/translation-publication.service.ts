@@ -54,6 +54,30 @@ export class TranslationPublicationService {
       throw new BadRequestException('Translation item has no approved value.');
     }
 
+    if (item.field.deletedAt) {
+      throw new ConflictException({
+        code: 'FIELD_DELETED',
+
+        message:
+          'The Shopify translatable field no longer exists on this resource.',
+
+        deletedAt:
+          item.field.deletedAt,
+      });
+    }
+
+    if (item.field.resource.deletedAt) {
+      throw new ConflictException({
+        code: 'RESOURCE_DELETED',
+
+        message:
+          'The Shopify resource was deleted after this translation was generated.',
+
+        deletedAt:
+          item.field.resource.deletedAt,
+      });
+    }
+
     /*
      * First protection:
      * compare job snapshot against our latest
@@ -202,6 +226,8 @@ export class TranslationPublicationService {
                   resourceType: true,
 
                   shopifyResourceId: true,
+
+                  deletedAt: true,
                 },
               },
             },
@@ -256,11 +282,15 @@ export class TranslationPublicationService {
 
             sourceValue: true,
 
+            deletedAt: true,
+
             resource: {
               select: {
                 resourceType: true,
 
                 shopifyResourceId: true,
+
+                deletedAt: true,
               },
             },
           },

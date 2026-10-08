@@ -38,11 +38,96 @@ compliance_topics = [ "shop/redact" ]
 uri = "/webhooks/shop/redact"
 
 # ------------------------------------------------------------
+# Shopify Events - near-real-time translation content changes
+# Requires Shopify CLI >= 3.92
+# ------------------------------------------------------------
+
+[events]
+api_version = "2026-10"
+
+[[events.subscription]]
+handle = "aca-locale-product-content"
+topic = "Product"
+actions = [ "create", "update", "delete" ]
+triggers = [ "product.*" ]
+uri = "/webhooks/translation-content"
+query = """
+query acaLocaleProductEvent($productId: ID!) {
+  product(id: $productId) {
+    id
+  }
+}
+"""
+
+[[events.subscription]]
+handle = "aca-locale-collection-content"
+topic = "Collection"
+actions = [ "create", "update", "delete" ]
+triggers = [ "collection.*" ]
+uri = "/webhooks/translation-content"
+query = """
+query acaLocaleCollectionEvent($collectionId: ID!) {
+  collection(id: $collectionId) {
+    id
+  }
+}
+"""
+
+[[events.subscription]]
+handle = "aca-locale-page-content"
+topic = "Page"
+actions = [ "create", "update", "delete" ]
+triggers = [ "page.*" ]
+uri = "/webhooks/translation-content"
+query = """
+query acaLocalePageEvent($pageId: ID!) {
+  page(id: $pageId) {
+    id
+  }
+}
+"""
+
+[[events.subscription]]
+handle = "aca-locale-blog-content"
+topic = "Blog"
+actions = [ "create", "update", "delete" ]
+triggers = [ "blog.*" ]
+uri = "/webhooks/translation-content"
+query = """
+query acaLocaleBlogEvent($blogId: ID!) {
+  blog(id: $blogId) {
+    id
+  }
+}
+"""
+
+[[events.subscription]]
+handle = "aca-locale-article-content"
+topic = "Article"
+actions = [ "create", "update", "delete" ]
+triggers = [ "article.*" ]
+uri = "/webhooks/translation-content"
+query = """
+query acaLocaleArticleEvent($articleId: ID!) {
+  article(id: $articleId) {
+    id
+  }
+}
+"""
+
+[[events.subscription]]
+handle = "aca-locale-metaobject-definitions"
+topic = "MetaobjectDefinition"
+actions = [ "create", "update", "delete" ]
+triggers = [ "metaobjectDefinition.*" ]
+uri = "/webhooks/translation-content"
+
+# ------------------------------------------------------------
 # Shopify API scopes
 # ------------------------------------------------------------
 
 [access_scopes]
-scopes = "read_locales,read_markets,read_translations,write_translations"
+scopes = "read_content,read_locales,read_markets,read_metaobject_definitions,read_metaobjects,read_products,read_translations,write_translations"
 
 # ------------------------------------------------------------
 # OAuth

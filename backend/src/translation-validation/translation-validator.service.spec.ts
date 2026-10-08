@@ -185,4 +185,148 @@ describe('TranslationValidatorService', () => {
       ]),
     );
   });
+
+  it('fails when a protected glossary term is changed', () => {
+    const result = validator.validate({
+      sourceValue: 'Ceramics from Vietri',
+      translatedValue: 'Ceramiche di Vetria',
+      sourceLocale: 'en',
+      targetLocale: 'it',
+      glossaryRules: [
+        {
+          id: 'g1',
+          glossaryId: 'glossary-1',
+          glossaryName: 'Master Glossary',
+          sourceTerm: 'Vietri',
+          targetLocale: '*',
+          targetTerm: null,
+          ruleType: 'DO_NOT_TRANSLATE',
+          caseSensitive: true,
+          notes: null,
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'GLOSSARY_PROTECTED_TERM_CHANGED',
+          severity: 'ERROR',
+        }),
+      ]),
+    );
+  });
+
+  it('fails when a preferred glossary translation is missing', () => {
+    const result = validator.validate({
+      sourceValue: 'Handmade ceramic bowl',
+      translatedValue: 'Ciotola di ceramica artigianale',
+      sourceLocale: 'en',
+      targetLocale: 'it',
+      glossaryRules: [
+        {
+          id: 'g2',
+          glossaryId: 'glossary-1',
+          glossaryName: 'Master Glossary',
+          sourceTerm: 'Handmade',
+          targetLocale: 'it',
+          targetTerm: 'Fatto a mano',
+          ruleType: 'PREFERRED_TRANSLATION',
+          caseSensitive: false,
+          notes: null,
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'GLOSSARY_REQUIRED_TERM_MISSING',
+          severity: 'ERROR',
+        }),
+      ]),
+    );
+  });
+
+  it('fails when a forbidden glossary translation is used', () => {
+    const result = validator.validate({
+      sourceValue: 'Handmade ceramic bowl',
+      translatedValue: 'Ciotola di ceramica artigianale',
+      sourceLocale: 'en',
+      targetLocale: 'it',
+      glossaryRules: [
+        {
+          id: 'g3',
+          glossaryId: 'glossary-1',
+          glossaryName: 'Master Glossary',
+          sourceTerm: 'Handmade',
+          targetLocale: 'it',
+          targetTerm: 'artigianale',
+          ruleType: 'FORBIDDEN_TRANSLATION',
+          caseSensitive: false,
+          notes: null,
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'GLOSSARY_FORBIDDEN_TERM_USED',
+          severity: 'ERROR',
+        }),
+      ]),
+    );
+  });
+
+  it('passes when all glossary requirements are satisfied', () => {
+    const result = validator.validate({
+      sourceValue: 'ACA Handmade ceramic from Vietri',
+      translatedValue: 'Ceramica ACA fatta a mano di Vietri',
+      sourceLocale: 'en',
+      targetLocale: 'it',
+      glossaryRules: [
+        {
+          id: 'g4',
+          glossaryId: 'glossary-1',
+          glossaryName: 'Master Glossary',
+          sourceTerm: 'ACA',
+          targetLocale: '*',
+          targetTerm: null,
+          ruleType: 'DO_NOT_TRANSLATE',
+          caseSensitive: true,
+          notes: null,
+        },
+        {
+          id: 'g5',
+          glossaryId: 'glossary-1',
+          glossaryName: 'Master Glossary',
+          sourceTerm: 'Handmade',
+          targetLocale: 'it',
+          targetTerm: 'fatta a mano',
+          ruleType: 'PREFERRED_TRANSLATION',
+          caseSensitive: false,
+          notes: null,
+        },
+        {
+          id: 'g6',
+          glossaryId: 'glossary-1',
+          glossaryName: 'Master Glossary',
+          sourceTerm: 'Handmade',
+          targetLocale: 'it',
+          targetTerm: 'artigianale',
+          ruleType: 'FORBIDDEN_TRANSLATION',
+          caseSensitive: false,
+          notes: null,
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.version).toBe('deterministic-v2-glossary');
+  });
+
 });

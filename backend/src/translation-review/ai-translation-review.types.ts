@@ -1,3 +1,5 @@
+import type { ResolvedGlossaryRule } from '../glossary/glossary.types.js';
+
 export type AiTranslationReviewSeverity = 'ERROR' | 'WARNING';
 
 export type AiTranslationReviewIssue = {
@@ -26,6 +28,8 @@ export type AiTranslationReviewInput = {
   provider: 'OPENAI' | 'ANTHROPIC' | 'GOOGLE';
 
   model: string;
+
+  glossaryRules?: ResolvedGlossaryRule[];
 };
 
 export type AiTranslationReviewResult = {

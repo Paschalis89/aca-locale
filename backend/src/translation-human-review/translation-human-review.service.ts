@@ -2,9 +2,12 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
+
+import { GlossaryService } from '../glossary/glossary.service.js';
 
 import { TranslationValidatorService } from '../translation-validation/translation-validator.service.js';
 
@@ -18,6 +21,9 @@ export class TranslationHumanReviewService {
     private readonly prisma: PrismaService,
 
     private readonly validator: TranslationValidatorService,
+
+    @Optional()
+    private readonly glossary?: GlossaryService,
   ) {}
 
   async approve(
@@ -65,8 +71,18 @@ export class TranslationHumanReviewService {
 
     /*
      * Any human modification must pass the
-     * deterministic validator again.
+     * deterministic validator again, including
+     * the currently active glossary rules.
      */
+    const glossaryRules = this.glossary
+      ? await this.glossary.resolveRulesForText(
+          shopifyDomain,
+          item.job.sourceLocale,
+          item.job.targetLocale,
+          item.sourceValue,
+        )
+      : [];
+
     const validation = this.validator.validate({
       sourceValue: item.sourceValue,
 
@@ -81,6 +97,8 @@ export class TranslationHumanReviewService {
       resourceType: item.field.resource.resourceType,
 
       fieldKey: item.field.key,
+
+      glossaryRules,
     });
 
     if (!validation.passed) {

@@ -1,3 +1,5 @@
+import type { ResolvedGlossaryRule } from '../glossary/glossary.types.js';
+
 export type TranslationProviderName =
   'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | 'DEEPL';
 
@@ -15,6 +17,8 @@ export type TranslationProviderInput = {
   fieldKey?: string;
 
   model?: string | null;
+
+  glossaryRules?: ResolvedGlossaryRule[];
 };
 
 export type TranslationProviderResult = {

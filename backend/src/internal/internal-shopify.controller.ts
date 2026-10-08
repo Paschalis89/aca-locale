@@ -11,6 +11,13 @@ import {
 } from '@nestjs/swagger';
 
 import {
+  ClaimShopifyContentChangeDto,
+  FailShopifyContentChangeDto,
+  ProcessShopifyContentDeleteDto,
+  ProcessShopifyContentUpsertDto,
+} from './dto/shopify-content-change.dto.js';
+
+import {
   ShopifyShopEventDto,
 } from './dto/shopify-shop-event.dto.js';
 
@@ -21,6 +28,10 @@ import {
 import {
   InternalShopifyService,
 } from './internal-shopify.service.js';
+
+import {
+  InternalTranslationChangeService,
+} from './internal-translation-change.service.js';
 
 @ApiTags(
   'Internal',
@@ -35,6 +46,9 @@ export class InternalShopifyController {
   constructor(
     private readonly service:
       InternalShopifyService,
+
+    private readonly translationChanges:
+      InternalTranslationChangeService,
   ) {}
 
   @Post('app-uninstalled')
@@ -66,4 +80,64 @@ export class InternalShopifyController {
       body.shopifyDomain,
     );
   }
+  @Post('content-change/claim')
+  @ApiOperation({
+    summary:
+      'Claim a verified Shopify translation content change',
+  })
+  claimContentChange(
+    @Body()
+    body:
+      ClaimShopifyContentChangeDto,
+  ) {
+    return this.translationChanges.claim(
+      body,
+    );
+  }
+
+  @Post('content-change/process-upsert')
+  @ApiOperation({
+    summary:
+      'Persist one incremental Shopify translation resource scan',
+  })
+  processContentUpsert(
+    @Body()
+    body:
+      ProcessShopifyContentUpsertDto,
+  ) {
+    return this.translationChanges.processUpsert(
+      body,
+    );
+  }
+
+  @Post('content-change/process-delete')
+  @ApiOperation({
+    summary:
+      'Tombstone one deleted Shopify translation resource',
+  })
+  processContentDelete(
+    @Body()
+    body:
+      ProcessShopifyContentDeleteDto,
+  ) {
+    return this.translationChanges.processDelete(
+      body,
+    );
+  }
+
+  @Post('content-change/fail')
+  @ApiOperation({
+    summary:
+      'Record a failed Shopify translation content change',
+  })
+  failContentChange(
+    @Body()
+    body:
+      FailShopifyContentChangeDto,
+  ) {
+    return this.translationChanges.fail(
+      body,
+    );
+  }
+
 }

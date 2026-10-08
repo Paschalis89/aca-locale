@@ -6,6 +6,10 @@ import {
   authenticate,
 } from "../shopify.server";
 
+import {
+  syncMetaobjectWebhookSubscriptions,
+} from "../services/metaobject-webhooks.server";
+
 export async function action({
   request,
 }: ActionFunctionArgs) {
@@ -94,6 +98,16 @@ export async function action({
       );
     }
 
+    const metaobjectWebhooks =
+      await syncMetaobjectWebhookSubscriptions(
+        admin,
+      );
+
+    console.info(
+      "[ACA Locale] Metaobject webhook subscriptions synchronized:",
+      metaobjectWebhooks,
+    );
+
     const backendUrl =
       process.env.ACA_LOCALE_BACKEND_URL ??
       "http://127.0.0.1:3001";
@@ -133,21 +147,46 @@ export async function action({
     const body =
       await backendResponse.text();
 
-    return new Response(
-      body,
-      {
-        status:
-          backendResponse.status,
+    if (!backendResponse.ok) {
+      return new Response(
+        body,
+        {
+          status:
+            backendResponse.status,
 
-        headers: {
-          "Content-Type":
-            backendResponse.headers.get(
-              "content-type",
-            ) ??
-            "application/json",
+          headers: {
+            "Content-Type":
+              backendResponse.headers.get(
+                "content-type",
+              ) ??
+              "application/json",
+          },
         },
-      },
-    );
+      );
+    }
+
+    try {
+      const data = body
+        ? JSON.parse(body)
+        : {};
+
+      return Response.json({
+        ...(
+          typeof data === "object" &&
+          data !== null
+            ? data
+            : {
+                result: data,
+              }
+        ),
+        metaobjectWebhooks,
+      });
+    } catch {
+      return Response.json({
+        result: body,
+        metaobjectWebhooks,
+      });
+    }
   } catch (error) {
     console.error(
       "[ACA Locale] Shopify configuration sync failed:",

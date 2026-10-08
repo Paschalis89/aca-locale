@@ -88,6 +88,7 @@ export class TranslationScannerService {
 
           update: {
             lastSeenAt: scannedAt,
+            deletedAt: null,
           },
 
           create: {
@@ -125,6 +126,8 @@ export class TranslationScannerService {
               sourceValue: content.value,
 
               sourceDigest: content.digest,
+
+              deletedAt: null,
             },
 
             create: {
@@ -212,23 +215,32 @@ export class TranslationScannerService {
          * Remove fields that disappeared
          * from this Shopify resource.
          */
-        if (seenFieldKeys.length === 0) {
-          await tx.translationField.deleteMany({
-            where: {
-              resourceId: savedResource.id,
-            },
-          });
-        } else {
-          await tx.translationField.deleteMany({
-            where: {
-              resourceId: savedResource.id,
+        const staleFieldWhere =
+          seenFieldKeys.length === 0
+            ? {
+                resourceId: savedResource.id,
+                deletedAt: null,
+              }
+            : {
+                resourceId: savedResource.id,
+                deletedAt: null,
+                key: {
+                  notIn: seenFieldKeys,
+                },
+              };
 
-              key: {
-                notIn: seenFieldKeys,
-              },
-            },
-          });
-        }
+        /*
+         * Keep field history for previous jobs.
+         * TranslationJobItem references TranslationField,
+         * so removing a field would otherwise erase audit
+         * history through the cascade relation.
+         */
+        await tx.translationField.updateMany({
+          where: staleFieldWhere,
+          data: {
+            deletedAt: scannedAt,
+          },
+        });
       }
 
       /*
@@ -239,24 +251,67 @@ export class TranslationScannerService {
        * for this type.
        */
       if (scan.completeScan) {
-        if (seenShopifyResourceIds.length === 0) {
-          await tx.translationResource.deleteMany({
-            where: {
-              shopId: shop.id,
+        const staleResourceWhere =
+          seenShopifyResourceIds.length === 0
+            ? {
+                shopId: shop.id,
+                resourceType: scan.resourceType,
+              }
+            : {
+                shopId: shop.id,
+                resourceType: scan.resourceType,
+                shopifyResourceId: {
+                  notIn: seenShopifyResourceIds,
+                },
+              };
 
-              resourceType: scan.resourceType,
+        /*
+         * Look up every stale resource, including resources
+         * that were already tombstoned by an older version of
+         * ACA Locale. This also repairs any child fields that
+         * were left active before field-level tombstoning was
+         * introduced.
+         */
+        const staleResources =
+          await tx.translationResource.findMany({
+            where: staleResourceWhere,
+            select: {
+              id: true,
             },
           });
-        } else {
-          await tx.translationResource.deleteMany({
+
+        const staleResourceIds =
+          staleResources.map((resource) => resource.id);
+
+        if (staleResourceIds.length > 0) {
+          await tx.translationField.updateMany({
             where: {
-              shopId: shop.id,
-
-              resourceType: scan.resourceType,
-
-              shopifyResourceId: {
-                notIn: seenShopifyResourceIds,
+              resourceId: {
+                in: staleResourceIds,
               },
+              deletedAt: null,
+            },
+            data: {
+              deletedAt: scannedAt,
+            },
+          });
+
+          /*
+           * Preserve historical jobs and audit data.
+           * Removing TranslationResource would cascade
+           * through fields and job items, so stale Shopify
+           * resources are tombstoned instead. A later scan
+           * automatically reactivates the same resource ID.
+           */
+          await tx.translationResource.updateMany({
+            where: {
+              id: {
+                in: staleResourceIds,
+              },
+              deletedAt: null,
+            },
+            data: {
+              deletedAt: scannedAt,
             },
           });
         }
@@ -264,6 +319,97 @@ export class TranslationScannerService {
     });
 
     return this.getSummary(shopifyDomain, scan.resourceType, scan.targetLocale);
+  }
+
+  async markResourceDeleted(
+    shopifyDomain: string,
+    resourceType: string,
+    shopifyResourceId: string,
+  ) {
+    const shop = await this.prisma.shop.findUnique({
+      where: {
+        shopifyDomain,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop is not registered.');
+    }
+
+    const resource =
+      await this.prisma.translationResource.findUnique({
+        where: {
+          shopId_resourceType_shopifyResourceId: {
+            shopId: shop.id,
+            resourceType,
+            shopifyResourceId,
+          },
+        },
+        select: {
+          id: true,
+          deletedAt: true,
+        },
+      });
+
+    if (!resource) {
+      return {
+        shopifyDomain,
+        resourceType,
+        shopifyResourceId,
+        deleted: false,
+        deletedAt: null,
+        fieldsDeleted: 0,
+      };
+    }
+
+    const deletedAt = resource.deletedAt ?? new Date();
+
+    const result =
+      await this.prisma.$transaction(async (tx) => {
+        const fields =
+          await tx.translationField.updateMany({
+            where: {
+              resourceId: resource.id,
+              deletedAt: null,
+            },
+            data: {
+              deletedAt,
+            },
+          });
+
+        const translationResource =
+          resource.deletedAt
+            ? null
+            : await tx.translationResource.update({
+                where: {
+                  id: resource.id,
+                },
+                data: {
+                  deletedAt,
+                },
+              });
+
+        return {
+          fieldsDeleted: fields.count,
+          resourceDeleted: Boolean(translationResource),
+        };
+      });
+
+    return {
+      shopifyDomain,
+      resourceType,
+      shopifyResourceId,
+      deleted:
+        result.resourceDeleted ||
+        result.fieldsDeleted > 0 ||
+        resource.deletedAt !== null,
+      deletedAt,
+      fieldsDeleted: result.fieldsDeleted,
+    };
   }
 
   async getSummary(
@@ -277,6 +423,7 @@ export class TranslationScannerService {
       },
 
       resourceType,
+      deletedAt: null,
     };
 
     const resources = await this.prisma.translationResource.count({
@@ -288,6 +435,7 @@ export class TranslationScannerService {
         targetLocale,
 
         field: {
+          deletedAt: null,
           resource: resourceFilter,
         },
       },
@@ -506,10 +654,15 @@ export class TranslationScannerService {
         },
 
         resourceType,
+        deletedAt: null,
       },
 
       include: {
         fields: {
+          where: {
+            deletedAt: null,
+          },
+
           include: {
             states: {
               where: {
@@ -576,12 +729,17 @@ export class TranslationScannerService {
     const resources = await this.prisma.translationResource.findMany({
       where: {
         shopId: shop.id,
+        deletedAt: null,
       },
 
       select: {
         resourceType: true,
 
         fields: {
+          where: {
+            deletedAt: null,
+          },
+
           select: {
             states: {
               where: {

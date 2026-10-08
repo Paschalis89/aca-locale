@@ -1,3 +1,5 @@
+import type { ResolvedGlossaryRule } from '../glossary/glossary.types.js';
+
 export type TranslationValidationSeverity = 'ERROR' | 'WARNING';
 
 export type TranslationValidationCode =
@@ -10,7 +12,10 @@ export type TranslationValidationCode =
   | 'NUMBER_TOKEN_MISMATCH'
   | 'SAME_AS_SOURCE'
   | 'LENGTH_RATIO_LOW'
-  | 'LENGTH_RATIO_HIGH';
+  | 'LENGTH_RATIO_HIGH'
+  | 'GLOSSARY_REQUIRED_TERM_MISSING'
+  | 'GLOSSARY_PROTECTED_TERM_CHANGED'
+  | 'GLOSSARY_FORBIDDEN_TERM_USED';
 
 export type TranslationValidationIssue = {
   code: TranslationValidationCode;
@@ -22,6 +27,12 @@ export type TranslationValidationIssue = {
   expected?: string[];
 
   actual?: string[];
+
+  glossaryEntryId?: string;
+
+  sourceTerm?: string;
+
+  targetTerm?: string | null;
 };
 
 export type TranslationValidationInput = {
@@ -38,6 +49,8 @@ export type TranslationValidationInput = {
   resourceType?: string;
 
   fieldKey?: string;
+
+  glossaryRules?: ResolvedGlossaryRule[];
 };
 
 export type TranslationValidationResult = {
