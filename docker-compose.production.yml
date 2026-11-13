@@ -1,0 +1,197 @@
+name: aca-locale
+
+services:
+  traefik:
+    image: traefik:v3.7.18
+    container_name: aca-locale-traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --log.level=INFO
+      - --accesslog=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - edge
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aca-locale-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET}
+      SHOPIFY_APP_URL: https://${APP_DOMAIN}
+      SHOPIFY_APP_DISTRIBUTION: single_merchant
+      SHOPIFY_SESSION_DATABASE_URL: file:/data/shopify-session.sqlite
+      SCOPES: ${SCOPES}
+      SHOP_CUSTOM_DOMAIN: ${SHOP_CUSTOM_DOMAIN:-}
+      ACA_LOCALE_INTERNAL_SECRET: ${ACA_LOCALE_INTERNAL_SECRET}
+      ACA_LOCALE_BACKEND_URL: http://backend:3001
+    volumes:
+      - shopify_session_data:/data
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.aca-locale.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.aca-locale.entrypoints=websecure
+      - traefik.http.routers.aca-locale.tls=true
+      - traefik.http.routers.aca-locale.tls.certresolver=letsencrypt
+      - traefik.http.services.aca-locale.loadbalancer.server.port=3000
+    networks:
+      - edge
+      - app
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aca-locale-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      API_PREFIX: api/v1
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET}
+      ACA_LOCALE_INTERNAL_SECRET: ${ACA_LOCALE_INTERNAL_SECRET}
+      CORS_ORIGINS: https://${APP_DOMAIN}
+      ENABLE_DEMO_ENDPOINTS: "false"
+      ENABLE_SWAGGER: "false"
+      HEALTHCHECK_TIMEOUT_MS: ${HEALTHCHECK_TIMEOUT_MS:-2500}
+      TRANSLATION_QUEUE_PREFIX: ${TRANSLATION_QUEUE_PREFIX:-aca-locale}
+      TRANSLATION_QUEUE_CONCURRENCY: ${TRANSLATION_QUEUE_CONCURRENCY:-2}
+      TRANSLATION_QUEUE_PER_SHOP_CONCURRENCY: ${TRANSLATION_QUEUE_PER_SHOP_CONCURRENCY:-1}
+      TRANSLATION_QUEUE_ATTEMPTS: ${TRANSLATION_QUEUE_ATTEMPTS:-5}
+      TRANSLATION_QUEUE_REVIEW_ATTEMPTS: ${TRANSLATION_QUEUE_REVIEW_ATTEMPTS:-5}
+      TRANSLATION_QUEUE_PUBLISH_ATTEMPTS: ${TRANSLATION_QUEUE_PUBLISH_ATTEMPTS:-8}
+      TRANSLATION_QUEUE_BACKOFF_MS: ${TRANSLATION_QUEUE_BACKOFF_MS:-10000}
+      TRANSLATION_QUEUE_RATE_LIMIT_MAX: ${TRANSLATION_QUEUE_RATE_LIMIT_MAX:-10}
+      TRANSLATION_QUEUE_RATE_LIMIT_DURATION_MS: ${TRANSLATION_QUEUE_RATE_LIMIT_DURATION_MS:-1000}
+      TRANSLATION_QUEUE_RECOVERY_INTERVAL_MS: ${TRANSLATION_QUEUE_RECOVERY_INTERVAL_MS:-60000}
+      TRANSLATION_QUEUE_STALE_RUNNING_MS: ${TRANSLATION_QUEUE_STALE_RUNNING_MS:-300000}
+      TRANSLATION_QUEUE_RECOVERY_BATCH_SIZE: ${TRANSLATION_QUEUE_RECOVERY_BATCH_SIZE:-100}
+      AI_TRANSLATION_MODEL: ${AI_TRANSLATION_MODEL:-}
+      AI_REVIEW_MODEL: ${AI_REVIEW_MODEL:-}
+      AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+      DEEPL_API_URL: ${DEEPL_API_URL:-https://api.deepl.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - app
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: aca-locale-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app
+
+  redis:
+    image: redis:7.4.12-alpine
+    container_name: aca-locale-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a '${REDIS_PASSWORD}' ping 2>/dev/null | grep PONG"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app
+
+networks:
+  edge:
+    name: aca-locale-edge
+  app:
+    name: aca-locale-app
+
+volumes:
+  traefik_letsencrypt:
+    name: aca-locale-traefik-letsencrypt
+  shopify_session_data:
+    name: aca-locale-shopify-session
+  postgres_data:
+    name: aca-locale-postgres-data
+  redis_data:
+    name: aca-locale-redis-data

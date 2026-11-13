@@ -65,6 +65,18 @@ export class ProcessShopifyContentUpsertDto extends ShopifyShopEventDto {
   @IsNotEmpty()
   eventId!: string;
 
+  /**
+   * Public React Router origin that received the verified Shopify event.
+   *
+   * It is propagated only to the BullMQ payload so the NestJS worker can
+   * call the server-side Shopify publication gateway without persisting an
+   * Admin API access token. The value is never exposed to storefront code.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  appUrl?: string;
+
   @IsString()
   @IsNotEmpty()
   resourceType!: string;

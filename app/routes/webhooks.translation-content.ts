@@ -485,6 +485,18 @@ export const action =
         request,
       );
 
+    /*
+     * The NestJS worker does not store Shopify Admin API credentials.
+     * Propagate the public React Router origin through the internal change
+     * pipeline so an automatic publish can come back through a protected
+     * server-to-server gateway and use the app's offline Shopify session.
+     */
+    const appUrl =
+      process.env.SHOPIFY_APP_URL?.trim() ||
+      new URL(
+        request.url,
+      ).origin;
+
     const rawTopic =
       String(
         webhook.topic,
@@ -734,6 +746,8 @@ export const action =
             eventId:
               claim.eventId,
 
+            appUrl,
+
             resourceType:
               configuration.resourceType,
 
@@ -803,6 +817,8 @@ export const action =
 
           eventId:
             claim.eventId,
+
+          appUrl,
 
           resourceType:
             configuration.resourceType,

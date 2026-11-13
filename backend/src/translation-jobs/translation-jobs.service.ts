@@ -245,6 +245,7 @@ export class TranslationJobsService {
       resourceType: string;
       shopifyResourceId: string;
       targetLocale: string;
+      shopifyGatewayUrl?: string;
     },
   ) {
     const shop = await this.prisma.shop.findUnique({
@@ -351,6 +352,17 @@ export class TranslationJobsService {
       });
 
     if (existingAutomaticJob) {
+      if (input.shopifyGatewayUrl) {
+        await this.prisma.translationJob.update({
+          where: {
+            id: existingAutomaticJob.id,
+          },
+          data: {
+            shopifyGatewayUrl: input.shopifyGatewayUrl,
+          },
+        });
+      }
+
       return {
         created: false,
         reason: 'DUPLICATE_CHANGE_EVENT',
@@ -484,6 +496,23 @@ export class TranslationJobsService {
     }
 
     const provider = shop.aiConfiguration?.translationProvider ?? null;
+
+    /*
+     * 10D safety: do not create an automatically executable job when
+     * there is no primary translation provider snapshot. Otherwise the
+     * BullMQ worker would deterministically fail and retry the same
+     * configuration error. Manual jobs keep their existing behavior.
+     */
+    if (!provider) {
+      return {
+        created: false,
+        reason: 'TRANSLATION_PROVIDER_NOT_CONFIGURED',
+        targetLocale,
+        jobId: null,
+        totalItems: 0,
+      };
+    }
+
     const model = shop.aiConfiguration?.translationModel ?? null;
     const fallbackProvider =
       shop.aiConfiguration?.fallbackProvider ?? null;
@@ -503,6 +532,8 @@ export class TranslationJobsService {
         origin: 'SHOPIFY_CHANGE',
         automationKey,
         changeEventId: changeEvent.id,
+        automationStage: 'TRANSLATION',
+        shopifyGatewayUrl: input.shopifyGatewayUrl ?? null,
 
         provider,
         model,

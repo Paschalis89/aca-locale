@@ -27,6 +27,26 @@ function requiredEnvironmentVariable(
   return value;
 }
 
+function resolveDistribution() {
+  const value =
+    process.env.SHOPIFY_APP_DISTRIBUTION
+      ?.trim()
+      .toLowerCase() ||
+    "app_store";
+
+  if (value === "single_merchant") {
+    return AppDistribution.SingleMerchant;
+  }
+
+  if (value === "app_store") {
+    return AppDistribution.AppStore;
+  }
+
+  throw new Error(
+    'SHOPIFY_APP_DISTRIBUTION must be "app_store" or "single_merchant".',
+  );
+}
+
 const shopify = shopifyApp({
   apiKey:
     requiredEnvironmentVariable(
@@ -42,7 +62,10 @@ const shopify = shopifyApp({
     ApiVersion.July26,
 
   scopes:
-    process.env.SCOPES?.split(","),
+    process.env.SCOPES
+      ?.split(",")
+      .map((scope) => scope.trim())
+      .filter(Boolean),
 
   appUrl:
     requiredEnvironmentVariable(
@@ -58,7 +81,7 @@ const shopify = shopifyApp({
     ),
 
   distribution:
-    AppDistribution.AppStore,
+    resolveDistribution(),
 
   future: {
     expiringOfflineAccessTokens:

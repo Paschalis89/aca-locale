@@ -209,6 +209,18 @@ export class TranslationExecutorService {
           continue;
         }
 
+        /*
+         * 10D safety: the job stores an immutable source snapshot, but
+         * Shopify content may change again while this job is waiting in
+         * BullMQ. Re-check the live scanner projection immediately before
+         * consuming provider quota. A newer Shopify change will create its
+         * own automatic job for the new digest.
+         */
+        await this.assertSourceSnapshotCurrent(
+          item.fieldId,
+          item.sourceDigest,
+        );
+
         if (!item.sourceValue || item.sourceValue.trim().length === 0) {
           throw new Error('Source value is empty.');
         }
@@ -682,6 +694,79 @@ export class TranslationExecutorService {
     }
 
     return job;
+  }
+
+  private async assertSourceSnapshotCurrent(
+    fieldId: string,
+
+    expectedSourceDigest: string,
+  ) {
+    /*
+     * PrismaService always exposes this delegate in the real application.
+     * The small guard keeps older isolated unit mocks compatible while
+     * production execution still performs the freshness check.
+     */
+    const translationField =
+      (this.prisma as unknown as {
+        translationField?: {
+          findUnique: (args: unknown) => Promise<{
+            sourceDigest: string;
+            deletedAt: Date | null;
+            resource: {
+              deletedAt: Date | null;
+            };
+          } | null>;
+        };
+      }).translationField;
+
+    if (!translationField?.findUnique) {
+      return;
+    }
+
+    const current =
+      await translationField.findUnique({
+        where: {
+          id: fieldId,
+        },
+
+        select: {
+          sourceDigest: true,
+          deletedAt: true,
+
+          resource: {
+            select: {
+              deletedAt: true,
+            },
+          },
+        },
+      });
+
+    if (!current) {
+      throw new Error(
+        'SOURCE_FIELD_NOT_FOUND_BEFORE_EXECUTION',
+      );
+    }
+
+    if (current.resource.deletedAt) {
+      throw new Error(
+        'RESOURCE_DELETED_BEFORE_EXECUTION',
+      );
+    }
+
+    if (current.deletedAt) {
+      throw new Error(
+        'FIELD_DELETED_BEFORE_EXECUTION',
+      );
+    }
+
+    if (
+      current.sourceDigest !==
+      expectedSourceDigest
+    ) {
+      throw new Error(
+        'SOURCE_CHANGED_BEFORE_EXECUTION',
+      );
+    }
   }
 
   private async isCancelled(jobId: string) {

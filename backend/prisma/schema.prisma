@@ -330,6 +330,22 @@ model TranslationJob {
 
   errorMessage String? @db.Text
 
+  // 10G automation recovery / retry state.
+  // These fields track stage progress without changing the core translation
+  // lifecycle statuses used by manual jobs and human review.
+  automationStage         String?
+  translationAttempts     Int       @default(0)
+  reviewAttempts          Int       @default(0)
+  publishAttempts         Int       @default(0)
+  automationLastError     String?   @db.Text
+  automationLastAttemptAt DateTime?
+  automationNextRetryAt   DateTime?
+  automationCompletedAt   DateTime?
+
+  // Last known React Router gateway origin for background Shopify publish.
+  // Production uses a stable URL; dev can refresh this from incoming events.
+  shopifyGatewayUrl String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -343,6 +359,7 @@ model TranslationJob {
   @@index([shopId, status])
   @@index([shopId, targetLocale])
   @@index([shopId, origin, createdAt])
+  @@index([shopId, origin, automationStage, updatedAt])
   @@index([changeEventId])
   @@index([createdAt])
 }

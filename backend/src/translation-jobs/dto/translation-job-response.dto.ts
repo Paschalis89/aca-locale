@@ -77,6 +77,36 @@ export class TranslationJobDto {
   })
   errorMessage!: string | null;
 
+  @ApiPropertyOptional({
+    example: 'AI_REVIEW',
+    nullable: true,
+  })
+  automationStage!: string | null;
+
+  @ApiProperty({ example: 1 })
+  translationAttempts!: number;
+
+  @ApiProperty({ example: 0 })
+  reviewAttempts!: number;
+
+  @ApiProperty({ example: 0 })
+  publishAttempts!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  automationLastError!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  automationLastAttemptAt!: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  automationNextRetryAt!: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  automationCompletedAt!: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  shopifyGatewayUrl!: string | null;
+
   @ApiProperty()
   createdAt!: Date;
 

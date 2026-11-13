@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
@@ -9,6 +10,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { TranslationScannerService } from '../translation-scanner/translation-scanner.service.js';
 
 import { TranslationJobsService } from '../translation-jobs/translation-jobs.service.js';
+
+import { TranslationQueueService } from '../translation-jobs/translation-queue.service.js';
 
 import type {
   ClaimShopifyContentChangeDto,
@@ -31,6 +34,10 @@ export class InternalTranslationChangeService {
 
     private readonly translationJobs:
       TranslationJobsService,
+
+    @Optional()
+    private readonly translationQueue?:
+      TranslationQueueService,
   ) {}
 
   async claim(
@@ -340,12 +347,67 @@ export class InternalTranslationChangeService {
 
             targetLocale:
               locale.targetLocale,
+
+            shopifyGatewayUrl:
+              input.appUrl,
           },
         );
 
-      automaticJobs.push(
-        automaticJob,
-      );
+      /*
+       * 10D - automatic execution.
+       *
+       * createFromShopifyChange() remains responsible only for
+       * deterministic/idempotent PostgreSQL job creation. The change
+       * orchestration layer owns queueing because it is the component
+       * that knows this job came from a Shopify content event.
+       *
+       * Queue both a freshly-created job and the job returned for the
+       * same change-event idempotency key. This matters if PostgreSQL
+       * job creation succeeded but Redis/BullMQ was temporarily
+       * unavailable: a webhook retry can recover by enqueueing the
+       * already-created job instead of creating a duplicate.
+       */
+      let queue:
+        Awaited<
+          ReturnType<
+            TranslationQueueService['enqueue']
+          >
+        > |
+        null =
+        null;
+
+      if (
+        automaticJob.jobId &&
+        [
+          'CREATED',
+          'DUPLICATE_CHANGE_EVENT',
+        ].includes(
+          automaticJob.reason,
+        )
+      ) {
+        if (!this.translationQueue) {
+          throw new Error(
+            'Translation queue is not available for automatic execution.',
+          );
+        }
+
+        queue =
+          input.appUrl
+            ? await this.translationQueue.enqueue(
+                automaticJob.jobId,
+                input.shopifyDomain,
+                input.appUrl,
+              )
+            : await this.translationQueue.enqueue(
+                automaticJob.jobId,
+                input.shopifyDomain,
+              );
+      }
+
+      automaticJobs.push({
+        ...automaticJob,
+        queue,
+      });
     }
 
     await this.completeEvent(

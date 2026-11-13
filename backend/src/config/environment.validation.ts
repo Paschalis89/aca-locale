@@ -138,6 +138,83 @@ export function validateEnvironment(
       'HEALTHCHECK_TIMEOUT_MS',
     );
 
+  environment.TRANSLATION_QUEUE_CONCURRENCY =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_CONCURRENCY,
+      2,
+      'TRANSLATION_QUEUE_CONCURRENCY',
+    );
+
+  environment.TRANSLATION_QUEUE_PER_SHOP_CONCURRENCY =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_PER_SHOP_CONCURRENCY,
+      1,
+      'TRANSLATION_QUEUE_PER_SHOP_CONCURRENCY',
+    );
+
+  environment.TRANSLATION_QUEUE_ATTEMPTS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_ATTEMPTS,
+      5,
+      'TRANSLATION_QUEUE_ATTEMPTS',
+    );
+
+  environment.TRANSLATION_QUEUE_REVIEW_ATTEMPTS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_REVIEW_ATTEMPTS,
+      5,
+      'TRANSLATION_QUEUE_REVIEW_ATTEMPTS',
+    );
+
+  environment.TRANSLATION_QUEUE_PUBLISH_ATTEMPTS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_PUBLISH_ATTEMPTS,
+      8,
+      'TRANSLATION_QUEUE_PUBLISH_ATTEMPTS',
+    );
+
+  environment.TRANSLATION_QUEUE_BACKOFF_MS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_BACKOFF_MS,
+      10000,
+      'TRANSLATION_QUEUE_BACKOFF_MS',
+    );
+
+  environment.TRANSLATION_QUEUE_RATE_LIMIT_MAX =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_RATE_LIMIT_MAX,
+      10,
+      'TRANSLATION_QUEUE_RATE_LIMIT_MAX',
+    );
+
+  environment.TRANSLATION_QUEUE_RATE_LIMIT_DURATION_MS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_RATE_LIMIT_DURATION_MS,
+      1000,
+      'TRANSLATION_QUEUE_RATE_LIMIT_DURATION_MS',
+    );
+
+  environment.TRANSLATION_QUEUE_RECOVERY_INTERVAL_MS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_RECOVERY_INTERVAL_MS,
+      60000,
+      'TRANSLATION_QUEUE_RECOVERY_INTERVAL_MS',
+    );
+
+  environment.TRANSLATION_QUEUE_STALE_RUNNING_MS =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_STALE_RUNNING_MS,
+      300000,
+      'TRANSLATION_QUEUE_STALE_RUNNING_MS',
+    );
+
+  environment.TRANSLATION_QUEUE_RECOVERY_BATCH_SIZE =
+    positiveInteger(
+      environment.TRANSLATION_QUEUE_RECOVERY_BATCH_SIZE,
+      100,
+      'TRANSLATION_QUEUE_RECOVERY_BATCH_SIZE',
+    );
+
   const apiPrefix =
     stringValue(
       environment.API_PREFIX,
