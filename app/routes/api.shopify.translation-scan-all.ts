@@ -11,8 +11,8 @@ import {
 } from "../lib/shopify-translatable-resource-types";
 
 import {
-  fetchAllTranslationResources,
-} from "../lib/shopify-translation-scanner.server";
+  syncTranslationResourceType,
+} from "../lib/shopify-translation-scan-sync.server";
 
 type ResourceSummary = {
   resourceType: string;
@@ -110,85 +110,13 @@ export async function action({
     of SHOPIFY_TRANSLATABLE_RESOURCE_TYPES
   ) {
     try {
-      /*
-       * Read every Shopify page
-       * for this resource type.
-       */
-      const resources =
-        await fetchAllTranslationResources(
-          admin,
-          resourceType,
-          targetLocale,
-        );
-
-      /*
-       * Persist the complete scan
-       * in NestJS / PostgreSQL.
-       */
-      const backendResponse =
-        await fetch(
-          `${backendUrl}/api/v1/translations/scanner/sync`,
-          {
-            method:
-              "POST",
-
-            headers: {
-              Authorization:
-                authorization,
-
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                resourceType,
-
-                targetLocale,
-
-                completeScan:
-                  true,
-
-                resources:
-                  resources.map(
-                    (
-                      resource:
-                        any,
-                    ) => ({
-                      resourceId:
-                        resource
-                          .resourceId,
-
-                      content:
-                        resource
-                          .translatableContent ??
-                        [],
-
-                      translations:
-                        resource
-                          .translations ??
-                        [],
-                    }),
-                  ),
-              }),
-          },
-        );
-
-      const responseText =
-        await backendResponse.text();
-
-      if (
-        !backendResponse.ok
-      ) {
-        throw new Error(
-          `Backend ${backendResponse.status}: ${responseText}`,
-        );
-      }
-
-      const summary =
-        JSON.parse(
-          responseText,
-        ) as ResourceSummary;
+      const summary = await syncTranslationResourceType({
+        admin,
+        resourceType,
+        targetLocale,
+        backendUrl,
+        authorization,
+      }) as ResourceSummary;
 
       byResourceType[
         resourceType

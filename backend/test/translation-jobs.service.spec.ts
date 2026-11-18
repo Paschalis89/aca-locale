@@ -4,37 +4,33 @@ import { describe, expect, it, vi } from 'vitest';
 import { TranslationJobsService } from '../src/translation-jobs/translation-jobs.service.js';
 
 function createPrisma() {
+  const shop = { findUnique: vi.fn() };
+  const translationState = { findMany: vi.fn() };
+  const translationJob = {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  };
+  const translationJobItem = {
+    findMany: vi.fn().mockResolvedValue([]),
+    updateMany: vi.fn(),
+  };
   const tx = {
-    translationJob: {
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    translationJobItem: {
-      updateMany: vi.fn(),
-    },
+    $queryRaw: vi.fn().mockResolvedValue([{ locked: 1 }]),
+    translationState,
+    translationJob,
+    translationJobItem,
   };
 
   return {
-    shop: {
-      findUnique: vi.fn(),
-    },
-    translationState: {
-      findMany: vi.fn(),
-    },
-    translationJob: {
-      create: vi.fn(),
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    translationJobItem: {
-      updateMany: vi.fn(),
-    },
-    translationUsageEvent: {
-      findMany: vi.fn(),
-    },
+    shop,
+    translationState,
+    translationJob,
+    translationJobItem,
+    translationUsageEvent: { findMany: vi.fn() },
     $transaction: vi.fn(async (callback: any) => callback(tx)),
     __tx: tx,
   } as any;
@@ -131,7 +127,6 @@ describe('TranslationJobsService', () => {
             }),
           }),
         }),
-        take: 25,
       }),
     );
 

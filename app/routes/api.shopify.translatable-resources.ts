@@ -12,9 +12,10 @@ import {
 } from "../lib/shopify-translatable-resource-types";
 
 import {
-  fetchAllTranslationResources,
   fetchTranslationPage,
 } from "../lib/shopify-translation-scanner.server";
+
+import { syncTranslationResourceType } from "../lib/shopify-translation-scan-sync.server";
 
 type ScannerStatus =
   | "EMPTY_SOURCE"
@@ -407,131 +408,17 @@ export async function action({
   }
 
   try {
-    /*
-     * Read ALL Shopify pages for
-     * the selected resource type.
-     */
-    const resources =
-      await fetchAllTranslationResources(
-        admin,
-        resourceType,
-        targetLocale,
-      );
-
     const backendUrl =
-      process.env
-        .ACA_LOCALE_BACKEND_URL ??
+      process.env.ACA_LOCALE_BACKEND_URL ??
       "http://127.0.0.1:3001";
 
-    /*
-     * Send the raw Shopify state
-     * to NestJS.
-     *
-     * NestJS remains responsible for:
-     *
-     * - persistence
-     * - MISSING calculation
-     * - TRANSLATED calculation
-     * - OUTDATED calculation
-     * - EMPTY_SOURCE calculation
-     * - stale resource cleanup
-     */
-    const backendResponse =
-      await fetch(
-        `${backendUrl}/api/v1/translations/scanner/sync`,
-        {
-          method:
-            "POST",
-
-          headers: {
-            Authorization:
-              authorization,
-
-            "Content-Type":
-              "application/json",
-          },
-
-          body:
-            JSON.stringify({
-              resourceType,
-
-              targetLocale,
-
-              /*
-               * fetchAllTranslationResources()
-               * fetched every Shopify page.
-               *
-               * NestJS can therefore safely
-               * remove resources that are no
-               * longer present on Shopify.
-               */
-              completeScan:
-                true,
-
-              resources:
-                resources.map(
-                  (
-                    resource:
-                      any,
-                  ) => ({
-                    resourceId:
-                      resource.resourceId,
-
-                    content:
-                      resource
-                        .translatableContent ??
-                      [],
-
-                    translations:
-                      resource
-                        .translations ??
-                      [],
-                  }),
-                ),
-            }),
-        },
-      );
-
-    const responseText =
-      await backendResponse.text();
-
-    if (
-      !backendResponse.ok
-    ) {
-      console.error(
-        "[ACA Locale] Translation scan persistence failed:",
-        responseText,
-      );
-
-      return new Response(
-        responseText,
-        {
-          status:
-            backendResponse.status,
-
-          headers: {
-            "Content-Type":
-              backendResponse.headers.get(
-                "content-type",
-              ) ??
-              "application/json",
-          },
-        },
-      );
-    }
-
-    let backendData:
-      unknown;
-
-    try {
-      backendData =
-        JSON.parse(
-          responseText,
-        );
-    } catch {
-      backendData =
-        responseText;
-    }
+    const backendData = await syncTranslationResourceType({
+      admin,
+      resourceType,
+      targetLocale,
+      backendUrl,
+      authorization,
+    });
 
     return Response.json({
       shop:

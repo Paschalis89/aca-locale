@@ -275,7 +275,8 @@ export async function action({
       );
 
     const currentJson =
-      await currentResponse.json();
+      (await currentResponse.json()) as
+        Awaited<ReturnType<typeof currentResponse.json>> & { errors?: unknown };
 
     if (
       currentJson.errors
@@ -451,7 +452,8 @@ export async function action({
       );
 
     const registerJson =
-      await registerResponse.json();
+      (await registerResponse.json()) as
+        Awaited<ReturnType<typeof registerResponse.json>> & { errors?: unknown };
 
     if (
       registerJson.errors
@@ -478,6 +480,13 @@ export async function action({
     const publication =
       registerJson.data
         ?.translationsRegister;
+
+    if (!publication || !Array.isArray(publication.translations)) {
+      return Response.json(
+        { message: 'Shopify did not confirm the translation mutation result.' },
+        { status: 502 },
+      );
+    }
 
     const userErrors =
       publication?.userErrors ??

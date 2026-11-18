@@ -60,21 +60,14 @@ export class TranslationScannerService {
       throw new NotFoundException('Shop is not registered.');
     }
 
+    // Each resource has its own bounded transaction. A large Shopify catalog
+    // must not hold one Prisma interactive transaction open for the entire scan.
+    // If a page fails, already persisted resources can be safely replayed;
+    // stale resources are tombstoned only in the final successful request.
     const scannedAt = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
-      /*
-       * Used only when completeScan=true.
-       *
-       * At the end of the scan we remove
-       * resources that no longer exist
-       * in Shopify.
-       */
-      const seenShopifyResourceIds: string[] = [];
-
-      for (const resource of scan.resources) {
-        seenShopifyResourceIds.push(resource.resourceId);
-
+    for (const resource of scan.resources) {
+      await this.prisma.$transaction(async (tx) => {
         const savedResource = await tx.translationResource.upsert({
           where: {
             shopId_resourceType_shopifyResourceId: {
@@ -241,21 +234,22 @@ export class TranslationScannerService {
             deletedAt: scannedAt,
           },
         });
-      }
+      }, { maxWait: 10000, timeout: 30000 });
+    }
 
-      /*
-       * Because the React Router gateway
-       * fetched every Shopify page,
-       * completeScan=true means this is the
-       * authoritative current resource list
-       * for this type.
-       */
-      if (scan.completeScan) {
+    if (scan.completeScan) {
+      // A finalization-only request supplies all IDs seen across the pages.
+      // Legacy callers still work by deriving the IDs from scan.resources.
+      const seenShopifyResourceIds = scan.seenResourceIds ??
+        scan.resources.map((resource) => resource.resourceId);
+      await this.prisma.$transaction(async (tx) => {
+
         const staleResourceWhere =
           seenShopifyResourceIds.length === 0
             ? {
                 shopId: shop.id,
                 resourceType: scan.resourceType,
+                ...(scan.scanStartedAt ? { lastSeenAt: { lt: new Date(scan.scanStartedAt) } } : {}),
               }
             : {
                 shopId: shop.id,
@@ -263,6 +257,7 @@ export class TranslationScannerService {
                 shopifyResourceId: {
                   notIn: seenShopifyResourceIds,
                 },
+                ...(scan.scanStartedAt ? { lastSeenAt: { lt: new Date(scan.scanStartedAt) } } : {}),
               };
 
         /*
@@ -315,8 +310,8 @@ export class TranslationScannerService {
             },
           });
         }
-      }
-    });
+      }, { maxWait: 10000, timeout: 30000 });
+    }
 
     return this.getSummary(shopifyDomain, scan.resourceType, scan.targetLocale);
   }

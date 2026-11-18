@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
+import { lockTranslationScope } from '../translation-coordination/translation-scope-lock.js';
 
 import { GlossaryService } from '../glossary/glossary.service.js';
 
@@ -210,90 +211,93 @@ export class TranslationHumanReviewService {
      * Prevent double-clicks from creating
      * multiple active regeneration jobs.
      */
-    const activeRegeneration = await this.prisma.translationJobItem.findFirst({
-      where: {
-        regeneratedFromItemId: item.id,
+    return this.prisma.$transaction(async (tx) => {
+      await lockTranslationScope(tx, item.job.shopId, item.job.targetLocale);
+      const activeRegeneration = await tx.translationJobItem.findFirst({
+        where: {
+          regeneratedFromItemId: item.id,
 
-        job: {
-          status: {
-            in: ['QUEUED', 'RUNNING'],
+          job: {
+            status: {
+              in: ['QUEUED', 'RUNNING'],
+            },
           },
         },
-      },
 
-      select: {
-        id: true,
+        select: {
+          id: true,
 
-        jobId: true,
-      },
-    });
+          jobId: true,
+        },
+      });
 
-    if (activeRegeneration) {
-      throw new BadRequestException(
-        `An active regeneration already exists in job "${activeRegeneration.jobId}".`,
-      );
-    }
+      if (activeRegeneration) {
+        throw new BadRequestException(
+          `An active regeneration already exists in job "${activeRegeneration.jobId}".`,
+        );
+      }
 
-    /*
-     * Regeneration creates a brand-new job.
-     *
-     * The previous item is left untouched,
-     * preserving translation, validation,
-     * AI review and human review history.
-     */
-    return this.prisma.translationJob.create({
-      data: {
-        shopId: item.job.shopId,
+      /*
+       * Regeneration creates a brand-new job.
+       *
+       * The previous item is left untouched,
+       * preserving translation, validation,
+       * AI review and human review history.
+       */
+      return tx.translationJob.create({
+        data: {
+          shopId: item.job.shopId,
 
-        sourceLocale: item.job.sourceLocale,
+          sourceLocale: item.job.sourceLocale,
 
-        targetLocale: item.job.targetLocale,
+          targetLocale: item.job.targetLocale,
 
-        status: 'QUEUED',
+          status: 'QUEUED',
 
-        provider: item.job.provider,
+          provider: item.job.provider,
 
-        model: item.job.model,
+          model: item.job.model,
 
-        fallbackProvider: item.job.fallbackProvider,
+          fallbackProvider: item.job.fallbackProvider,
 
-        fallbackModel: item.job.fallbackModel,
+          fallbackModel: item.job.fallbackModel,
 
-        reviewProvider: item.job.reviewProvider,
+          reviewProvider: item.job.reviewProvider,
 
-        reviewModel: item.job.reviewModel,
+          reviewModel: item.job.reviewModel,
 
-        totalItems: 1,
+          totalItems: 1,
 
-        items: {
-          create: {
-            fieldId: item.fieldId,
+          items: {
+            create: {
+              fieldId: item.fieldId,
 
-            sourceDigest: item.sourceDigest,
+              sourceDigest: item.sourceDigest,
 
-            sourceValue: item.sourceValue,
+              sourceValue: item.sourceValue,
 
-            status: 'PENDING',
+              status: 'PENDING',
 
-            provider: item.job.provider,
+              provider: item.job.provider,
 
-            model: item.job.model,
+              model: item.job.model,
 
-            regeneratedFromItemId: item.id,
+              regeneratedFromItemId: item.id,
+            },
           },
         },
-      },
 
-      include: {
-        items: {
-          include: this.itemInclude(),
+        include: {
+          items: {
+            include: this.itemInclude(),
 
-          orderBy: {
-            createdAt: 'asc',
+            orderBy: {
+              createdAt: 'asc',
+            },
           },
         },
-      },
-    });
+      });
+    }, { maxWait: 10000, timeout: 30000 });
   }
 
   async markPublished(

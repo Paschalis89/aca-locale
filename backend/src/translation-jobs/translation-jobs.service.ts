@@ -5,8 +5,22 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
+
+import { lockTranslationScope, BLOCKING_TRANSLATION_ITEM_STATUSES } from '../translation-coordination/translation-scope-lock.js';
 
 import type { CreateTranslationJobDto } from './dto/create-translation-job.dto.js';
+
+type TranslationCandidateState = {
+  status: string;
+  field: {
+    id: string;
+    sourceValue: string;
+    sourceDigest: string;
+    sourceLocale?: string;
+    resource?: { resourceType: string; shopifyResourceId: string };
+  };
+};
 
 @Injectable()
 export class TranslationJobsService {
@@ -45,6 +59,7 @@ export class TranslationJobsService {
       );
     }
 
+    const sourceLocale: string = shop.sourceLocale;
     const targetLocale = body.targetLocale.trim();
 
     if (targetLocale === shop.sourceLocale) {
@@ -73,159 +88,151 @@ export class TranslationJobsService {
 
     const maxItems = body.maxItems ?? 100;
 
-    const states = await this.prisma.translationState.findMany({
-      where: {
-        targetLocale,
+    return this.prisma.$transaction(async (tx) => {
+      await lockTranslationScope(tx, shop.id, targetLocale);
+      const states = (await tx.translationState.findMany({
+        where: {
+          targetLocale,
 
-        OR: [
+          OR: [
+            {
+              status: 'MISSING',
+            },
+            {
+              status: 'OUTDATED',
+            },
+          ],
+
+          field: {
+            sourceLocale,
+
+            deletedAt: null,
+
+            type: {
+              not: 'URI',
+            },
+
+            resource: {
+              shopId: shop.id,
+
+              resourceType: {
+                in: resourceTypes,
+              },
+
+              deletedAt: null,
+            },
+
+
+          },
+        },
+
+        select: {
+          status: true,
+
+          field: {
+            select: {
+              id: true,
+
+              sourceLocale: true,
+
+              sourceValue: true,
+
+              sourceDigest: true,
+
+              resource: {
+                select: {
+                  resourceType: true,
+
+                  shopifyResourceId: true,
+                },
+              },
+            },
+          },
+        },
+
+        orderBy: [
           {
-            status: 'MISSING',
+            field: {
+              resource: {
+                resourceType: 'asc',
+              },
+            },
           },
           {
-            status: 'OUTDATED',
+            updatedAt: 'asc',
           },
         ],
 
-        field: {
-          sourceLocale: shop.sourceLocale,
+      })) as TranslationCandidateState[];
 
-          deletedAt: null,
-
-          type: {
-            not: 'URI',
-          },
-
-          resource: {
-            shopId: shop.id,
-
-            resourceType: {
-              in: resourceTypes,
-            },
-
-            deletedAt: null,
-          },
-
-          jobItems: {
-            none: {
-              job: {
-                shopId: shop.id,
-
-                targetLocale,
-
-                OR: [
-                  {
-                    status: 'QUEUED',
-                  },
-                  {
-                    status: 'RUNNING',
-                  },
-                ],
-              },
-            },
-          },
-        },
-      },
-
-      select: {
-        status: true,
-
-        field: {
-          select: {
-            id: true,
-
-            sourceLocale: true,
-
-            sourceValue: true,
-
-            sourceDigest: true,
-
-            resource: {
-              select: {
-                resourceType: true,
-
-                shopifyResourceId: true,
-              },
-            },
-          },
-        },
-      },
-
-      orderBy: [
-        {
-          field: {
-            resource: {
-              resourceType: 'asc',
-            },
-          },
-        },
-        {
-          updatedAt: 'asc',
-        },
-      ],
-
-      take: maxItems,
-    });
-
-    if (states.length === 0) {
-      throw new BadRequestException(
-        'No eligible MISSING or OUTDATED translation fields were found for the requested resource types.',
-      );
-    }
-
-    const provider = shop.aiConfiguration?.translationProvider ?? null;
-
-    const model = shop.aiConfiguration?.translationModel ?? null;
-
-    const fallbackProvider = shop.aiConfiguration?.fallbackProvider ?? null;
-
-    const fallbackModel =
-      fallbackProvider === 'DEEPL'
-        ? null
-        : (shop.aiConfiguration?.fallbackModel ?? null);
-
-    const reviewProvider = shop.aiConfiguration?.reviewProvider ?? null;
-
-    const reviewModel = shop.aiConfiguration?.reviewModel ?? null;
-
-    return this.prisma.translationJob.create({
-      data: {
-        shopId: shop.id,
-
-        sourceLocale: shop.sourceLocale,
-
+      const eligibleStates = await this.filterUnclaimedSnapshots(
+        tx,
+        shop.id,
         targetLocale,
+        states,
+      );
 
-        status: 'QUEUED',
+      if (eligibleStates.length === 0) {
+        throw new BadRequestException(
+          'No eligible MISSING or OUTDATED translation fields were found for the requested resource types.',
+        );
+      }
 
-        origin: 'MANUAL',
+      const provider = shop.aiConfiguration?.translationProvider ?? null;
 
-        provider,
-        model,
-        fallbackProvider,
-        fallbackModel,
-        reviewProvider,
-        reviewModel,
+      const model = shop.aiConfiguration?.translationModel ?? null;
 
-        totalItems: states.length,
+      const fallbackProvider = shop.aiConfiguration?.fallbackProvider ?? null;
 
-        items: {
-          create: states.map((state) => ({
-            fieldId: state.field.id,
+      const fallbackModel =
+        fallbackProvider === 'DEEPL'
+          ? null
+          : (shop.aiConfiguration?.fallbackModel ?? null);
 
-            sourceDigest: state.field.sourceDigest,
+      const reviewProvider = shop.aiConfiguration?.reviewProvider ?? null;
 
-            sourceValue: state.field.sourceValue,
+      const reviewModel = shop.aiConfiguration?.reviewModel ?? null;
 
-            status: 'PENDING',
+      return tx.translationJob.create({
+        data: {
+          shopId: shop.id,
 
-            provider,
-            model,
-          })),
+          sourceLocale,
+
+          targetLocale,
+
+          status: 'QUEUED',
+
+          origin: 'MANUAL',
+
+          provider,
+          model,
+          fallbackProvider,
+          fallbackModel,
+          reviewProvider,
+          reviewModel,
+
+          totalItems: Math.min(eligibleStates.length, maxItems),
+
+          items: {
+            create: eligibleStates.slice(0, maxItems).map((state) => ({
+              fieldId: state.field.id,
+
+              sourceDigest: state.field.sourceDigest,
+
+              sourceValue: state.field.sourceValue,
+
+              status: 'PENDING',
+
+              provider,
+              model,
+            })),
+          },
         },
-      },
 
-      include: this.jobInclude(),
-    });
+        include: this.jobInclude(),
+      });
+    }, { maxWait: 10000, timeout: 30000 });
   }
 
 
@@ -336,6 +343,7 @@ export class TranslationJobsService {
       };
     }
 
+    const sourceLocale: string = shop.sourceLocale;
     const resourceType = input.resourceType.trim().toUpperCase();
     const automationKey = `SHOPIFY_CHANGE:${input.changeEventId}:${targetLocale}`;
 
@@ -393,182 +401,233 @@ export class TranslationJobsService {
       );
     }
 
-    const states = await this.prisma.translationState.findMany({
-      where: {
-        targetLocale,
+    return this.prisma.$transaction(async (tx) => {
+      await lockTranslationScope(tx, shop.id, targetLocale);
 
-        status: {
-          in: ['MISSING', 'OUTDATED'],
-        },
+      // Re-check the unique automation event after acquiring the lock.
+      // Two webhook deliveries can pass the initial fast-path check.
+      const concurrentJob = await tx.translationJob.findUnique({
+        where: { automationKey },
+        select: { id: true, totalItems: true },
+      });
+      if (concurrentJob) {
+        return {
+          created: false,
+          reason: 'DUPLICATE_CHANGE_EVENT',
+          targetLocale,
+          jobId: concurrentJob.id,
+          totalItems: concurrentJob.totalItems,
+        };
+      }
 
-        field: {
-          sourceLocale: shop.sourceLocale,
-          deletedAt: null,
-
-          type: {
-            not: 'URI',
-          },
-
-          resource: {
-            shopId: shop.id,
-            resourceType,
-            shopifyResourceId: input.shopifyResourceId,
-            deletedAt: null,
-          },
-        },
-      },
-
-      select: {
-        status: true,
-
-        field: {
-          select: {
-            id: true,
-            sourceValue: true,
-            sourceDigest: true,
-          },
-        },
-      },
-
-      orderBy: {
-        updatedAt: 'asc',
-      },
-    });
-
-    if (states.length === 0) {
-      return {
-        created: false,
-        reason: 'NO_ELIGIBLE_FIELDS',
-        targetLocale,
-        jobId: null,
-        totalItems: 0,
-      };
-    }
-
-    /*
-     * A Shopify event can be delivered more than once and a different
-     * event can also arrive without changing a given translatable field.
-     * Do not create a second automatic job for the same field/sourceDigest
-     * and target locale if that exact snapshot already exists anywhere in
-     * job history (manual or automatic).
-     */
-    const existingSnapshots =
-      await this.prisma.translationJobItem.findMany({
+      const states = (await tx.translationState.findMany({
         where: {
-          job: {
-            shopId: shop.id,
-            targetLocale,
+          targetLocale,
+
+          status: {
+            in: ['MISSING', 'OUTDATED'],
           },
 
-          OR: states.map((state) => ({
-            fieldId: state.field.id,
-            sourceDigest: state.field.sourceDigest,
-          })),
+          field: {
+            sourceLocale,
+            deletedAt: null,
+
+            type: {
+              not: 'URI',
+            },
+
+            resource: {
+              shopId: shop.id,
+              resourceType,
+              shopifyResourceId: input.shopifyResourceId,
+              deletedAt: null,
+            },
+          },
         },
 
         select: {
-          fieldId: true,
-          sourceDigest: true,
+          status: true,
+
+          field: {
+            select: {
+              id: true,
+              sourceValue: true,
+              sourceDigest: true,
+            },
+          },
+        },
+
+        orderBy: {
+          updatedAt: 'asc',
+        },
+      })) as TranslationCandidateState[];
+
+      if (states.length === 0) {
+        return {
+          created: false,
+          reason: 'NO_ELIGIBLE_FIELDS',
+          targetLocale,
+          jobId: null,
+          totalItems: 0,
+        };
+      }
+
+      /*
+       * A Shopify event can be delivered more than once and a different
+       * event can also arrive without changing a given translatable field.
+       * Do not create a second automatic job for the same field/sourceDigest
+       * and target locale if that exact snapshot already exists anywhere in
+       * job history (manual or automatic).
+       */
+      const existingSnapshots =
+        await tx.translationJobItem.findMany({
+          where: {
+            job: {
+              shopId: shop.id,
+              targetLocale,
+            },
+
+            status: {
+              in: BLOCKING_TRANSLATION_ITEM_STATUSES,
+            },
+
+            OR: states.map((state) => ({
+              fieldId: state.field.id,
+              sourceDigest: state.field.sourceDigest,
+            })),
+          },
+
+          select: {
+            fieldId: true,
+            sourceDigest: true,
+          },
+        });
+
+      const existingSnapshotKeys = new Set(
+        existingSnapshots.map(
+          (item) => `${item.fieldId}:${item.sourceDigest}`,
+        ),
+      );
+
+      const eligibleStates = states.filter(
+        (state) =>
+          !existingSnapshotKeys.has(
+            `${state.field.id}:${state.field.sourceDigest}`,
+          ),
+      );
+
+      if (eligibleStates.length === 0) {
+        return {
+          created: false,
+          reason: 'SOURCE_SNAPSHOT_ALREADY_JOBBED',
+          targetLocale,
+          jobId: null,
+          totalItems: 0,
+        };
+      }
+
+      const provider = shop.aiConfiguration?.translationProvider ?? null;
+
+      /*
+       * 10D safety: do not create an automatically executable job when
+       * there is no primary translation provider snapshot. Otherwise the
+       * BullMQ worker would deterministically fail and retry the same
+       * configuration error. Manual jobs keep their existing behavior.
+       */
+      if (!provider) {
+        return {
+          created: false,
+          reason: 'TRANSLATION_PROVIDER_NOT_CONFIGURED',
+          targetLocale,
+          jobId: null,
+          totalItems: 0,
+        };
+      }
+
+      const model = shop.aiConfiguration?.translationModel ?? null;
+      const fallbackProvider =
+        shop.aiConfiguration?.fallbackProvider ?? null;
+      const fallbackModel =
+        fallbackProvider === 'DEEPL'
+          ? null
+          : (shop.aiConfiguration?.fallbackModel ?? null);
+      const reviewProvider = shop.aiConfiguration?.reviewProvider ?? null;
+      const reviewModel = shop.aiConfiguration?.reviewModel ?? null;
+
+      const job = await tx.translationJob.create({
+        data: {
+          shopId: shop.id,
+          sourceLocale,
+          targetLocale,
+          status: 'QUEUED',
+          origin: 'SHOPIFY_CHANGE',
+          automationKey,
+          changeEventId: changeEvent.id,
+          automationStage: 'TRANSLATION',
+          shopifyGatewayUrl: input.shopifyGatewayUrl ?? null,
+
+          provider,
+          model,
+          fallbackProvider,
+          fallbackModel,
+          reviewProvider,
+          reviewModel,
+
+          totalItems: eligibleStates.length,
+
+          items: {
+            create: eligibleStates.map((state) => ({
+              fieldId: state.field.id,
+              sourceDigest: state.field.sourceDigest,
+              sourceValue: state.field.sourceValue,
+              status: 'PENDING',
+              provider,
+              model,
+            })),
+          },
+        },
+
+        select: {
+          id: true,
+          totalItems: true,
         },
       });
 
-    const existingSnapshotKeys = new Set(
-      existingSnapshots.map(
-        (item) => `${item.fieldId}:${item.sourceDigest}`,
-      ),
-    );
-
-    const eligibleStates = states.filter(
-      (state) =>
-        !existingSnapshotKeys.has(
-          `${state.field.id}:${state.field.sourceDigest}`,
-        ),
-    );
-
-    if (eligibleStates.length === 0) {
       return {
-        created: false,
-        reason: 'SOURCE_SNAPSHOT_ALREADY_JOBBED',
+        created: true,
+        reason: 'CREATED',
         targetLocale,
-        jobId: null,
-        totalItems: 0,
+        jobId: job.id,
+        totalItems: job.totalItems,
       };
-    }
+    }, { maxWait: 10000, timeout: 30000 });
+  }
 
-    const provider = shop.aiConfiguration?.translationProvider ?? null;
+  private async filterUnclaimedSnapshots<
+    T extends { field: { id: string; sourceDigest: string } },
+  >(
+    tx: Prisma.TransactionClient,
+    shopId: string,
+    targetLocale: string,
+    states: T[],
+  ): Promise<T[]> {
+    if (states.length === 0) return states;
 
-    /*
-     * 10D safety: do not create an automatically executable job when
-     * there is no primary translation provider snapshot. Otherwise the
-     * BullMQ worker would deterministically fail and retry the same
-     * configuration error. Manual jobs keep their existing behavior.
-     */
-    if (!provider) {
-      return {
-        created: false,
-        reason: 'TRANSLATION_PROVIDER_NOT_CONFIGURED',
-        targetLocale,
-        jobId: null,
-        totalItems: 0,
-      };
-    }
-
-    const model = shop.aiConfiguration?.translationModel ?? null;
-    const fallbackProvider =
-      shop.aiConfiguration?.fallbackProvider ?? null;
-    const fallbackModel =
-      fallbackProvider === 'DEEPL'
-        ? null
-        : (shop.aiConfiguration?.fallbackModel ?? null);
-    const reviewProvider = shop.aiConfiguration?.reviewProvider ?? null;
-    const reviewModel = shop.aiConfiguration?.reviewModel ?? null;
-
-    const job = await this.prisma.translationJob.create({
-      data: {
-        shopId: shop.id,
-        sourceLocale: shop.sourceLocale,
-        targetLocale,
-        status: 'QUEUED',
-        origin: 'SHOPIFY_CHANGE',
-        automationKey,
-        changeEventId: changeEvent.id,
-        automationStage: 'TRANSLATION',
-        shopifyGatewayUrl: input.shopifyGatewayUrl ?? null,
-
-        provider,
-        model,
-        fallbackProvider,
-        fallbackModel,
-        reviewProvider,
-        reviewModel,
-
-        totalItems: eligibleStates.length,
-
-        items: {
-          create: eligibleStates.map((state) => ({
-            fieldId: state.field.id,
-            sourceDigest: state.field.sourceDigest,
-            sourceValue: state.field.sourceValue,
-            status: 'PENDING',
-            provider,
-            model,
-          })),
-        },
+    const existing = await tx.translationJobItem.findMany({
+      where: {
+        job: { shopId, targetLocale },
+        status: { in: BLOCKING_TRANSLATION_ITEM_STATUSES },
+        fieldId: { in: states.map((state) => state.field.id) },
       },
-
-      select: {
-        id: true,
-        totalItems: true,
-      },
+      select: { fieldId: true, sourceDigest: true },
     });
 
-    return {
-      created: true,
-      reason: 'CREATED',
-      targetLocale,
-      jobId: job.id,
-      totalItems: job.totalItems,
-    };
+    const claimed = new Set(
+      existing.map((item) => `${item.fieldId}:${item.sourceDigest}`),
+    );
+    return states.filter(
+      (state) => !claimed.has(`${state.field.id}:${state.field.sourceDigest}`),
+    );
   }
 
   async findAll(shopifyDomain: string) {
