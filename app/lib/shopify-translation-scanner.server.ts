@@ -71,20 +71,17 @@ export async function fetchTranslationPage(
     );
   }
 
-  return {
-    resources:
-      result.data
-        ?.translatableResources
-        ?.nodes ??
-      [],
+  // Do not treat an incomplete Shopify response as an empty catalog:
+  // the caller may finalize a scan and tombstone missing resources.
+  const collection = result.data?.translatableResources;
+  if (!collection || !Array.isArray(collection.nodes) || !collection.pageInfo ||
+      typeof collection.pageInfo.hasNextPage !== "boolean") {
+    throw new Error("Shopify returned an incomplete translatableResources response.");
+  }
 
-    pageInfo:
-      result.data
-        ?.translatableResources
-        ?.pageInfo ?? {
-        hasNextPage: false,
-        endCursor: null,
-      },
+  return {
+    resources: collection.nodes,
+    pageInfo: collection.pageInfo,
   };
 }
 

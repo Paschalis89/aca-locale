@@ -244,17 +244,22 @@ export async function action({
         `#graphql
           query AcaLocalePublishResource(
             $resourceId: ID!
+            $targetLocale: String!
           ) {
-            translatableResource(
-              resourceId: $resourceId
-            ) {
+            translatableResource(resourceId: $resourceId) {
               resourceId
-
               translatableContent {
                 key
                 value
                 locale
                 digest
+              }
+              translations(locale: $targetLocale) {
+                key
+                locale
+                value
+                outdated
+                market { id }
               }
             }
           }
@@ -262,12 +267,14 @@ export async function action({
         {
           variables: {
             resourceId,
+            targetLocale: job.targetLocale,
           },
         },
       );
 
     const resourceJson =
-      await resourceResponse.json();
+      (await resourceResponse.json()) as
+        Awaited<ReturnType<typeof resourceResponse.json>> & { errors?: unknown };
 
     if (
       resourceJson.errors
@@ -376,7 +383,21 @@ export async function action({
     /*
      * 3. Publish to Shopify.
      */
-    const registerResponse =
+    const alreadyExistsOnShopify = Boolean(
+      resourceJson.data?.translatableResource?.translations?.some(
+        (translation: any) =>
+          translation.key === fieldKey &&
+          translation.locale === job.targetLocale &&
+          !translation.market?.id &&
+          translation.value === item.approvedValue &&
+          translation.outdated !== true,
+      ),
+    );
+
+    let publication: any = null;
+
+    if (!alreadyExistsOnShopify) {
+      const registerResponse =
       await admin.graphql(
         `#graphql
           mutation AcaLocaleRegisterTranslation(
@@ -426,7 +447,8 @@ export async function action({
       );
 
     const registerJson =
-      await registerResponse.json();
+      (await registerResponse.json()) as
+        Awaited<ReturnType<typeof registerResponse.json>> & { errors?: unknown };
 
     if (
       registerJson.errors
@@ -451,9 +473,16 @@ export async function action({
       );
     }
 
-    const publication =
+    publication =
       registerJson.data
         ?.translationsRegister;
+
+    if (!publication || !Array.isArray(publication.translations)) {
+      return Response.json(
+        { message: "Shopify did not confirm the translation mutation result." },
+        { status: 502 },
+      );
+    }
 
     const userErrors =
       publication
@@ -476,6 +505,7 @@ export async function action({
             422,
         },
       );
+    }
     }
 
     /*
@@ -542,7 +572,7 @@ export async function action({
         true,
 
       alreadyPublished:
-        false,
+        alreadyExistsOnShopify,
 
       shopify:
         publication,
