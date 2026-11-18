@@ -5,6 +5,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
 import { authenticate } from "../shopify.server";
+import { formatUsageUsd, usageHasUnpricedCosts } from "../lib/usage-analytics";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -100,33 +101,33 @@ type TranslationJob = {
   reviewExecution?: Record<string, unknown>;
 };
 
-type UsageSummary = {
-  days?: number;
-  totals?: {
-    translation?: UsageTotals;
-    aiReview?: UsageTotals;
-    overall?: UsageTotals;
-  };
-  byProvider?: Array<{
-    stage: string;
-    provider: string;
-    model?: string | null;
-    events: number;
-    estimatedCostMicrousd?: number;
-    billedCharacters?: number;
-    inputTokens?: number;
-    outputTokens?: number;
-  }>;
-  daily?: unknown[];
-  monthly?: unknown[];
+type UsageTotals = {
+  estimatedCostMicrousd: number;
+  billedCharacters: number;
+  inputTokens: number;
+  outputTokens: number;
+  events: number;
+  successfulEvents: number;
+  failedEvents: number;
+  usageUnknownEvents: number;
+  costedEvents: number;
+  unpricedEvents: number;
 };
 
-type UsageTotals = {
-  estimatedCostMicrousd?: number;
-  billedCharacters?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  events?: number;
+type UsageProviderRow = UsageTotals & {
+  stage?: string;
+  provider: string;
+  model?: string | null;
+};
+
+type UsageSummary = {
+  period?: { days: number; from: string; to: string };
+  totals: UsageTotals;
+  byStage?: Array<UsageTotals & { stage: string }>;
+  byProvider?: UsageProviderRow[];
+  byProviderStage?: UsageProviderRow[];
+  daily?: Array<UsageTotals & { date: string }>;
+  monthly?: Array<UsageTotals & { month: string }>;
 };
 
 type ScannerResult = {
@@ -270,6 +271,11 @@ export default function Index() {
 
   const [jobSearch, setJobSearch] = useState("");
   const [jobStatusFilter, setJobStatusFilter] = useState("ALL");
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewLocale, setReviewLocale] = useState("ALL");
+  const [reviewType, setReviewType] = useState("ALL");
+  const [reviewStatus, setReviewStatus] = useState("ALL");
+  const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
 
   const [scannerLocale, setScannerLocale] = useState("it");
   const [scannerResourceType, setScannerResourceType] = useState("PRODUCT");
@@ -577,6 +583,61 @@ export default function Index() {
     [jobs],
   );
 
+  const reviewLocales = useMemo(
+    () => Array.from(new Set(reviewQueue.map(({ job }) => job.targetLocale))).sort(),
+    [reviewQueue],
+  );
+  const reviewTypes = useMemo(
+    () => Array.from(new Set(reviewQueue.map(({ item }) => item.field?.resource?.resourceType ?? "UNKNOWN"))).sort(),
+    [reviewQueue],
+  );
+  const filteredReviewQueue = useMemo(() => {
+    const query = reviewSearch.trim().toLowerCase();
+    return reviewQueue.filter(({ job, item }) => {
+      if (reviewLocale !== "ALL" && job.targetLocale !== reviewLocale) return false;
+      if (reviewType !== "ALL" && (item.field?.resource?.resourceType ?? "UNKNOWN") !== reviewType) return false;
+      if (reviewStatus !== "ALL" && item.status !== reviewStatus) return false;
+      return !query || [item.field?.key, item.sourceValue, item.translatedValue, job.id,
+        item.field?.resource?.shopifyResourceId].filter(Boolean).join(" ").toLowerCase().includes(query);
+    });
+  }, [reviewQueue, reviewSearch, reviewLocale, reviewType, reviewStatus]);
+
+  const bulkApproveSelected = async () => {
+    const targets = filteredReviewQueue.filter(({ item }) =>
+      selectedReviewIds.includes(item.id) &&
+      (item.status === "VALIDATED" || item.status === "NEEDS_REVIEW") &&
+      Boolean(item.translatedValue?.trim()),
+    );
+    if (targets.length === 0) {
+      shopify.toast.show("Select reviewable items with generated translations.", { isError: true });
+      return;
+    }
+    if (!window.confirm(`Approve ${targets.length} generated translations? This will NOT publish them to Shopify. Review each item before proceeding.`)) return;
+    setBusyAction("bulk-approve");
+    let success = 0;
+    let failures = 0;
+    try {
+      for (const { job, item } of targets) {
+        try {
+          await apiCall(`/api/backend/translation-jobs/${job.id}/items/${item.id}/approve`, {
+            method: "POST",
+            body: JSON.stringify({ note: "Batch approval from ACA Locale review queue." }),
+          }, false);
+          success += 1;
+        } catch (error) {
+          failures += 1;
+          console.error("Batch approval failed for item", item.id, error);
+        }
+      }
+      setSelectedReviewIds([]);
+      await loadJobs();
+      if (selectedJobId) await loadJobDetail(selectedJobId);
+      shopify.toast.show(`Approved ${success} items; ${failures} failed.${failures ? " Check the review queue." : ""}`, { isError: failures > 0 });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   const filteredJobs = useMemo(() => {
     const search = jobSearch.trim().toLowerCase();
 
@@ -640,15 +701,7 @@ export default function Index() {
     return new Date(value).toLocaleString();
   };
 
-  const formatUsd = (microusd?: number) => {
-    const usd = (microusd ?? 0) / 1_000_000;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4,
-    }).format(usd);
-  };
+  const formatUsd = (microusd?: number | null) => formatUsageUsd(microusd);
 
   const toneForStatus = (status?: string) => {
     switch (status) {
@@ -1586,14 +1639,49 @@ export default function Index() {
 
         {activeTab === "review" ? (
           <div className="aca-layout-review">
-            <Card title="Review Queue" subtitle="Validated items waiting for human decision or AI-assisted review.">
-              {reviewQueue.length === 0 ? (
+            <Card title="Review Queue" subtitle="Reviewable items from the latest 15 job details currently loaded. Filter and select explicitly; approvals never publish automatically.">
+              <div className="aca-review-filters">
+                <input aria-label="Search review queue" placeholder="Search field, source text or product ID"
+                  value={reviewSearch} onChange={(event) => setReviewSearch(event.target.value)} style={inputStyle} />
+                <select aria-label="Review target language" value={reviewLocale} onChange={(event) => setReviewLocale(event.target.value)} style={inputStyle}>
+                  <option value="ALL">All languages</option>
+                  {reviewLocales.map((locale) => <option key={locale} value={locale}>{locale.toUpperCase()}</option>)}
+                </select>
+                <select aria-label="Review resource type" value={reviewType} onChange={(event) => setReviewType(event.target.value)} style={inputStyle}>
+                  <option value="ALL">All resource types</option>
+                  {reviewTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+                <select aria-label="Review status" value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value)} style={inputStyle}>
+                  <option value="ALL">All statuses</option>
+                  <option value="VALIDATED">Validated</option>
+                  <option value="NEEDS_REVIEW">Needs review</option>
+                </select>
+              </div>
+              <div className="aca-actions" style={{ margin: "12px 0" }}>
+                <span className="aca-muted-small">{filteredReviewQueue.length} of {reviewQueue.length} items · {selectedReviewIds.length} selected</span>
+                <button type="button" className="aca-mini-action" disabled={busyAction !== null} onClick={() => {
+                  const visibleIds = filteredReviewQueue.filter(({ item }) => Boolean(item.translatedValue?.trim())).map(({ item }) => item.id);
+                  setSelectedReviewIds((current) => Array.from(new Set([...current, ...visibleIds])));
+                }}>Select filtered</button>
+                <button type="button" className="aca-mini-action" onClick={() => setSelectedReviewIds([])}>Clear selection</button>
+                <button type="button" className="aca-mini-action" disabled={busyAction !== null || selectedReviewIds.length === 0}
+                  onClick={() => void bulkApproveSelected()}>
+                  {busyAction === "bulk-approve" ? "Approving…" : "Approve selected (no publish)"}
+                </button>
+              </div>
+              {filteredReviewQueue.length === 0 ? (
                 <EmptyState title="Review queue is empty" text="Validated and NEEDS_REVIEW items will appear here." />
               ) : (
                 <div className="aca-review-list">
-                  {reviewQueue.map(({ job, item }) => (
+                  {filteredReviewQueue.map(({ job, item }) => (
+                    <div key={item.id} className="aca-review-choice">
+                      <input type="checkbox" aria-label={`Select ${item.field?.key ?? item.id}`}
+                        checked={selectedReviewIds.includes(item.id)}
+                        disabled={!item.translatedValue?.trim() || busyAction !== null}
+                        onChange={(event) => setSelectedReviewIds((current) => event.target.checked
+                          ? [...current.filter((id) => id !== item.id), item.id]
+                          : current.filter((id) => id !== item.id))} />
                     <button
-                      key={item.id}
                       type="button"
                       className={`aca-review-row ${item.id === selectedItemId ? "aca-review-row-active" : ""}`}
                       onClick={() => {
@@ -1615,6 +1703,7 @@ export default function Index() {
                         </div>
                       </div>
                     </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -2144,49 +2233,67 @@ export default function Index() {
             ) : usageSummary ? (
               <>
                 <div className="aca-stat-grid-4">
-                  <MiniStat label="Total cost" value={formatUsd(usageSummary.totals?.overall?.estimatedCostMicrousd)} />
-                  <MiniStat label="DeepL characters" value={String(usageSummary.totals?.translation?.billedCharacters ?? 0)} />
-                  <MiniStat label="LLM input tokens" value={String(usageSummary.totals?.overall?.inputTokens ?? 0)} />
-                  <MiniStat label="LLM output tokens" value={String(usageSummary.totals?.overall?.outputTokens ?? 0)} />
+                  <MiniStat label="Estimated cost (30 days)" value={formatUsd(usageSummary.totals?.estimatedCostMicrousd)} />
+                  <MiniStat label="Billed characters" value={(usageSummary.totals?.billedCharacters ?? 0).toLocaleString()} />
+                  <MiniStat label="LLM input tokens" value={(usageSummary.totals?.inputTokens ?? 0).toLocaleString()} />
+                  <MiniStat label="LLM output tokens" value={(usageSummary.totals?.outputTokens ?? 0).toLocaleString()} />
                 </div>
-
-                <div className="aca-item-table-wrap" style={{ marginTop: 20 }}>
+                <div className="aca-stat-grid-4" style={{ marginTop: 10 }}>
+                  <MiniStat label="Provider calls" value={String(usageSummary.totals?.events ?? 0)} />
+                  <MiniStat label="Successful" value={String(usageSummary.totals?.successfulEvents ?? 0)} />
+                  <MiniStat label="Failed" value={String(usageSummary.totals?.failedEvents ?? 0)} />
+                  <MiniStat label="Unpriced calls" value={String(usageSummary.totals?.unpricedEvents ?? 0)} />
+                </div>
+                <h3 style={{ marginTop: 24, color: ACA.blue }}>Usage by stage</h3>
+                <div className="aca-item-table-wrap">
                   <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th style={tableHeadCellStyle}>Stage</th>
-                        <th style={tableHeadCellStyle}>Provider</th>
-                        <th style={tableHeadCellStyle}>Model</th>
-                        <th style={tableHeadCellStyle}>Events</th>
-                        <th style={tableHeadCellStyle}>Characters</th>
-                        <th style={tableHeadCellStyle}>Input tokens</th>
-                        <th style={tableHeadCellStyle}>Output tokens</th>
-                        <th style={tableHeadCellStyle}>Estimated cost</th>
+                    <thead><tr>
+                      <th style={tableHeadCellStyle}>Stage</th><th style={tableHeadCellStyle}>Events</th>
+                      <th style={tableHeadCellStyle}>Characters</th><th style={tableHeadCellStyle}>Input tokens</th>
+                      <th style={tableHeadCellStyle}>Output tokens</th><th style={tableHeadCellStyle}>Estimated cost</th>
+                    </tr></thead>
+                    <tbody>{(usageSummary.byStage ?? []).map((row) => (
+                      <tr key={row.stage}>
+                        <td style={tableBodyCellStyle}>{row.stage}</td>
+                        <td style={tableBodyCellStyle}>{row.events}</td>
+                        <td style={tableBodyCellStyle}>{row.billedCharacters.toLocaleString()}</td>
+                        <td style={tableBodyCellStyle}>{row.inputTokens.toLocaleString()}</td>
+                        <td style={tableBodyCellStyle}>{row.outputTokens.toLocaleString()}</td>
+                        <td style={tableBodyCellStyle}>{formatUsd(row.estimatedCostMicrousd)}{row.unpricedEvents > 0 ? ` · ${row.unpricedEvents} unpriced` : ""}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {(usageSummary.byProvider ?? []).map((row) => (
-                        <tr key={`${row.stage}-${row.provider}-${row.model ?? "none"}`}>
-                          <td style={tableBodyCellStyle}>{row.stage}</td>
-                          <td style={tableBodyCellStyle}>{row.provider}</td>
-                          <td style={tableBodyCellStyle}>{row.model ?? "—"}</td>
-                          <td style={tableBodyCellStyle}>{row.events}</td>
-                          <td style={tableBodyCellStyle}>{row.billedCharacters ?? 0}</td>
-                          <td style={tableBodyCellStyle}>{row.inputTokens ?? 0}</td>
-                          <td style={tableBodyCellStyle}>{row.outputTokens ?? 0}</td>
-                          <td style={tableBodyCellStyle}>{formatUsd(row.estimatedCostMicrousd)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                    ))}</tbody>
                   </table>
                 </div>
-
-                <InfoCallout tone="orange" style={{ marginTop: 18 }}>
-                  Estimated cost is based on the pricing configuration currently stored for ACA Locale. Replace test pricing before production billing decisions.
+                <h3 style={{ marginTop: 24, color: ACA.blue }}>Usage by provider and model</h3>
+                <div className="aca-item-table-wrap">
+                  <table style={tableStyle}>
+                    <thead><tr>
+                      <th style={tableHeadCellStyle}>Provider</th><th style={tableHeadCellStyle}>Model</th>
+                      <th style={tableHeadCellStyle}>Events</th><th style={tableHeadCellStyle}>Characters</th>
+                      <th style={tableHeadCellStyle}>Input tokens</th><th style={tableHeadCellStyle}>Output tokens</th>
+                      <th style={tableHeadCellStyle}>Estimated cost</th>
+                    </tr></thead>
+                    <tbody>{(usageSummary.byProvider ?? []).map((row) => (
+                      <tr key={`${row.provider}-${row.model ?? "none"}`}>
+                        <td style={tableBodyCellStyle}>{row.provider}</td>
+                        <td style={tableBodyCellStyle}>{row.model ?? "—"}</td>
+                        <td style={tableBodyCellStyle}>{row.events}</td>
+                        <td style={tableBodyCellStyle}>{row.billedCharacters.toLocaleString()}</td>
+                        <td style={tableBodyCellStyle}>{row.inputTokens.toLocaleString()}</td>
+                        <td style={tableBodyCellStyle}>{row.outputTokens.toLocaleString()}</td>
+                        <td style={tableBodyCellStyle}>{formatUsd(row.estimatedCostMicrousd)}{row.unpricedEvents > 0 ? " · incomplete" : ""}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+                <InfoCallout tone={usageHasUnpricedCosts(usageSummary.totals) ? "orange" : "blue"} style={{ marginTop: 18 }}>
+                  {usageHasUnpricedCosts(usageSummary.totals)
+                    ? `${usageSummary.totals.unpricedEvents} usage events have no configured price. The displayed total is incomplete; configure ACA_LOCALE_USAGE_PRICING_JSON on the backend before using it for billing.`
+                    : "Costs are estimates based on the pricing version saved with each usage event, not provider invoices. Tiny amounts use up to six decimals."}
                 </InfoCallout>
               </>
             ) : (
-              <EmptyState title="No usage data" text="Usage events will appear after translations or AI reviews are executed." />
+              <EmptyState title="No usage data" text="Usage events appear after translations or AI reviews are executed." />
             )}
           </Card>
         ) : null}
@@ -2312,6 +2419,19 @@ export default function Index() {
                 <InfoCallout tone="blue">
                   Configuration changes affect only new jobs. Existing jobs keep their snapshotted provider and model history.
                 </InfoCallout>
+              </div>
+              <div style={{ marginTop: 18 }}>
+                <h3 style={{ color: ACA.blue }}>AI usage & pricing status</h3>
+                <div className="aca-stat-grid-3">
+                  <MiniStat label="Recorded calls (30d)" value={String(usageSummary?.totals?.events ?? 0)} />
+                  <MiniStat label="Unpriced calls" value={String(usageSummary?.totals?.unpricedEvents ?? 0)} />
+                  <MiniStat label="Estimated spend" value={formatUsd(usageSummary?.totals?.estimatedCostMicrousd)} />
+                </div>
+                <p style={{ ...mutedTextStyle, marginTop: 10 }}>
+                  Provider credentials and usage prices are managed in backend environment settings.
+                  Pricing is not editable here. An unpriced event must not be reported as free usage.
+                </p>
+                <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}>Inspect usage by provider</button>
               </div>
             </Card>
           </div>
@@ -2439,11 +2559,18 @@ function OverviewTab({
           ) : usageError ? (
             <p style={{ ...mutedTextStyle, color: ACA.danger }}>{usageError}</p>
           ) : usageSummary ? (
+            <>
             <div className="aca-stat-grid-3">
-              <MiniStat label="Estimated cost" value={formatUsd(usageSummary.totals?.overall?.estimatedCostMicrousd)} />
-              <MiniStat label="Characters" value={String(usageSummary.totals?.overall?.billedCharacters ?? 0)} />
-              <MiniStat label="LLM tokens" value={String((usageSummary.totals?.overall?.inputTokens ?? 0) + (usageSummary.totals?.overall?.outputTokens ?? 0))} />
+              <MiniStat label="Estimated cost" value={formatUsd(usageSummary.totals?.estimatedCostMicrousd)} />
+              <MiniStat label="Characters" value={String(usageSummary.totals?.billedCharacters ?? 0)} />
+              <MiniStat label="LLM tokens" value={String((usageSummary.totals?.inputTokens ?? 0) + (usageSummary.totals?.outputTokens ?? 0))} />
             </div>
+            {usageHasUnpricedCosts(usageSummary.totals) ? (
+              <p className="aca-muted-small" style={{ marginTop: 10, color: ACA.warning }}>
+                Cost estimate is incomplete: {usageSummary.totals.unpricedEvents} unpriced events. Open Usage for details.
+              </p>
+            ) : null}
+            </>
           ) : (
             <EmptyState title="No usage data" text="Usage appears after translation or AI review calls." />
           )}
@@ -3003,6 +3130,14 @@ const responsiveCss = `
   }
 
   .aca-main { width: 100%; }
+  .aca-review-filters { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 8px; }
+  .aca-review-choice { display: flex; align-items: center; gap: 9px; }
+  .aca-review-choice > input { width: 17px; height: 17px; flex: none; accent-color: ${ACA.blue}; }
+  .aca-review-choice > button { flex: 1; min-width: 0; }
+  .aca-mini-action { border: 1px solid ${ACA.line}; border-radius: 8px; background: white; padding: 7px 10px; font: inherit; font-size: 11px; cursor: pointer; }
+  .aca-mini-action:disabled { opacity: 0.5; cursor: not-allowed; }
+  @media (max-width: 900px) { .aca-review-filters { grid-template-columns: 1fr 1fr; } }
+
   .aca-column-stack { display: grid; gap: 18px; align-content: start; }
   .aca-layout-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
   .aca-layout-jobs { display: grid; grid-template-columns: minmax(390px, 0.92fr) minmax(560px, 1.45fr); gap: 18px; }
