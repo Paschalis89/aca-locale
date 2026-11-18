@@ -1,14 +1,13 @@
 # ACA Locale - production configuration
 # Replace client_id with the production app Client ID before the first deploy.
 
-client_id = "REPLACE_WITH_PRODUCTION_CLIENT_ID"
+client_id = "376a10873bb211f460792cd37239d562"
 name = "ACA Locale"
 application_url = "https://locale.amalficoastartistry.com"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = false
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-10"

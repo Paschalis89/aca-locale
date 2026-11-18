@@ -64,6 +64,7 @@ services:
       start_period: 30s
     labels:
       - traefik.enable=true
+      - traefik.docker.network=aca-locale-edge
       - traefik.http.routers.aca-locale.rule=Host(`${APP_DOMAIN}`)
       - traefik.http.routers.aca-locale.entrypoints=websecure
       - traefik.http.routers.aca-locale.tls=true

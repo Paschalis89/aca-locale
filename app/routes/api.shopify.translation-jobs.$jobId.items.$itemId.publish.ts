@@ -204,6 +204,36 @@ export async function action({
     }
 
     /*
+     * Verify publication eligibility in NestJS
+     * before making any Shopify write.
+     */
+    const preparationResponse = await fetch(
+      `${backendUrl}/api/v1/translations/jobs/${encodeURIComponent(
+        jobId,
+      )}/items/${encodeURIComponent(
+        itemId,
+      )}/publication/prepare`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authorization,
+        },
+      },
+    );
+
+    if (!preparationResponse.ok) {
+      return new Response(
+        await preparationResponse.text(),
+        {
+          status: preparationResponse.status,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
+    /*
      * 2. Read the CURRENT source digest
      * directly from Shopify.
      *
@@ -458,7 +488,7 @@ export async function action({
           jobId,
         )}/items/${encodeURIComponent(
           itemId,
-        )}/published`,
+        )}/publication/confirm`,
         {
           method:
             "POST",
