@@ -39,14 +39,22 @@ function baseItem(status = 'VALIDATED') {
 }
 
 function createPrisma() {
+  const translationJobItem = {
+    findFirst: vi.fn(),
+    update: vi.fn(),
+  };
+  const translationJob = { create: vi.fn() };
+  const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([{ locked: 1 }]),
+    translationJobItem,
+    translationJob,
+  };
+
   return {
-    translationJobItem: {
-      findFirst: vi.fn(),
-      update: vi.fn(),
-    },
-    translationJob: {
-      create: vi.fn(),
-    },
+    translationJobItem,
+    translationJob,
+    $transaction: vi.fn(async (callback: any) => callback(tx)),
+    __tx: tx,
   } as any;
 }
 
