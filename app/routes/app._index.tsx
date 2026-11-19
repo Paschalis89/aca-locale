@@ -6,6 +6,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 
 import { authenticate } from "../shopify.server";
 import { formatUsageUsd, usageHasUnpricedCosts } from "../lib/usage-analytics";
+import { pricingRowsFromRules, rulesFromPricingRows, type PricingEditorRow } from "../lib/usage-pricing-editor";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -309,6 +310,9 @@ export default function Index() {
   const [pricingVersion, setPricingVersion] = useState(0);
   const [pricingSource, setPricingSource] = useState("ENVIRONMENT");
   const [pricingRulesText, setPricingRulesText] = useState("{}");
+  const [pricingRows, setPricingRows] = useState<PricingEditorRow[]>([]);
+  const [pricingAdvanced, setPricingAdvanced] = useState(false);
+  const [pricingDirty, setPricingDirty] = useState(false);
   const [pricingHistory, setPricingHistory] = useState<Array<{version: number; createdAt: string}>>([]);
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -468,6 +472,8 @@ export default function Index() {
       setPricingVersion(data.version ?? 0);
       setPricingSource(data.source ?? "ENVIRONMENT");
       setPricingRulesText(JSON.stringify(data.rules ?? {}, null, 2));
+      setPricingRows(pricingRowsFromRules(data.rules ?? {}));
+      setPricingDirty(false);
       setPricingHistory(data.history ?? []);
       setPricingError(null);
     } catch (error) {
@@ -478,9 +484,12 @@ export default function Index() {
   const savePricing = async () => {
     let rules: unknown;
     try {
-      rules = JSON.parse(pricingRulesText);
-    } catch {
-      shopify.toast.show("Pricing rules must contain valid JSON.", { isError: true });
+      rules = pricingAdvanced ? JSON.parse(pricingRulesText) : rulesFromPricingRows(pricingRows);
+      if (typeof rules !== "object" || rules === null || Array.isArray(rules)) throw new Error("Pricing rules must be an object.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid pricing rules.";
+      setPricingError(message);
+      shopify.toast.show(message, { isError: true });
       return;
     }
     if (!window.confirm("Save new version of estimated USD-per-million rates for FUTURE events only? Historical costs stay unchanged.")) return;
@@ -490,6 +499,26 @@ export default function Index() {
       });
       await loadPricing();
     }, "Usage pricing updated for future events.");
+  };
+
+  const editPricingRow = (index: number, patch: Partial<PricingEditorRow>) => {
+    setPricingRows((current) => current.map((row, i) => i === index ? { ...row, ...patch } : row));
+    setPricingDirty(true);
+    setPricingError(null);
+  };
+
+  const switchPricingEditor = () => {
+    try {
+      if (pricingAdvanced) {
+        setPricingRows(pricingRowsFromRules(JSON.parse(pricingRulesText)));
+      } else {
+        setPricingRulesText(JSON.stringify(rulesFromPricingRows(pricingRows), null, 2));
+      }
+      setPricingAdvanced((current) => !current);
+      setPricingError(null);
+    } catch (error) {
+      setPricingError(error instanceof Error ? error.message : "Invalid pricing configuration.");
+    }
   };
 
   const loadUsage = async () => {
@@ -2375,19 +2404,50 @@ export default function Index() {
           <div className="aca-layout-two">
             <Card title="Usage Pricing (USD)" subtitle="Versioned rates per 1,000,000 billable units; applies only to future provider events.">
               <div className="aca-column-stack">
-                <p className="aca-muted-small">Source: {pricingSource} · Version {pricingVersion}. No prices are imported automatically. Confirm current rates in your provider contracts.</p>
-                <Field label="Pricing JSON: PROVIDER:model or PROVIDER:*">
-                  <textarea aria-label="Versioned usage pricing JSON" value={pricingRulesText}
-                    onChange={(event) => setPricingRulesText(event.target.value)}
-                    rows={11} spellCheck={false} style={{ ...inputStyle, fontFamily: "monospace", width: "100%" }} />
-                </Field>
-                <p className="aca-muted-small">Example: {`{"DEEPL:*":{"charactersPerMillionUsd":25},"OPENAI:your-model":{"inputPerMillionUsd":1,"outputPerMillionUsd":4}}`} (example rates only, NOT provider prices).</p>
+                <p className="aca-muted-small">Source: {pricingSource} · Version {pricingVersion}. Enter the contractual USD rates for your own providers. No prices are imported automatically.</p>
+                <div className="aca-actions">
+                  <button type="button" className="aca-mini-action" onClick={switchPricingEditor}>
+                    {pricingAdvanced ? "Use guided editor" : "Advanced: edit JSON"}
+                  </button>
+                  {!pricingAdvanced ? <button type="button" className="aca-mini-action" onClick={() => { setPricingRows((current) => [...current, { provider: "DEEPL", model: "*", charactersPerMillionUsd: "", inputPerMillionUsd: "", outputPerMillionUsd: "" }]); setPricingDirty(true); }}>+ Add provider / model</button> : null}
+                </div>
+                {pricingAdvanced ? (
+                  <Field label="Pricing JSON: PROVIDER:model or PROVIDER:*">
+                    <textarea aria-label="Versioned usage pricing JSON" value={pricingRulesText}
+                      onChange={(event) => { setPricingRulesText(event.target.value); setPricingDirty(true); }}
+                      rows={11} spellCheck={false} style={{ ...inputStyle, fontFamily: "monospace", width: "100%" }} />
+                  </Field>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="aca-pricing-table">
+                      <thead><tr><th>Provider</th><th>Model (* = all)</th><th>Characters / 1M</th><th>Input tokens / 1M</th><th>Output tokens / 1M</th><th>Action</th></tr></thead>
+                      <tbody>
+                        {pricingRows.map((row, index) => (
+                          <tr key={index}>
+                            <td><select aria-label={`Pricing provider ${index + 1}`} value={row.provider} onChange={(event) => editPricingRow(index, { provider: event.target.value })} style={inputStyle}>
+                              {Array.from(new Set(["DEEPL", "OPENAI", "ANTHROPIC", "GOOGLE", "MISTRAL", row.provider])).map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+                            </select></td>
+                            <td><input aria-label={`Pricing model ${index + 1}`} value={row.model} onChange={(event) => editPricingRow(index, { model: event.target.value })} style={inputStyle} placeholder="* or exact model" /></td>
+                            {(["charactersPerMillionUsd", "inputPerMillionUsd", "outputPerMillionUsd"] as const).map((key) => (
+                              <td key={key}><input aria-label={`${key} row ${index + 1}`} type="number" min="0" max="100000" step="any" value={row[key]}
+                                onChange={(event) => editPricingRow(index, { [key]: event.target.value })} style={{ ...inputStyle, minWidth: 100 }} placeholder="—" /></td>
+                            ))}
+                            <td><button type="button" className="aca-mini-action" aria-label={`Remove pricing row ${index + 1}`} onClick={() => { setPricingRows((current) => current.filter((_, i) => i !== index)); setPricingDirty(true); }}>Remove</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!pricingRows.length ? <p className="aca-muted-small">No rates configured. Add a provider and model to start. Empty rate fields are not charged at zero.</p> : null}
+                  </div>
+                )}
+                <p className="aca-muted-small">Use * only when the same price applies to all models of a provider. Blank fields mean that rate is not configured. A numerical 0 is an explicit zero-dollar rate.</p>
                 {pricingError ? <p role="alert" style={{ color: ACA.danger }}>{pricingError}</p> : null}
                 <div className="aca-actions">
                   <ActionButton label="Save new pricing version" actionKey="save-usage-pricing" busyAction={busyAction} onClick={() => void savePricing()} />
                   <button className="aca-mini-action" type="button" onClick={() => void loadPricing()}>Discard edits / Refresh</button>
+                  {pricingDirty ? <span className="aca-muted-small">Unsaved changes</span> : null}
                 </div>
-                <p className="aca-muted-small">Historical cost snapshots remain unchanged. Last versions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
+                <p className="aca-muted-small">Historical cost snapshots remain unchanged. Recent revisions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
               </div>
             </Card>
             <Card
@@ -2518,8 +2578,7 @@ export default function Index() {
                   <MiniStat label="Estimated spend" value={formatUsd(usageSummary?.totals?.estimatedCostMicrousd)} />
                 </div>
                 <p style={{ ...mutedTextStyle, marginTop: 10 }}>
-                  Provider credentials and usage prices are managed in backend environment settings.
-                  Pricing is not editable here. An unpriced event must not be reported as free usage.
+                  Provider credentials are managed securely on the backend. Edit versioned usage prices in Settings → Usage Pricing. Historical unpriced events remain unchanged.
                 </p>
                 <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}>Inspect usage by provider</button>
               </div>
@@ -3224,6 +3283,10 @@ const responsiveCss = `
   .aca-review-choice { display: flex; align-items: center; gap: 9px; }
   .aca-review-choice > input { width: 17px; height: 17px; flex: none; accent-color: ${ACA.blue}; }
   .aca-review-choice > button { flex: 1; min-width: 0; }
+  .aca-pricing-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .aca-pricing-table th, .aca-pricing-table td { padding: 7px 6px; border-bottom: 1px solid ${ACA.line}; text-align: left; vertical-align: middle; }
+  .aca-pricing-table th { white-space: nowrap; }
+  .aca-pricing-table input { width: 100%; box-sizing: border-box; }
   .aca-mini-action { border: 1px solid ${ACA.line}; border-radius: 8px; background: white; padding: 7px 10px; font: inherit; font-size: 11px; cursor: pointer; }
   .aca-mini-action:disabled { opacity: 0.5; cursor: not-allowed; }
   @media (max-width: 900px) { .aca-review-filters { grid-template-columns: 1fr 1fr; } }
