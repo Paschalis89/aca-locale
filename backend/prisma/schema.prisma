@@ -115,6 +115,8 @@ model Shop {
   translationResources    TranslationResource[]
   translationJobs         TranslationJob[]
   translationUsageEvents  TranslationUsageEvent[]
+  usagePricingProfile      UsagePricingProfile?
+  usagePricingRevisions    UsagePricingRevision[]
   translationChangeEvents TranslationChangeEvent[]
   glossaries              Glossary[]
 
@@ -584,4 +586,24 @@ model GlossaryEntry {
   @@index([glossaryId, enabled])
   @@index([targetLocale, ruleType])
   @@index([sourceTerm])
+}
+
+// Per-shop, versioned pricing. No provider prices are hardcoded.
+model UsagePricingProfile {
+  shopId String @id
+  rules Json
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+model UsagePricingRevision {
+  id String @id @default(cuid())
+  shopId String
+  version Int
+  rules Json
+  createdAt DateTime @default(now())
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  @@unique([shopId, version])
+  @@index([shopId, createdAt])
 }

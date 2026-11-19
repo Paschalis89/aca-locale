@@ -13,6 +13,8 @@ import { ShopifyAuthGuard } from '../shopify-auth/shopify-auth.guard.js';
 
 import type { ShopifyAuthContext } from '../shopify-auth/shopify-auth.types.js';
 
+import { UsagePricingService } from './usage-pricing.service.js';
+
 import { AiRegistryService } from './ai-registry.service.js';
 
 import { AiConfigurationService } from './ai-configuration.service.js';
@@ -40,6 +42,7 @@ export class AiController {
     private readonly aiConfigurationService: AiConfigurationService,
 
     private readonly aiModelCatalogService: AiModelCatalogService,
+    private readonly usagePricing: UsagePricingService,
   ) {}
 
   @Get('providers')
@@ -79,6 +82,18 @@ export class AiController {
   })
   getModels() {
     return this.aiModelCatalogService.getCatalog();
+  }
+
+  @Get('usage-pricing')
+  @ApiOperation({ summary: 'Get shop pricing and recent version history' })
+  getUsagePricing(@CurrentShop() shop: ShopifyAuthContext) {
+    return this.usagePricing.get(shop.shopDomain);
+  }
+
+  @Patch('usage-pricing')
+  @ApiOperation({ summary: 'Save versioned, per-shop estimated provider prices' })
+  setUsagePricing(@CurrentShop() shop: ShopifyAuthContext, @Body() body: { rules?: unknown; expectedVersion?: unknown }) {
+    return this.usagePricing.update(shop.shopDomain, body);
   }
 
   @Get('configuration')

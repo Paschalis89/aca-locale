@@ -834,6 +834,19 @@ export class TranslationExecutorService {
     errorMessage?: string | null;
   }) {
     try {
+      // Pricing lookup is best-effort: a temporarily unavailable pricing
+      // profile must not prevent recording the provider usage event.
+      let pricingProfile: { rules: unknown; version: number } | null = null;
+      try {
+        pricingProfile = await this.prisma.usagePricingProfile.findUnique({
+          where: { shopId: input.shopId }, select: { rules: true, version: true },
+        });
+      } catch (pricingError) {
+        console.error('[ACA Locale] Unable to load usage pricing profile:', pricingError);
+      }
+      const pricing = pricingProfile
+        ? { rules: pricingProfile.rules as Record<string, import('../translation-usage/translation-usage-cost.js').UsagePricingRule>, version: String(pricingProfile.version) }
+        : undefined;
       const cost = input.usageKnown
         ? estimateUsageCost({
             provider: input.provider,
@@ -845,14 +858,14 @@ export class TranslationExecutorService {
             inputTokens: input.inputTokens,
 
             outputTokens: input.outputTokens,
-          })
+          }, pricing)
         : {
             estimatedCostMicrousd: null,
 
             pricingKey: null,
 
             pricingVersion:
-              process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
+              pricing?.version ?? process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
           };
 
       await this.prisma.translationUsageEvent.create({

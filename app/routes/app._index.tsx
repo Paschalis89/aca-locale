@@ -276,6 +276,12 @@ export default function Index() {
   const [reviewType, setReviewType] = useState("ALL");
   const [reviewStatus, setReviewStatus] = useState("ALL");
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
+  const [reviewPageNumber, setReviewPageNumber] = useState(1);
+  const [reviewPageData, setReviewPageData] = useState<{ items: Array<JobItem & { job: TranslationJob }>; total: number; pages: number; page: number } | null>(null);
+  const [reviewPageLoading, setReviewPageLoading] = useState(false);
+  const [reviewPageError, setReviewPageError] = useState<string | null>(null);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+
 
   const [scannerLocale, setScannerLocale] = useState("it");
   const [scannerResourceType, setScannerResourceType] = useState("PRODUCT");
@@ -300,6 +306,11 @@ export default function Index() {
     fallbackModel: "gpt-6-luna",
   });
 
+  const [pricingVersion, setPricingVersion] = useState(0);
+  const [pricingSource, setPricingSource] = useState("ENVIRONMENT");
+  const [pricingRulesText, setPricingRulesText] = useState("{}");
+  const [pricingHistory, setPricingHistory] = useState<Array<{version: number; createdAt: string}>>([]);
+  const [pricingError, setPricingError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
@@ -451,6 +462,36 @@ export default function Index() {
     }
   };
 
+  const loadPricing = async () => {
+    try {
+      const data = await apiCall("/api/backend/usage-pricing", {}, false);
+      setPricingVersion(data.version ?? 0);
+      setPricingSource(data.source ?? "ENVIRONMENT");
+      setPricingRulesText(JSON.stringify(data.rules ?? {}, null, 2));
+      setPricingHistory(data.history ?? []);
+      setPricingError(null);
+    } catch (error) {
+      setPricingError(error instanceof Error ? error.message : "Unable to load pricing.");
+    }
+  };
+
+  const savePricing = async () => {
+    let rules: unknown;
+    try {
+      rules = JSON.parse(pricingRulesText);
+    } catch {
+      shopify.toast.show("Pricing rules must contain valid JSON.", { isError: true });
+      return;
+    }
+    if (!window.confirm("Save new version of estimated USD-per-million rates for FUTURE events only? Historical costs stay unchanged.")) return;
+    await runAction("save-usage-pricing", async () => {
+      await apiCall("/api/backend/usage-pricing", {
+        method: "PATCH", body: JSON.stringify({ rules, expectedVersion: pricingVersion }),
+      });
+      await loadPricing();
+    }, "Usage pricing updated for future events.");
+  };
+
   const loadUsage = async () => {
     setLoadingUsage(true);
     setUsageError(null);
@@ -481,11 +522,38 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
+    if (activeTab === "settings") void loadPricing();
     if (activeTab === "glossary" && !glossary && !loadingGlossary) {
       void loadGlossary();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  // The dedicated review API searches every job, not just the 15 details
+  // initially loaded for the Jobs screen. Each response is tenant-scoped.
+  useEffect(() => {
+    if (activeTab !== "review") return;
+    let cancelled = false;
+    setReviewPageLoading(true);
+    setReviewPageError(null);
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ page: String(reviewPageNumber), limit: "30" });
+        if (reviewSearch.trim()) params.set("search", reviewSearch.trim());
+        if (reviewLocale !== "ALL") params.set("locale", reviewLocale);
+        if (reviewType !== "ALL") params.set("resourceType", reviewType);
+        if (reviewStatus !== "ALL") params.set("status", reviewStatus);
+        const data = await apiCall(`/api/backend/translation-review-queue?${params.toString()}`, {}, false);
+        if (!cancelled) setReviewPageData(data);
+      } catch (error) {
+        if (!cancelled) setReviewPageError(error instanceof Error ? error.message : "Unable to load review queue.");
+      } finally {
+        if (!cancelled) setReviewPageLoading(false);
+      }
+    }, reviewSearch ? 300 : 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, reviewPageNumber, reviewSearch, reviewLocale, reviewType, reviewStatus, reviewRefreshKey]);
 
   const activeJobKey = jobs
     .filter((job) => job.status === "QUEUED" || job.status === "RUNNING")
@@ -591,16 +659,10 @@ export default function Index() {
     () => Array.from(new Set(reviewQueue.map(({ item }) => item.field?.resource?.resourceType ?? "UNKNOWN"))).sort(),
     [reviewQueue],
   );
-  const filteredReviewQueue = useMemo(() => {
-    const query = reviewSearch.trim().toLowerCase();
-    return reviewQueue.filter(({ job, item }) => {
-      if (reviewLocale !== "ALL" && job.targetLocale !== reviewLocale) return false;
-      if (reviewType !== "ALL" && (item.field?.resource?.resourceType ?? "UNKNOWN") !== reviewType) return false;
-      if (reviewStatus !== "ALL" && item.status !== reviewStatus) return false;
-      return !query || [item.field?.key, item.sourceValue, item.translatedValue, job.id,
-        item.field?.resource?.shopifyResourceId].filter(Boolean).join(" ").toLowerCase().includes(query);
-    });
-  }, [reviewQueue, reviewSearch, reviewLocale, reviewType, reviewStatus]);
+  const filteredReviewQueue = useMemo(() =>
+    (reviewPageData?.items ?? []).map((item) => ({ job: item.job, item })),
+    [reviewPageData],
+  );
 
   const bulkApproveSelected = async () => {
     const targets = filteredReviewQueue.filter(({ item }) =>
@@ -631,6 +693,7 @@ export default function Index() {
       }
       setSelectedReviewIds([]);
       await loadJobs();
+      setReviewRefreshKey((current) => current + 1);
       if (selectedJobId) await loadJobDetail(selectedJobId);
       shopify.toast.show(`Approved ${success} items; ${failures} failed.${failures ? " Check the review queue." : ""}`, { isError: failures > 0 });
     } finally {
@@ -1301,8 +1364,8 @@ export default function Index() {
           >
             <span className="aca-tab-label">{tab.label}</span>
             <span className="aca-tab-short">{tab.short}</span>
-            {tab.id === "review" && reviewQueue.length > 0 ? (
-              <span className="aca-tab-count">{reviewQueue.length}</span>
+            {tab.id === "review" && (reviewPageData?.total ?? reviewQueue.length) > 0 ? (
+              <span className="aca-tab-count">{reviewPageData?.total ?? reviewQueue.length}</span>
             ) : null}
           </button>
         ))}
@@ -1639,26 +1702,26 @@ export default function Index() {
 
         {activeTab === "review" ? (
           <div className="aca-layout-review">
-            <Card title="Review Queue" subtitle="Reviewable items from the latest 15 job details currently loaded. Filter and select explicitly; approvals never publish automatically.">
+            <Card title="Review Queue" subtitle="Server-side review queue across all jobs. Filters apply to the entire shop; approvals never publish automatically.">
               <div className="aca-review-filters">
                 <input aria-label="Search review queue" placeholder="Search field, source text or product ID"
-                  value={reviewSearch} onChange={(event) => setReviewSearch(event.target.value)} style={inputStyle} />
-                <select aria-label="Review target language" value={reviewLocale} onChange={(event) => setReviewLocale(event.target.value)} style={inputStyle}>
+                  value={reviewSearch} onChange={(event) => { setReviewSearch(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle} />
+                <select aria-label="Review target language" value={reviewLocale} onChange={(event) => { setReviewLocale(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
                   <option value="ALL">All languages</option>
-                  {reviewLocales.map((locale) => <option key={locale} value={locale}>{locale.toUpperCase()}</option>)}
+                  {Array.from(new Set([...reviewLocales, ...jobs.map((job) => job.targetLocale)])).sort().map((locale) => <option key={locale} value={locale}>{locale.toUpperCase()}</option>)}
                 </select>
-                <select aria-label="Review resource type" value={reviewType} onChange={(event) => setReviewType(event.target.value)} style={inputStyle}>
+                <select aria-label="Review resource type" value={reviewType} onChange={(event) => { setReviewType(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
                   <option value="ALL">All resource types</option>
-                  {reviewTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                  {Array.from(new Set([...reviewTypes, ...resourceTypes])).sort().map((type) => <option key={type} value={type}>{type}</option>)}
                 </select>
-                <select aria-label="Review status" value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value)} style={inputStyle}>
+                <select aria-label="Review status" value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
                   <option value="ALL">All statuses</option>
                   <option value="VALIDATED">Validated</option>
                   <option value="NEEDS_REVIEW">Needs review</option>
                 </select>
               </div>
               <div className="aca-actions" style={{ margin: "12px 0" }}>
-                <span className="aca-muted-small">{filteredReviewQueue.length} of {reviewQueue.length} items · {selectedReviewIds.length} selected</span>
+                <span className="aca-muted-small">{filteredReviewQueue.length} on page · {reviewPageData?.total ?? "—"} total · {selectedReviewIds.length} selected</span>
                 <button type="button" className="aca-mini-action" disabled={busyAction !== null} onClick={() => {
                   const visibleIds = filteredReviewQueue.filter(({ item }) => Boolean(item.translatedValue?.trim())).map(({ item }) => item.id);
                   setSelectedReviewIds((current) => Array.from(new Set([...current, ...visibleIds])));
@@ -1669,7 +1732,9 @@ export default function Index() {
                   {busyAction === "bulk-approve" ? "Approving…" : "Approve selected (no publish)"}
                 </button>
               </div>
-              {filteredReviewQueue.length === 0 ? (
+              {reviewPageLoading ? <p className="aca-muted-small">Loading review queue…</p> : null}
+              {reviewPageError ? <p role="alert" style={{ color: ACA.danger }}>{reviewPageError}</p> : null}
+              {!reviewPageLoading && !reviewPageError && filteredReviewQueue.length === 0 ? (
                 <EmptyState title="Review queue is empty" text="Validated and NEEDS_REVIEW items will appear here." />
               ) : (
                 <div className="aca-review-list">
@@ -1707,6 +1772,14 @@ export default function Index() {
                   ))}
                 </div>
               )}
+              <div className="aca-actions" style={{ marginTop: 12 }}>
+                <button type="button" className="aca-mini-action" disabled={reviewPageNumber <= 1 || reviewPageLoading}
+                  onClick={() => { setSelectedReviewIds([]); setReviewPageNumber((n) => Math.max(1, n - 1)); }}>Previous</button>
+                <span className="aca-muted-small">Page {reviewPageNumber} / {reviewPageData?.pages ?? 1}</span>
+                <button type="button" className="aca-mini-action" disabled={reviewPageNumber >= (reviewPageData?.pages ?? 1) || reviewPageLoading}
+                  onClick={() => { setSelectedReviewIds([]); setReviewPageNumber((n) => n + 1); }}>Next</button>
+                <button type="button" className="aca-mini-action" onClick={() => setReviewRefreshKey((n) => n + 1)}>Refresh</button>
+              </div>
             </Card>
 
             <Card
@@ -2288,7 +2361,7 @@ export default function Index() {
                 </div>
                 <InfoCallout tone={usageHasUnpricedCosts(usageSummary.totals) ? "orange" : "blue"} style={{ marginTop: 18 }}>
                   {usageHasUnpricedCosts(usageSummary.totals)
-                    ? `${usageSummary.totals.unpricedEvents} usage events have no configured price. The displayed total is incomplete; configure ACA_LOCALE_USAGE_PRICING_JSON on the backend before using it for billing.`
+                    ? `${usageSummary.totals.unpricedEvents} usage events have no configured price. The displayed total is incomplete; configure versioned Usage Pricing in Settings. Historical unpriced events remain unchanged.`
                     : "Costs are estimates based on the pricing version saved with each usage event, not provider invoices. Tiny amounts use up to six decimals."}
                 </InfoCallout>
               </>
@@ -2300,6 +2373,23 @@ export default function Index() {
 
         {activeTab === "settings" ? (
           <div className="aca-layout-two">
+            <Card title="Usage Pricing (USD)" subtitle="Versioned rates per 1,000,000 billable units; applies only to future provider events.">
+              <div className="aca-column-stack">
+                <p className="aca-muted-small">Source: {pricingSource} · Version {pricingVersion}. No prices are imported automatically. Confirm current rates in your provider contracts.</p>
+                <Field label="Pricing JSON: PROVIDER:model or PROVIDER:*">
+                  <textarea aria-label="Versioned usage pricing JSON" value={pricingRulesText}
+                    onChange={(event) => setPricingRulesText(event.target.value)}
+                    rows={11} spellCheck={false} style={{ ...inputStyle, fontFamily: "monospace", width: "100%" }} />
+                </Field>
+                <p className="aca-muted-small">Example: {`{"DEEPL:*":{"charactersPerMillionUsd":25},"OPENAI:your-model":{"inputPerMillionUsd":1,"outputPerMillionUsd":4}}`} (example rates only, NOT provider prices).</p>
+                {pricingError ? <p role="alert" style={{ color: ACA.danger }}>{pricingError}</p> : null}
+                <div className="aca-actions">
+                  <ActionButton label="Save new pricing version" actionKey="save-usage-pricing" busyAction={busyAction} onClick={() => void savePricing()} />
+                  <button className="aca-mini-action" type="button" onClick={() => void loadPricing()}>Discard edits / Refresh</button>
+                </div>
+                <p className="aca-muted-small">Historical cost snapshots remain unchanged. Last versions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
+              </div>
+            </Card>
             <Card
               title="Translation Engine"
               subtitle="Choose the primary translation provider and fallback used for future jobs."

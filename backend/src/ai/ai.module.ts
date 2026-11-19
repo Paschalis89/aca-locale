@@ -10,6 +10,8 @@ import { AiConfigurationService } from './ai-configuration.service.js';
 
 import { AiModelCatalogService } from './ai-model-catalog.service.js';
 
+import { UsagePricingService } from './usage-pricing.service.js';
+
 import { AiController } from './ai.controller.js';
 
 @Global()
@@ -18,8 +20,8 @@ import { AiController } from './ai.controller.js';
 
   controllers: [AiController],
 
-  providers: [AiRegistryService, AiConfigurationService, AiModelCatalogService],
+  providers: [AiRegistryService, AiConfigurationService, AiModelCatalogService, UsagePricingService],
 
-  exports: [AiRegistryService, AiConfigurationService, AiModelCatalogService],
+  exports: [AiRegistryService, AiConfigurationService, AiModelCatalogService, UsagePricingService],
 })
 export class AiModule {}

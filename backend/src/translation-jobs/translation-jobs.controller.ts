@@ -119,6 +119,22 @@ export class TranslationJobsController {
    * cross-tenant operational metadata, so it is deliberately removed.
    */
 
+  @Get('review/queue')
+  @ApiOperation({ summary: 'Paginated translation review queue for the authenticated shop' })
+  reviewQueue(
+    @CurrentShop() shop: ShopifyAuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('locale') locale?: string,
+    @Query('resourceType') resourceType?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.translationJobsService.reviewQueue(shop.shopDomain, {
+      page, limit, locale, resourceType, status, search,
+    });
+  }
+
   @Get(':id/queue')
   @ApiOperation({
     summary:

@@ -48,6 +48,9 @@ describe('TranslationReviewExecutorService glossary integration', () => {
       translationJobItem: {
         update: vi.fn().mockResolvedValue({}),
       },
+      usagePricingProfile: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
       translationUsageEvent: {
         create: vi.fn().mockResolvedValue({}),
       },

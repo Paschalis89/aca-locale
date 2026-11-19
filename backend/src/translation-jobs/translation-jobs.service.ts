@@ -656,6 +656,57 @@ export class TranslationJobsService {
     });
   }
 
+  /** Server-side, tenant-scoped review queue. Never returns other shops' items. */
+  async reviewQueue(
+    shopifyDomain: string,
+    query: { page?: string; limit?: string; locale?: string; resourceType?: string; status?: string; search?: string },
+  ) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { shopifyDomain }, select: { id: true },
+    });
+    if (!shop) throw new NotFoundException('Shop is not registered.');
+
+    const page = this.boundedInteger(query.page, 1, 1, 100000);
+    const limit = this.boundedInteger(query.limit, 30, 1, 100);
+    const statuses = ['VALIDATED', 'NEEDS_REVIEW'] as const;
+    if (query.status && query.status !== 'ALL' && !statuses.includes(query.status as typeof statuses[number])) {
+      throw new BadRequestException('Invalid review status.');
+    }
+    const locale = query.locale && query.locale !== 'ALL' ? query.locale.trim() : undefined;
+    const resourceType = query.resourceType && query.resourceType !== 'ALL' ? query.resourceType.trim().toUpperCase() : undefined;
+    const search = query.search?.trim().slice(0, 200);
+    const where: Prisma.TranslationJobItemWhereInput = {
+      job: { shopId: shop.id, ...(locale ? { targetLocale: locale } : {}) },
+      status: { in: query.status && query.status !== 'ALL' ? [query.status as typeof statuses[number]] : [...statuses] },
+      ...(resourceType ? { field: { resource: { resourceType } } } : {}),
+      ...(search ? {
+        OR: [
+          { sourceValue: { contains: search, mode: 'insensitive' } },
+          { translatedValue: { contains: search, mode: 'insensitive' } },
+          { field: { key: { contains: search, mode: 'insensitive' } } },
+          { field: { resource: { shopifyResourceId: { contains: search, mode: 'insensitive' } } } },
+        ],
+      } : {}),
+    };
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.translationJobItem.count({ where }),
+      this.prisma.translationJobItem.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          job: { select: { id: true, sourceLocale: true, targetLocale: true, status: true, createdAt: true } },
+          field: { select: {
+            key: true, type: true, sourceLocale: true,
+            resource: { select: { resourceType: true, shopifyResourceId: true } },
+          } },
+        },
+      }),
+    ]);
+    return { items, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) };
+  }
+
   async findOne(
     shopifyDomain: string,
 

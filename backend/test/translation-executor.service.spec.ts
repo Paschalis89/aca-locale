@@ -45,6 +45,9 @@ function createPrisma() {
     translationJobItem: {
       updateMany: vi.fn(),
     },
+    usagePricingProfile: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     translationUsageEvent: {
       create: vi.fn(),
     },

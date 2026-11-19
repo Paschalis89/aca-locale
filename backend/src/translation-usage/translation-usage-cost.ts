@@ -1,4 +1,4 @@
-type UsagePricingRule = {
+export type UsagePricingRule = {
   charactersPerMillionUsd?: number;
 
   inputPerMillionUsd?: number;
@@ -52,8 +52,12 @@ export type UsageCostEstimate = {
  *
  * Exact provider:model wins over provider:*.
  */
-export function estimateUsageCost(input: UsageCostInput): UsageCostEstimate {
-  const rules = readPricingRules();
+export function estimateUsageCost(
+  input: UsageCostInput,
+  pricing?: { rules: Record<string, UsagePricingRule>; version: string },
+): UsageCostEstimate {
+  const rules = pricing?.rules ?? readPricingRules();
+  const version = pricing?.version ?? process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null;
 
   const provider = input.provider.trim().toUpperCase();
 
@@ -76,7 +80,7 @@ export function estimateUsageCost(input: UsageCostInput): UsageCostEstimate {
 
       pricingKey: null,
 
-      pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
+      pricingVersion: version,
     };
   }
 
@@ -133,8 +137,15 @@ export function estimateUsageCost(input: UsageCostInput): UsageCostEstimate {
 
       pricingKey,
 
-      pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
+      pricingVersion: version,
     };
+  }
+
+  // A partially priced request must never be presented as a complete estimate.
+  if ((billedCharacters > 0 && !isValidRate(rule.charactersPerMillionUsd)) ||
+      (inputTokens > 0 && !isValidRate(rule.inputPerMillionUsd)) ||
+      (outputTokens > 0 && !isValidRate(rule.outputPerMillionUsd))) {
+    return { estimatedCostMicrousd: null, pricingKey, pricingVersion: version };
   }
 
   if (!hasApplicableRate) {
@@ -143,7 +154,7 @@ export function estimateUsageCost(input: UsageCostInput): UsageCostEstimate {
 
       pricingKey,
 
-      pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
+      pricingVersion: version,
     };
   }
 
@@ -152,11 +163,11 @@ export function estimateUsageCost(input: UsageCostInput): UsageCostEstimate {
 
     pricingKey,
 
-    pricingVersion: process.env.ACA_LOCALE_USAGE_PRICING_VERSION ?? null,
+    pricingVersion: version,
   };
 }
 
-function readPricingRules(): Record<string, UsagePricingRule> {
+export function readPricingRules(): Record<string, UsagePricingRule> {
   const raw = process.env.ACA_LOCALE_USAGE_PRICING_JSON?.trim();
 
   if (!raw) {
