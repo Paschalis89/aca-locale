@@ -117,6 +117,7 @@ model Shop {
   translationUsageEvents  TranslationUsageEvent[]
   usagePricingProfile      UsagePricingProfile?
   usagePricingRevisions    UsagePricingRevision[]
+  aiBudgetProfile          AiBudgetProfile?
   translationChangeEvents TranslationChangeEvent[]
   glossaries              Glossary[]
 
@@ -606,4 +607,14 @@ model UsagePricingRevision {
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
   @@unique([shopId, version])
   @@index([shopId, createdAt])
+}
+
+
+// Advisory monthly spend budget, never an execution gate.
+model AiBudgetProfile {
+  shopId String @id
+  monthlyBudgetCents Int @default(0)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 }

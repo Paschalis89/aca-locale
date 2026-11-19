@@ -67,7 +67,8 @@ export const ModelName = {
   Glossary: 'Glossary',
   GlossaryEntry: 'GlossaryEntry',
   UsagePricingProfile: 'UsagePricingProfile',
-  UsagePricingRevision: 'UsagePricingRevision'
+  UsagePricingRevision: 'UsagePricingRevision',
+  AiBudgetProfile: 'AiBudgetProfile'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -395,6 +396,16 @@ export const UsagePricingRevisionScalarFieldEnum = {
 } as const
 
 export type UsagePricingRevisionScalarFieldEnum = (typeof UsagePricingRevisionScalarFieldEnum)[keyof typeof UsagePricingRevisionScalarFieldEnum]
+
+
+export const AiBudgetProfileScalarFieldEnum = {
+  shopId: 'shopId',
+  monthlyBudgetCents: 'monthlyBudgetCents',
+  version: 'version',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AiBudgetProfileScalarFieldEnum = (typeof AiBudgetProfileScalarFieldEnum)[keyof typeof AiBudgetProfileScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -263,6 +263,7 @@ export type ShopWhereInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventListRelationFilter
   usagePricingProfile?: Prisma.XOR<Prisma.UsagePricingProfileNullableScalarRelationFilter, Prisma.UsagePricingProfileWhereInput> | null
   usagePricingRevisions?: Prisma.UsagePricingRevisionListRelationFilter
+  aiBudgetProfile?: Prisma.XOR<Prisma.AiBudgetProfileNullableScalarRelationFilter, Prisma.AiBudgetProfileWhereInput> | null
   translationChangeEvents?: Prisma.TranslationChangeEventListRelationFilter
   glossaries?: Prisma.GlossaryListRelationFilter
 }
@@ -291,6 +292,7 @@ export type ShopOrderByWithRelationInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventOrderByRelationAggregateInput
   usagePricingProfile?: Prisma.UsagePricingProfileOrderByWithRelationInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionOrderByRelationAggregateInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileOrderByWithRelationInput
   translationChangeEvents?: Prisma.TranslationChangeEventOrderByRelationAggregateInput
   glossaries?: Prisma.GlossaryOrderByRelationAggregateInput
 }
@@ -322,6 +324,7 @@ export type ShopWhereUniqueInput = Prisma.AtLeast<{
   translationUsageEvents?: Prisma.TranslationUsageEventListRelationFilter
   usagePricingProfile?: Prisma.XOR<Prisma.UsagePricingProfileNullableScalarRelationFilter, Prisma.UsagePricingProfileWhereInput> | null
   usagePricingRevisions?: Prisma.UsagePricingRevisionListRelationFilter
+  aiBudgetProfile?: Prisma.XOR<Prisma.AiBudgetProfileNullableScalarRelationFilter, Prisma.AiBudgetProfileWhereInput> | null
   translationChangeEvents?: Prisma.TranslationChangeEventListRelationFilter
   glossaries?: Prisma.GlossaryListRelationFilter
 }, "id" | "shopifyDomain" | "shopifyShopId">
@@ -390,6 +393,7 @@ export type ShopCreateInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -418,6 +422,7 @@ export type ShopUncheckedCreateInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -446,6 +451,7 @@ export type ShopUpdateInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -474,6 +480,7 @@ export type ShopUncheckedUpdateInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -759,6 +766,20 @@ export type ShopUpdateOneRequiredWithoutUsagePricingRevisionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ShopUpdateToOneWithWhereWithoutUsagePricingRevisionsInput, Prisma.ShopUpdateWithoutUsagePricingRevisionsInput>, Prisma.ShopUncheckedUpdateWithoutUsagePricingRevisionsInput>
 }
 
+export type ShopCreateNestedOneWithoutAiBudgetProfileInput = {
+  create?: Prisma.XOR<Prisma.ShopCreateWithoutAiBudgetProfileInput, Prisma.ShopUncheckedCreateWithoutAiBudgetProfileInput>
+  connectOrCreate?: Prisma.ShopCreateOrConnectWithoutAiBudgetProfileInput
+  connect?: Prisma.ShopWhereUniqueInput
+}
+
+export type ShopUpdateOneRequiredWithoutAiBudgetProfileNestedInput = {
+  create?: Prisma.XOR<Prisma.ShopCreateWithoutAiBudgetProfileInput, Prisma.ShopUncheckedCreateWithoutAiBudgetProfileInput>
+  connectOrCreate?: Prisma.ShopCreateOrConnectWithoutAiBudgetProfileInput
+  upsert?: Prisma.ShopUpsertWithoutAiBudgetProfileInput
+  connect?: Prisma.ShopWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ShopUpdateToOneWithWhereWithoutAiBudgetProfileInput, Prisma.ShopUpdateWithoutAiBudgetProfileInput>, Prisma.ShopUncheckedUpdateWithoutAiBudgetProfileInput>
+}
+
 export type ShopCreateWithoutSettingsInput = {
   id?: string
   shopifyDomain: string
@@ -782,6 +803,7 @@ export type ShopCreateWithoutSettingsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -809,6 +831,7 @@ export type ShopUncheckedCreateWithoutSettingsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -852,6 +875,7 @@ export type ShopUpdateWithoutSettingsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -879,6 +903,7 @@ export type ShopUncheckedUpdateWithoutSettingsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -906,6 +931,7 @@ export type ShopCreateWithoutAiConfigurationInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -933,6 +959,7 @@ export type ShopUncheckedCreateWithoutAiConfigurationInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -976,6 +1003,7 @@ export type ShopUpdateWithoutAiConfigurationInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1003,6 +1031,7 @@ export type ShopUncheckedUpdateWithoutAiConfigurationInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -1030,6 +1059,7 @@ export type ShopCreateWithoutLanguagesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -1057,6 +1087,7 @@ export type ShopUncheckedCreateWithoutLanguagesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -1100,6 +1131,7 @@ export type ShopUpdateWithoutLanguagesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1127,6 +1159,7 @@ export type ShopUncheckedUpdateWithoutLanguagesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -1154,6 +1187,7 @@ export type ShopCreateWithoutMarketsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -1181,6 +1215,7 @@ export type ShopUncheckedCreateWithoutMarketsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -1224,6 +1259,7 @@ export type ShopUpdateWithoutMarketsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1251,6 +1287,7 @@ export type ShopUncheckedUpdateWithoutMarketsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -1278,6 +1315,7 @@ export type ShopCreateWithoutTranslationResourcesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -1305,6 +1343,7 @@ export type ShopUncheckedCreateWithoutTranslationResourcesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -1348,6 +1387,7 @@ export type ShopUpdateWithoutTranslationResourcesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1375,6 +1415,7 @@ export type ShopUncheckedUpdateWithoutTranslationResourcesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -1402,6 +1443,7 @@ export type ShopCreateWithoutTranslationJobsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -1429,6 +1471,7 @@ export type ShopUncheckedCreateWithoutTranslationJobsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -1472,6 +1515,7 @@ export type ShopUpdateWithoutTranslationJobsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1499,6 +1543,7 @@ export type ShopUncheckedUpdateWithoutTranslationJobsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -1526,6 +1571,7 @@ export type ShopCreateWithoutTranslationUsageEventsInput = {
   translationJobs?: Prisma.TranslationJobCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -1553,6 +1599,7 @@ export type ShopUncheckedCreateWithoutTranslationUsageEventsInput = {
   translationJobs?: Prisma.TranslationJobUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -1596,6 +1643,7 @@ export type ShopUpdateWithoutTranslationUsageEventsInput = {
   translationJobs?: Prisma.TranslationJobUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1623,6 +1671,7 @@ export type ShopUncheckedUpdateWithoutTranslationUsageEventsInput = {
   translationJobs?: Prisma.TranslationJobUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -1651,6 +1700,7 @@ export type ShopCreateWithoutTranslationChangeEventsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
 
@@ -1678,6 +1728,7 @@ export type ShopUncheckedCreateWithoutTranslationChangeEventsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
 
@@ -1721,6 +1772,7 @@ export type ShopUpdateWithoutTranslationChangeEventsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
 
@@ -1748,6 +1800,7 @@ export type ShopUncheckedUpdateWithoutTranslationChangeEventsInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
 
@@ -1775,6 +1828,7 @@ export type ShopCreateWithoutGlossariesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
 }
 
@@ -1802,6 +1856,7 @@ export type ShopUncheckedCreateWithoutGlossariesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
 }
 
@@ -1845,6 +1900,7 @@ export type ShopUpdateWithoutGlossariesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
 }
 
@@ -1872,6 +1928,7 @@ export type ShopUncheckedUpdateWithoutGlossariesInput = {
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
 }
 
@@ -1898,6 +1955,7 @@ export type ShopCreateWithoutUsagePricingProfileInput = {
   translationJobs?: Prisma.TranslationJobCreateNestedManyWithoutShopInput
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -1925,6 +1983,7 @@ export type ShopUncheckedCreateWithoutUsagePricingProfileInput = {
   translationJobs?: Prisma.TranslationJobUncheckedCreateNestedManyWithoutShopInput
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -1968,6 +2027,7 @@ export type ShopUpdateWithoutUsagePricingProfileInput = {
   translationJobs?: Prisma.TranslationJobUpdateManyWithoutShopNestedInput
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -1995,6 +2055,7 @@ export type ShopUncheckedUpdateWithoutUsagePricingProfileInput = {
   translationJobs?: Prisma.TranslationJobUncheckedUpdateManyWithoutShopNestedInput
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -2022,6 +2083,7 @@ export type ShopCreateWithoutUsagePricingRevisionsInput = {
   translationJobs?: Prisma.TranslationJobCreateNestedManyWithoutShopInput
   translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
 }
@@ -2049,6 +2111,7 @@ export type ShopUncheckedCreateWithoutUsagePricingRevisionsInput = {
   translationJobs?: Prisma.TranslationJobUncheckedCreateNestedManyWithoutShopInput
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedCreateNestedOneWithoutShopInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
   glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
 }
@@ -2092,6 +2155,7 @@ export type ShopUpdateWithoutUsagePricingRevisionsInput = {
   translationJobs?: Prisma.TranslationJobUpdateManyWithoutShopNestedInput
   translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUpdateOneWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
 }
@@ -2119,6 +2183,135 @@ export type ShopUncheckedUpdateWithoutUsagePricingRevisionsInput = {
   translationJobs?: Prisma.TranslationJobUncheckedUpdateManyWithoutShopNestedInput
   translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
   usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
+  aiBudgetProfile?: Prisma.AiBudgetProfileUncheckedUpdateOneWithoutShopNestedInput
+  translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
+  glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
+}
+
+export type ShopCreateWithoutAiBudgetProfileInput = {
+  id?: string
+  shopifyDomain: string
+  shopifyShopId?: string | null
+  name?: string | null
+  status?: $Enums.ShopStatus
+  sourceLocale?: string | null
+  currencyCode?: string | null
+  ianaTimezone?: string | null
+  primaryDomainHost?: string | null
+  primaryDomainUrl?: string | null
+  installedAt?: Date | string
+  uninstalledAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  settings?: Prisma.ShopSettingsCreateNestedOneWithoutShopInput
+  aiConfiguration?: Prisma.AiConfigurationCreateNestedOneWithoutShopInput
+  languages?: Prisma.ShopLanguageCreateNestedManyWithoutShopInput
+  markets?: Prisma.ShopMarketCreateNestedManyWithoutShopInput
+  translationResources?: Prisma.TranslationResourceCreateNestedManyWithoutShopInput
+  translationJobs?: Prisma.TranslationJobCreateNestedManyWithoutShopInput
+  translationUsageEvents?: Prisma.TranslationUsageEventCreateNestedManyWithoutShopInput
+  usagePricingProfile?: Prisma.UsagePricingProfileCreateNestedOneWithoutShopInput
+  usagePricingRevisions?: Prisma.UsagePricingRevisionCreateNestedManyWithoutShopInput
+  translationChangeEvents?: Prisma.TranslationChangeEventCreateNestedManyWithoutShopInput
+  glossaries?: Prisma.GlossaryCreateNestedManyWithoutShopInput
+}
+
+export type ShopUncheckedCreateWithoutAiBudgetProfileInput = {
+  id?: string
+  shopifyDomain: string
+  shopifyShopId?: string | null
+  name?: string | null
+  status?: $Enums.ShopStatus
+  sourceLocale?: string | null
+  currencyCode?: string | null
+  ianaTimezone?: string | null
+  primaryDomainHost?: string | null
+  primaryDomainUrl?: string | null
+  installedAt?: Date | string
+  uninstalledAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  settings?: Prisma.ShopSettingsUncheckedCreateNestedOneWithoutShopInput
+  aiConfiguration?: Prisma.AiConfigurationUncheckedCreateNestedOneWithoutShopInput
+  languages?: Prisma.ShopLanguageUncheckedCreateNestedManyWithoutShopInput
+  markets?: Prisma.ShopMarketUncheckedCreateNestedManyWithoutShopInput
+  translationResources?: Prisma.TranslationResourceUncheckedCreateNestedManyWithoutShopInput
+  translationJobs?: Prisma.TranslationJobUncheckedCreateNestedManyWithoutShopInput
+  translationUsageEvents?: Prisma.TranslationUsageEventUncheckedCreateNestedManyWithoutShopInput
+  usagePricingProfile?: Prisma.UsagePricingProfileUncheckedCreateNestedOneWithoutShopInput
+  usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedCreateNestedManyWithoutShopInput
+  translationChangeEvents?: Prisma.TranslationChangeEventUncheckedCreateNestedManyWithoutShopInput
+  glossaries?: Prisma.GlossaryUncheckedCreateNestedManyWithoutShopInput
+}
+
+export type ShopCreateOrConnectWithoutAiBudgetProfileInput = {
+  where: Prisma.ShopWhereUniqueInput
+  create: Prisma.XOR<Prisma.ShopCreateWithoutAiBudgetProfileInput, Prisma.ShopUncheckedCreateWithoutAiBudgetProfileInput>
+}
+
+export type ShopUpsertWithoutAiBudgetProfileInput = {
+  update: Prisma.XOR<Prisma.ShopUpdateWithoutAiBudgetProfileInput, Prisma.ShopUncheckedUpdateWithoutAiBudgetProfileInput>
+  create: Prisma.XOR<Prisma.ShopCreateWithoutAiBudgetProfileInput, Prisma.ShopUncheckedCreateWithoutAiBudgetProfileInput>
+  where?: Prisma.ShopWhereInput
+}
+
+export type ShopUpdateToOneWithWhereWithoutAiBudgetProfileInput = {
+  where?: Prisma.ShopWhereInput
+  data: Prisma.XOR<Prisma.ShopUpdateWithoutAiBudgetProfileInput, Prisma.ShopUncheckedUpdateWithoutAiBudgetProfileInput>
+}
+
+export type ShopUpdateWithoutAiBudgetProfileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  shopifyDomain?: Prisma.StringFieldUpdateOperationsInput | string
+  shopifyShopId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumShopStatusFieldUpdateOperationsInput | $Enums.ShopStatus
+  sourceLocale?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currencyCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ianaTimezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  primaryDomainHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  primaryDomainUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  installedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  uninstalledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.ShopSettingsUpdateOneWithoutShopNestedInput
+  aiConfiguration?: Prisma.AiConfigurationUpdateOneWithoutShopNestedInput
+  languages?: Prisma.ShopLanguageUpdateManyWithoutShopNestedInput
+  markets?: Prisma.ShopMarketUpdateManyWithoutShopNestedInput
+  translationResources?: Prisma.TranslationResourceUpdateManyWithoutShopNestedInput
+  translationJobs?: Prisma.TranslationJobUpdateManyWithoutShopNestedInput
+  translationUsageEvents?: Prisma.TranslationUsageEventUpdateManyWithoutShopNestedInput
+  usagePricingProfile?: Prisma.UsagePricingProfileUpdateOneWithoutShopNestedInput
+  usagePricingRevisions?: Prisma.UsagePricingRevisionUpdateManyWithoutShopNestedInput
+  translationChangeEvents?: Prisma.TranslationChangeEventUpdateManyWithoutShopNestedInput
+  glossaries?: Prisma.GlossaryUpdateManyWithoutShopNestedInput
+}
+
+export type ShopUncheckedUpdateWithoutAiBudgetProfileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  shopifyDomain?: Prisma.StringFieldUpdateOperationsInput | string
+  shopifyShopId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumShopStatusFieldUpdateOperationsInput | $Enums.ShopStatus
+  sourceLocale?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currencyCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ianaTimezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  primaryDomainHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  primaryDomainUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  installedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  uninstalledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settings?: Prisma.ShopSettingsUncheckedUpdateOneWithoutShopNestedInput
+  aiConfiguration?: Prisma.AiConfigurationUncheckedUpdateOneWithoutShopNestedInput
+  languages?: Prisma.ShopLanguageUncheckedUpdateManyWithoutShopNestedInput
+  markets?: Prisma.ShopMarketUncheckedUpdateManyWithoutShopNestedInput
+  translationResources?: Prisma.TranslationResourceUncheckedUpdateManyWithoutShopNestedInput
+  translationJobs?: Prisma.TranslationJobUncheckedUpdateManyWithoutShopNestedInput
+  translationUsageEvents?: Prisma.TranslationUsageEventUncheckedUpdateManyWithoutShopNestedInput
+  usagePricingProfile?: Prisma.UsagePricingProfileUncheckedUpdateOneWithoutShopNestedInput
+  usagePricingRevisions?: Prisma.UsagePricingRevisionUncheckedUpdateManyWithoutShopNestedInput
   translationChangeEvents?: Prisma.TranslationChangeEventUncheckedUpdateManyWithoutShopNestedInput
   glossaries?: Prisma.GlossaryUncheckedUpdateManyWithoutShopNestedInput
 }
@@ -2241,6 +2434,7 @@ export type ShopSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   translationUsageEvents?: boolean | Prisma.Shop$translationUsageEventsArgs<ExtArgs>
   usagePricingProfile?: boolean | Prisma.Shop$usagePricingProfileArgs<ExtArgs>
   usagePricingRevisions?: boolean | Prisma.Shop$usagePricingRevisionsArgs<ExtArgs>
+  aiBudgetProfile?: boolean | Prisma.Shop$aiBudgetProfileArgs<ExtArgs>
   translationChangeEvents?: boolean | Prisma.Shop$translationChangeEventsArgs<ExtArgs>
   glossaries?: boolean | Prisma.Shop$glossariesArgs<ExtArgs>
   _count?: boolean | Prisma.ShopCountOutputTypeDefaultArgs<ExtArgs>
@@ -2308,6 +2502,7 @@ export type ShopInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   translationUsageEvents?: boolean | Prisma.Shop$translationUsageEventsArgs<ExtArgs>
   usagePricingProfile?: boolean | Prisma.Shop$usagePricingProfileArgs<ExtArgs>
   usagePricingRevisions?: boolean | Prisma.Shop$usagePricingRevisionsArgs<ExtArgs>
+  aiBudgetProfile?: boolean | Prisma.Shop$aiBudgetProfileArgs<ExtArgs>
   translationChangeEvents?: boolean | Prisma.Shop$translationChangeEventsArgs<ExtArgs>
   glossaries?: boolean | Prisma.Shop$glossariesArgs<ExtArgs>
   _count?: boolean | Prisma.ShopCountOutputTypeDefaultArgs<ExtArgs>
@@ -2327,6 +2522,7 @@ export type $ShopPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     translationUsageEvents: Prisma.$TranslationUsageEventPayload<ExtArgs>[]
     usagePricingProfile: Prisma.$UsagePricingProfilePayload<ExtArgs> | null
     usagePricingRevisions: Prisma.$UsagePricingRevisionPayload<ExtArgs>[]
+    aiBudgetProfile: Prisma.$AiBudgetProfilePayload<ExtArgs> | null
     translationChangeEvents: Prisma.$TranslationChangeEventPayload<ExtArgs>[]
     glossaries: Prisma.$GlossaryPayload<ExtArgs>[]
   }
@@ -2748,6 +2944,7 @@ export interface Prisma__ShopClient<T, Null = never, ExtArgs extends runtime.Typ
   translationUsageEvents<T extends Prisma.Shop$translationUsageEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Shop$translationUsageEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TranslationUsageEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   usagePricingProfile<T extends Prisma.Shop$usagePricingProfileArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Shop$usagePricingProfileArgs<ExtArgs>>): Prisma.Prisma__UsagePricingProfileClient<runtime.Types.Result.GetResult<Prisma.$UsagePricingProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   usagePricingRevisions<T extends Prisma.Shop$usagePricingRevisionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Shop$usagePricingRevisionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UsagePricingRevisionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  aiBudgetProfile<T extends Prisma.Shop$aiBudgetProfileArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Shop$aiBudgetProfileArgs<ExtArgs>>): Prisma.Prisma__AiBudgetProfileClient<runtime.Types.Result.GetResult<Prisma.$AiBudgetProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   translationChangeEvents<T extends Prisma.Shop$translationChangeEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Shop$translationChangeEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TranslationChangeEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   glossaries<T extends Prisma.Shop$glossariesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Shop$glossariesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GlossaryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -3384,6 +3581,25 @@ export type Shop$usagePricingRevisionsArgs<ExtArgs extends runtime.Types.Extensi
   take?: number
   skip?: number
   distinct?: Prisma.UsagePricingRevisionScalarFieldEnum | Prisma.UsagePricingRevisionScalarFieldEnum[]
+}
+
+/**
+ * Shop.aiBudgetProfile
+ */
+export type Shop$aiBudgetProfileArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AiBudgetProfile
+   */
+  select?: Prisma.AiBudgetProfileSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AiBudgetProfile
+   */
+  omit?: Prisma.AiBudgetProfileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AiBudgetProfileInclude<ExtArgs> | null
+  where?: Prisma.AiBudgetProfileWhereInput
 }
 
 /**

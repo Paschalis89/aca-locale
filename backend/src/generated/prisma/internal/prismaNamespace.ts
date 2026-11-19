@@ -413,7 +413,8 @@ export const ModelName = {
   Glossary: 'Glossary',
   GlossaryEntry: 'GlossaryEntry',
   UsagePricingProfile: 'UsagePricingProfile',
-  UsagePricingRevision: 'UsagePricingRevision'
+  UsagePricingRevision: 'UsagePricingRevision',
+  AiBudgetProfile: 'AiBudgetProfile'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -429,7 +430,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "shop" | "shopSettings" | "aiConfiguration" | "language" | "shopLanguage" | "shopMarket" | "translationResource" | "translationField" | "translationState" | "translationJob" | "translationJobItem" | "translationUsageEvent" | "translationChangeEvent" | "glossary" | "glossaryEntry" | "usagePricingProfile" | "usagePricingRevision"
+    modelProps: "shop" | "shopSettings" | "aiConfiguration" | "language" | "shopLanguage" | "shopMarket" | "translationResource" | "translationField" | "translationState" | "translationJob" | "translationJobItem" | "translationUsageEvent" | "translationChangeEvent" | "glossary" | "glossaryEntry" | "usagePricingProfile" | "usagePricingRevision" | "aiBudgetProfile"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1691,6 +1692,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AiBudgetProfile: {
+      payload: Prisma.$AiBudgetProfilePayload<ExtArgs>
+      fields: Prisma.AiBudgetProfileFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AiBudgetProfileFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AiBudgetProfileFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>
+        }
+        findFirst: {
+          args: Prisma.AiBudgetProfileFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AiBudgetProfileFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>
+        }
+        findMany: {
+          args: Prisma.AiBudgetProfileFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>[]
+        }
+        create: {
+          args: Prisma.AiBudgetProfileCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>
+        }
+        createMany: {
+          args: Prisma.AiBudgetProfileCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AiBudgetProfileCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>[]
+        }
+        delete: {
+          args: Prisma.AiBudgetProfileDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>
+        }
+        update: {
+          args: Prisma.AiBudgetProfileUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>
+        }
+        deleteMany: {
+          args: Prisma.AiBudgetProfileDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AiBudgetProfileUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AiBudgetProfileUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>[]
+        }
+        upsert: {
+          args: Prisma.AiBudgetProfileUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiBudgetProfilePayload>
+        }
+        aggregate: {
+          args: Prisma.AiBudgetProfileAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAiBudgetProfile>
+        }
+        groupBy: {
+          args: Prisma.AiBudgetProfileGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiBudgetProfileGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AiBudgetProfileCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiBudgetProfileCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2039,6 +2114,16 @@ export const UsagePricingRevisionScalarFieldEnum = {
 } as const
 
 export type UsagePricingRevisionScalarFieldEnum = (typeof UsagePricingRevisionScalarFieldEnum)[keyof typeof UsagePricingRevisionScalarFieldEnum]
+
+
+export const AiBudgetProfileScalarFieldEnum = {
+  shopId: 'shopId',
+  monthlyBudgetCents: 'monthlyBudgetCents',
+  version: 'version',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AiBudgetProfileScalarFieldEnum = (typeof AiBudgetProfileScalarFieldEnum)[keyof typeof AiBudgetProfileScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2493,6 +2578,7 @@ export type GlobalOmitConfig = {
   glossaryEntry?: Prisma.GlossaryEntryOmit
   usagePricingProfile?: Prisma.UsagePricingProfileOmit
   usagePricingRevision?: Prisma.UsagePricingRevisionOmit
+  aiBudgetProfile?: Prisma.AiBudgetProfileOmit
 }
 
 /* Types for Logging */

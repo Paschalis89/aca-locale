@@ -102,6 +102,26 @@ type TranslationJob = {
   reviewExecution?: Record<string, unknown>;
 };
 
+type AiBudgetSummary = {
+  month: string;
+  version: number;
+  monthlyBudgetUsd: number;
+  estimatedCostUsd: number;
+  percentOfBudget: number | null;
+  threshold: "NOT_CONFIGURED" | "OVER_100" | "OVER_80" | "OVER_50" | "BELOW_50";
+  incomplete: boolean;
+  advisoryOnly: boolean;
+  enforcementEnabled: boolean;
+  totalEvents: number;
+  sampledEvents: number;
+  truncated: boolean;
+  unpricedEvents: number;
+  unknownUsageEvents: number;
+  failedEvents: number;
+  byProvider: Array<{ provider: string; events: number; failed: number; unpriced: number; estimatedCostUsd: number }>;
+  byModel: Array<{ provider: string; model: string; events: number; failed: number; estimatedCostUsd: number }>;
+};
+
 type UsageTotals = {
   estimatedCostMicrousd: number;
   billedCharacters: number;
@@ -277,6 +297,10 @@ export default function Index() {
   const [selectedJobId, setSelectedJobId] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [aiBudget, setAiBudget] = useState<AiBudgetSummary | null>(null);
+  const [aiBudgetInput, setAiBudgetInput] = useState("0");
+  const [aiBudgetError, setAiBudgetError] = useState<string | null>(null);
+
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -616,6 +640,30 @@ export default function Index() {
     }
   };
 
+  const loadAiBudget = async () => {
+    try {
+      const data = await apiCall("/api/backend/ai-budget", {}, false) as AiBudgetSummary;
+      setAiBudget(data);
+      setAiBudgetInput(data.monthlyBudgetUsd.toFixed(2));
+      setAiBudgetError(null);
+    } catch (error) {
+      setAiBudgetError(error instanceof Error ? error.message : "Unable to load AI budget.");
+    }
+  };
+
+  const saveAiBudget = async () => {
+    const value = Number(aiBudgetInput);
+    if (!aiBudgetInput.trim() || !/^\d+(?:\.\d{1,2})?$/.test(aiBudgetInput.trim()) || !Number.isFinite(value) || value > 1000000) {
+      setAiBudgetError("Enter a valid monthly USD budget with up to two decimals. Use 0 to disable alerts.");
+      return;
+    }
+    if (!window.confirm("Save a monthly ADVISORY budget? This will NOT stop translations or AI calls.")) return;
+    await runAction("save-ai-budget", async () => {
+      await apiCall("/api/backend/ai-budget", { method: "PATCH", body: JSON.stringify({ monthlyBudgetUsd: value, expectedVersion: aiBudget?.version ?? 0 }) });
+      await loadAiBudget();
+    }, "Advisory AI budget saved.");
+  };
+
   const loadUsage = async () => {
     setLoadingUsage(true);
     setUsageError(null);
@@ -642,11 +690,13 @@ export default function Index() {
   useEffect(() => {
     void loadJobs(false);
     void loadUsage();
+    void loadAiBudget();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (activeTab === "settings") void loadPricing();
+    if (activeTab === "settings") { void loadPricing(); void loadAiBudget(); }
+    if (activeTab === "usage") void loadAiBudget();
     if (activeTab === "glossary" && !glossary && !loadingGlossary) {
       void loadGlossary();
     }
@@ -2553,6 +2603,46 @@ export default function Index() {
                   </div>
                 ) : null}
                 <p className="aca-muted-small">Historical cost snapshots remain unchanged. Recent revisions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
+              </div>
+            </Card>
+            <Card title="AI Budget & Reliability" subtitle="Monthly UTC advisory budget and observed provider failures. No automatic restrictions on jobs.">
+              <div className="aca-column-stack">
+                <p className="aca-muted-small">Budget month: {aiBudget?.month ?? "loading"} (UTC) · Version {aiBudget?.version ?? 0}. USD. Enter 0 to disable budget alerts.</p>
+                <div className="aca-actions" style={{ alignItems: "end" }}>
+                  <Field label="Monthly AI budget (USD)">
+                    <input aria-label="Monthly AI advisory budget USD" type="number" min="0" max="1000000" step="0.01" value={aiBudgetInput}
+                      onChange={(event) => setAiBudgetInput(event.target.value)} style={{ ...inputStyle, maxWidth: 220 }} />
+                  </Field>
+                  <ActionButton label="Save budget" actionKey="save-ai-budget" busyAction={busyAction} onClick={() => void saveAiBudget()} />
+                  <button type="button" className="aca-mini-action" onClick={() => void loadAiBudget()}>Refresh</button>
+                </div>
+                {aiBudgetError ? <p role="alert" style={{ color: ACA.danger }}>{aiBudgetError}</p> : null}
+                {aiBudget ? <>
+                  <div className="aca-stat-grid-3">
+                    <MiniStat label="Known estimated USD" value={`$${aiBudget.estimatedCostUsd.toFixed(6)}`} />
+                    <MiniStat label="Budget used (minimum)" value={aiBudget.percentOfBudget === null ? "Not configured" : `${aiBudget.percentOfBudget}%`} />
+                    <MiniStat label="Provider failures" value={String(aiBudget.failedEvents)} />
+                  </div>
+                  {aiBudget.threshold !== "NOT_CONFIGURED" && aiBudget.threshold !== "BELOW_50" ? (
+                    <InfoCallout tone="orange">Budget threshold reached: {aiBudget.threshold === "OVER_100" ? "100%+" : aiBudget.threshold === "OVER_80" ? "80%+" : "50%+"} of the monthly limit based on known estimated costs.</InfoCallout>
+                  ) : null}
+                  {aiBudget.incomplete ? <InfoCallout tone="orange">Incomplete cost coverage: {aiBudget.unpricedEvents} unpriced events, {aiBudget.unknownUsageEvents} unknown-usage events{aiBudget.truncated ? ", and more than 10,000 events" : ""}. Total spend may be higher than shown; do not treat the percentage as final.</InfoCallout> : null}
+                  <p className="aca-muted-small">{aiBudget.totalEvents} calls this month. Notifications are visible only inside this dashboard. No email alerts and no automatic blocking.</p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Calls</th><th>Failures</th><th>Unpriced</th><th>Known USD</th></tr></thead>
+                      <tbody>{aiBudget.byProvider.map((entry) => <tr key={entry.provider}>
+                        <td>{entry.provider}</td><td>{entry.events}</td><td>{entry.failed}</td><td>{entry.unpriced}</td><td>${entry.estimatedCostUsd.toFixed(6)}</td>
+                      </tr>)}</tbody>
+                    </table>
+                    {!aiBudget.byProvider.length ? <p className="aca-muted-small">No recorded events this month.</p> : null}
+                  </div>
+                  <strong>Model reliability (up to 30 models)</strong>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Failures</th><th>Known USD</th></tr></thead><tbody>
+                      {aiBudget.byModel.map((entry) => <tr key={`${entry.provider}:${entry.model}`}><td>{entry.provider}</td><td>{entry.model}</td><td>{entry.events}</td><td>{entry.failed}</td><td>${entry.estimatedCostUsd.toFixed(6)}</td></tr>)}
+                    </tbody></table>
+                  </div>
+                </> : <p className="aca-muted-small">Budget status not loaded.</p>}
               </div>
             </Card>
             <Card

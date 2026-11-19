@@ -14,6 +14,7 @@ import { ShopifyAuthGuard } from '../shopify-auth/shopify-auth.guard.js';
 import type { ShopifyAuthContext } from '../shopify-auth/shopify-auth.types.js';
 
 import { UsagePricingService } from './usage-pricing.service.js';
+import { AiBudgetService } from './ai-budget.service.js';
 
 import { AiRegistryService } from './ai-registry.service.js';
 
@@ -43,6 +44,7 @@ export class AiController {
 
     private readonly aiModelCatalogService: AiModelCatalogService,
     private readonly usagePricing: UsagePricingService,
+    private readonly aiBudget: AiBudgetService,
   ) {}
 
   @Get('providers')
@@ -100,6 +102,18 @@ export class AiController {
   @ApiOperation({ summary: 'Save versioned, per-shop estimated provider prices' })
   setUsagePricing(@CurrentShop() shop: ShopifyAuthContext, @Body() body: { rules?: unknown; expectedVersion?: unknown }) {
     return this.usagePricing.update(shop.shopDomain, body);
+  }
+
+  @Get('budget')
+  @ApiOperation({ summary: 'Monthly advisory AI budget, usage coverage and provider errors' })
+  getAiBudget(@CurrentShop() shop: ShopifyAuthContext) {
+    return this.aiBudget.get(shop.shopDomain);
+  }
+
+  @Patch('budget')
+  @ApiOperation({ summary: 'Set monthly advisory budget without stopping translations' })
+  updateAiBudget(@CurrentShop() shop: ShopifyAuthContext, @Body() body: { monthlyBudgetUsd?: unknown; expectedVersion?: unknown }) {
+    return this.aiBudget.update(shop.shopDomain, body);
   }
 
   @Get('configuration')

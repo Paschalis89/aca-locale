@@ -11,6 +11,7 @@ import { AiConfigurationService } from './ai-configuration.service.js';
 import { AiModelCatalogService } from './ai-model-catalog.service.js';
 
 import { UsagePricingService } from './usage-pricing.service.js';
+import { AiBudgetService } from './ai-budget.service.js';
 
 import { AiController } from './ai.controller.js';
 
@@ -20,8 +21,8 @@ import { AiController } from './ai.controller.js';
 
   controllers: [AiController],
 
-  providers: [AiRegistryService, AiConfigurationService, AiModelCatalogService, UsagePricingService],
+  providers: [AiRegistryService, AiConfigurationService, AiModelCatalogService, UsagePricingService, AiBudgetService],
 
-  exports: [AiRegistryService, AiConfigurationService, AiModelCatalogService, UsagePricingService],
+  exports: [AiRegistryService, AiConfigurationService, AiModelCatalogService, UsagePricingService, AiBudgetService],
 })
 export class AiModule {}

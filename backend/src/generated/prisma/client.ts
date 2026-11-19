@@ -126,3 +126,8 @@ export type UsagePricingProfile = Prisma.UsagePricingProfileModel
  *
  */
 export type UsagePricingRevision = Prisma.UsagePricingRevisionModel
+/**
+ * Model AiBudgetProfile
+ *
+ */
+export type AiBudgetProfile = Prisma.AiBudgetProfileModel
