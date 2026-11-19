@@ -149,6 +149,30 @@ type ScannerResult = {
   [key: string]: unknown;
 };
 
+type AiProviderHealthRow = {
+  provider: string;
+  status: "OK" | "ERROR" | "NOT_CONFIGURED";
+  latencyMs: number | null;
+  message: string;
+  availableModels?: number;
+  usage?: { characterCount: number; characterLimit: number };
+};
+
+type AiModelCatalogRow = {
+  provider: string;
+  status: "OK" | "ERROR" | "NOT_CONFIGURED";
+  configured: boolean;
+  requiresModel: boolean;
+  message: string;
+  modelCount: number;
+  models: Array<{ id: string; name: string; selectable: boolean; createdAt?: string | null }>;
+};
+
+type AiModelCatalog = {
+  generatedAt: string;
+  providers: AiModelCatalogRow[];
+};
+
 type AiConfigurationForm = {
   translationProvider: string;
   translationModel: string;
@@ -306,6 +330,14 @@ export default function Index() {
     fallbackProvider: "OPENAI",
     fallbackModel: "gpt-6-luna",
   });
+
+  const [aiProviderHealth, setAiProviderHealth] = useState<AiProviderHealthRow[] | null>(null);
+  const [aiProviderHealthError, setAiProviderHealthError] = useState<string | null>(null);
+  const [aiProviderHealthCheckedAt, setAiProviderHealthCheckedAt] = useState<string | null>(null);
+  const [aiModelCatalog, setAiModelCatalog] = useState<AiModelCatalog | null>(null);
+  const [aiModelCatalogError, setAiModelCatalogError] = useState<string | null>(null);
+  const [aiCatalogProviderFilter, setAiCatalogProviderFilter] = useState("ALL");
+  const [aiCatalogSearch, setAiCatalogSearch] = useState("");
 
   const [pricingVersion, setPricingVersion] = useState(0);
   const [pricingSource, setPricingSource] = useState("ENVIRONMENT");
@@ -465,6 +497,47 @@ export default function Index() {
     } finally {
       setLoadingGlossary(false);
     }
+  };
+
+  // Both lookups require a deliberate operator click. Neither creates an AI inference,
+  // modifies credentials, runs translations, or changes the saved shop configuration.
+  const checkAiProviderConnections = async () => {
+    setAiProviderHealthError(null);
+    await runAction("ai-provider-health", async () => {
+      try {
+        const data = await apiCall("/api/backend/ai-providers-health", {}, false);
+        if (!Array.isArray(data?.providers)) throw new Error("Invalid provider status response.");
+        setAiProviderHealth(data.providers as AiProviderHealthRow[]);
+        setAiProviderHealthCheckedAt(new Date().toISOString());
+      } catch (error) {
+        setAiProviderHealthError(error instanceof Error ? error.message : "Unable to check provider connections.");
+        throw error;
+      }
+    });
+  };
+
+  const browseAiModels = async () => {
+    setAiModelCatalogError(null);
+    await runAction("ai-model-catalog", async () => {
+      try {
+        const data = await apiCall("/api/backend/ai-models", {}, false);
+        if (!Array.isArray(data?.providers)) throw new Error("Invalid model catalog response.");
+        setAiModelCatalog(data as AiModelCatalog);
+      } catch (error) {
+        setAiModelCatalogError(error instanceof Error ? error.message : "Unable to load models.");
+        throw error;
+      }
+    });
+  };
+
+  const chooseAiCatalogModel = (provider: string, modelId: string, target: "translation" | "fallback" | "review") => {
+    const upper = provider.toUpperCase();
+    setAiConfiguration((current) => target === "translation"
+      ? { ...current, translationProvider: upper, translationModel: modelId }
+      : target === "fallback"
+        ? { ...current, fallbackProvider: upper, fallbackModel: modelId }
+        : { ...current, reviewProvider: upper, reviewModel: modelId });
+    shopify.toast.show(`Selected ${modelId} for ${target}. Save Configuration to apply to future jobs.`);
   };
 
   const loadPricing = async () => {
@@ -2482,6 +2555,76 @@ export default function Index() {
                 <p className="aca-muted-small">Historical cost snapshots remain unchanged. Recent revisions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
               </div>
             </Card>
+            <Card
+              title="AI Provider Management"
+              subtitle="Manual credential checks and live model discovery; no AI generations or configuration changes."
+            >
+              <div className="aca-column-stack">
+                <div className="aca-actions">
+                  <ActionButton label="Check provider connections" actionKey="ai-provider-health" busyAction={busyAction} onClick={() => void checkAiProviderConnections()} />
+                  <ActionButton label="Load model catalog" actionKey="ai-model-catalog" busyAction={busyAction} onClick={() => void browseAiModels()} />
+                </div>
+                <p className="aca-muted-small">Checks contact provider metadata/usage endpoints and may make API requests, but do not generate billable text. Connection success does not guarantee model-specific access or remaining quota. API keys remain on the backend.</p>
+                {aiProviderHealthError ? <InfoCallout tone="orange">Provider check failed: {aiProviderHealthError}</InfoCallout> : null}
+                {aiProviderHealth ? (
+                  <div>
+                    <p className="aca-muted-small">Last checked: {aiProviderHealthCheckedAt ? new Date(aiProviderHealthCheckedAt).toLocaleString() : "—"} (manual snapshot)</p>
+                    <div className="aca-table-wrap">
+                      <table className="aca-table">
+                        <thead><tr><th>Provider</th><th>Connection</th><th>Latency</th><th>Details</th></tr></thead>
+                        <tbody>{aiProviderHealth.map((provider) => (
+                          <tr key={provider.provider}>
+                            <td>{provider.provider.toUpperCase()}</td>
+                            <td>{provider.status}</td>
+                            <td>{provider.latencyMs === null ? "—" : `${provider.latencyMs} ms`}</td>
+                            <td>{provider.status === "OK"
+                              ? provider.usage
+                                ? `${provider.usage.characterCount.toLocaleString()} / ${provider.usage.characterLimit.toLocaleString()} DeepL characters`
+                                : "Credentials accepted"
+                              : provider.status === "NOT_CONFIGURED" ? "No server-side key" : "Connection check failed (see server logs)"}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+                {aiModelCatalogError ? <InfoCallout tone="orange">Model catalog unavailable: {aiModelCatalogError}</InfoCallout> : null}
+                {aiModelCatalog ? (
+                  <div className="aca-column-stack">
+                    <p className="aca-muted-small">Catalog generated {new Date(aiModelCatalog.generatedAt).toLocaleString()}. Provider catalog is cached for up to five minutes. Only models marked selectable can be chosen.</p>
+                    <div className="aca-actions">
+                      <select aria-label="Filter AI model provider" style={{ ...inputStyle, maxWidth: 180 }} value={aiCatalogProviderFilter} onChange={(event) => setAiCatalogProviderFilter(event.target.value)}>
+                        <option value="ALL">All providers</option>
+                        {aiModelCatalog.providers.map((provider) => <option key={provider.provider} value={provider.provider}>{provider.provider.toUpperCase()}</option>)}
+                      </select>
+                      <input aria-label="Search AI models" placeholder="Search model ID or name" style={{ ...inputStyle, maxWidth: 270 }} value={aiCatalogSearch} onChange={(event) => setAiCatalogSearch(event.target.value)} />
+                    </div>
+                    {aiModelCatalog.providers.filter((provider) => aiCatalogProviderFilter === "ALL" || provider.provider === aiCatalogProviderFilter).map((provider) => {
+                      const models = provider.models.filter((model) => model.selectable && `${model.id} ${model.name}`.toLowerCase().includes(aiCatalogSearch.trim().toLowerCase()));
+                      return (
+                        <div key={provider.provider} style={{ border: `1px solid ${ACA.line}`, borderRadius: 8, padding: 10 }}>
+                          <strong>{provider.provider.toUpperCase()} · {provider.status} · {provider.modelCount} reported</strong>
+                          {provider.status !== "OK" ? <p className="aca-muted-small">Catalog not available for this provider.</p> : null}
+                          {provider.provider === "deepl" ? <p className="aca-muted-small">DeepL requires no model ID.</p> : null}
+                          {models.length === 0 && provider.requiresModel && provider.status === "OK" ? <p className="aca-muted-small">No selectable models match the filter.</p> : null}
+                          {models.slice(0, 25).map((model) => (
+                            <div key={model.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${ACA.line}` }}>
+                              <div style={{ flex: "1 1 190px", minWidth: 0 }}><strong>{model.name}</strong><div className="aca-muted-small">{model.id}</div></div>
+                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "translation")}>Use for translation</button>
+                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "fallback")}>Use as fallback</button>
+                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "review")}>Use for review</button>
+                            </div>
+                          ))}
+                          {models.length > 25 ? <p className="aca-muted-small">Showing the first 25 matches. Narrow the search to see more.</p> : null}
+                        </div>
+                      );
+                    })}
+                    <InfoCallout tone="blue">Selecting a model only fills the Translation Engine or AI Review form. Press Save Configuration separately to update future jobs. Existing jobs are not changed.</InfoCallout>
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+
             <Card
               title="Translation Engine"
               subtitle="Choose the primary translation provider and fallback used for future jobs."
