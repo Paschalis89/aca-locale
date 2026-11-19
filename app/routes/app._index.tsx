@@ -315,6 +315,7 @@ export default function Index() {
   const [pricingDirty, setPricingDirty] = useState(false);
   const [pricingHistory, setPricingHistory] = useState<Array<{version: number; createdAt: string}>>([]);
   const [pricingError, setPricingError] = useState<string | null>(null);
+  const [pricingPreview, setPricingPreview] = useState<null | { dryRun: boolean; totalEvents: number; sampledEvents: number; truncated: boolean; costedEvents: number; unpricedEvents: number; unknownUsageEvents: number; estimatedCostUsd: number; complete: boolean }>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
@@ -476,9 +477,28 @@ export default function Index() {
       setPricingDirty(false);
       setPricingHistory(data.history ?? []);
       setPricingError(null);
+      setPricingPreview(null);
     } catch (error) {
       setPricingError(error instanceof Error ? error.message : "Unable to load pricing.");
     }
+  };
+
+  const previewPricing = async () => {
+    let rules: unknown;
+    try {
+      rules = pricingAdvanced ? JSON.parse(pricingRulesText) : rulesFromPricingRows(pricingRows);
+      if (!rules || typeof rules !== "object" || Array.isArray(rules)) throw new Error("Invalid rules object.");
+      setPricingError(null);
+    } catch (error) {
+      setPricingError(error instanceof Error ? error.message : "Invalid rules.");
+      return;
+    }
+    await runAction("preview-usage-pricing", async () => {
+      const data = await apiCall("/api/backend/usage-pricing-preview", {
+        method: "POST", body: JSON.stringify({ rules }),
+      });
+      setPricingPreview(data);
+    }, "Pricing simulation finished. No rates saved.");
   };
 
   const savePricing = async () => {
@@ -505,9 +525,11 @@ export default function Index() {
     setPricingRows((current) => current.map((row, i) => i === index ? { ...row, ...patch } : row));
     setPricingDirty(true);
     setPricingError(null);
+    setPricingPreview(null);
   };
 
   const switchPricingEditor = () => {
+    setPricingPreview(null);
     try {
       if (pricingAdvanced) {
         setPricingRows(pricingRowsFromRules(JSON.parse(pricingRulesText)));
@@ -2409,12 +2431,12 @@ export default function Index() {
                   <button type="button" className="aca-mini-action" onClick={switchPricingEditor}>
                     {pricingAdvanced ? "Use guided editor" : "Advanced: edit JSON"}
                   </button>
-                  {!pricingAdvanced ? <button type="button" className="aca-mini-action" onClick={() => { setPricingRows((current) => [...current, { provider: "DEEPL", model: "*", charactersPerMillionUsd: "", inputPerMillionUsd: "", outputPerMillionUsd: "" }]); setPricingDirty(true); }}>+ Add provider / model</button> : null}
+                  {!pricingAdvanced ? <button type="button" className="aca-mini-action" onClick={() => { setPricingRows((current) => [...current, { provider: "DEEPL", model: "*", charactersPerMillionUsd: "", inputPerMillionUsd: "", outputPerMillionUsd: "" }]); setPricingDirty(true); setPricingPreview(null); }}>+ Add provider / model</button> : null}
                 </div>
                 {pricingAdvanced ? (
                   <Field label="Pricing JSON: PROVIDER:model or PROVIDER:*">
                     <textarea aria-label="Versioned usage pricing JSON" value={pricingRulesText}
-                      onChange={(event) => { setPricingRulesText(event.target.value); setPricingDirty(true); }}
+                      onChange={(event) => { setPricingRulesText(event.target.value); setPricingDirty(true); setPricingPreview(null); }}
                       rows={11} spellCheck={false} style={{ ...inputStyle, fontFamily: "monospace", width: "100%" }} />
                   </Field>
                 ) : (
@@ -2432,7 +2454,7 @@ export default function Index() {
                               <td key={key}><input aria-label={`${key} row ${index + 1}`} type="number" min="0" max="100000" step="any" value={row[key]}
                                 onChange={(event) => editPricingRow(index, { [key]: event.target.value })} style={{ ...inputStyle, minWidth: 100 }} placeholder="—" /></td>
                             ))}
-                            <td><button type="button" className="aca-mini-action" aria-label={`Remove pricing row ${index + 1}`} onClick={() => { setPricingRows((current) => current.filter((_, i) => i !== index)); setPricingDirty(true); }}>Remove</button></td>
+                            <td><button type="button" className="aca-mini-action" aria-label={`Remove pricing row ${index + 1}`} onClick={() => { setPricingRows((current) => current.filter((_, i) => i !== index)); setPricingDirty(true); setPricingPreview(null); }}>Remove</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -2443,10 +2465,20 @@ export default function Index() {
                 <p className="aca-muted-small">Use * only when the same price applies to all models of a provider. Blank fields mean that rate is not configured. A numerical 0 is an explicit zero-dollar rate.</p>
                 {pricingError ? <p role="alert" style={{ color: ACA.danger }}>{pricingError}</p> : null}
                 <div className="aca-actions">
+                  <ActionButton label="Preview historical usage (no save)" actionKey="preview-usage-pricing" busyAction={busyAction} onClick={() => void previewPricing()} />
                   <ActionButton label="Save new pricing version" actionKey="save-usage-pricing" busyAction={busyAction} onClick={() => void savePricing()} />
                   <button className="aca-mini-action" type="button" onClick={() => void loadPricing()}>Discard edits / Refresh</button>
                   {pricingDirty ? <span className="aca-muted-small">Unsaved changes</span> : null}
                 </div>
+                {pricingPreview ? (
+                  <div role="status" style={{ border: `1px solid ${ACA.line}`, padding: 12, borderRadius: 8 }}>
+                    <strong>30-day cost simulation — not saved</strong>
+                    <p className="aca-muted-small">Previewed {pricingPreview.sampledEvents} of {pricingPreview.totalEvents} events. Priced: {pricingPreview.costedEvents}; unpriced: {pricingPreview.unpricedEvents}; usage unknown: {pricingPreview.unknownUsageEvents}.</p>
+                    <p style={{ fontWeight: 700 }}>Simulated USD ${pricingPreview.estimatedCostUsd.toFixed(6)} {pricingPreview.complete ? "(complete for observed events)" : "(INCOMPLETE — not an invoice)"}</p>
+                    {pricingPreview.truncated ? <p role="alert">More than 10,000 events in the period: this preview covers only the most recent 10,000.</p> : null}
+                    <p className="aca-muted-small">These rates are only simulated against recorded usage. Historical event costs and provider invoices are unchanged.</p>
+                  </div>
+                ) : null}
                 <p className="aca-muted-small">Historical cost snapshots remain unchanged. Recent revisions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
               </div>
             </Card>

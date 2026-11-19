@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 
 import {
   ApiBearerAuth,
@@ -88,6 +88,12 @@ export class AiController {
   @ApiOperation({ summary: 'Get shop pricing and recent version history' })
   getUsagePricing(@CurrentShop() shop: ShopifyAuthContext) {
     return this.usagePricing.get(shop.shopDomain);
+  }
+
+  @Post('usage-pricing/preview')
+  @ApiOperation({ summary: 'Preview pricing against recorded usage, without saving or changing history' })
+  previewUsagePricing(@CurrentShop() shop: ShopifyAuthContext, @Body() body: { rules?: unknown }) {
+    return this.usagePricing.preview(shop.shopDomain, body);
   }
 
   @Patch('usage-pricing')

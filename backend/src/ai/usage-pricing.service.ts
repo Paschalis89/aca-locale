@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import { readPricingRules, type UsagePricingRule } from '../translation-usage/translation-usage-cost.js';
+import { estimateUsageCost, readPricingRules, type UsagePricingRule } from '../translation-usage/translation-usage-cost.js';
 
 export function validateUsagePricingRules(value: unknown): Record<string, UsagePricingRule> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BadRequestException('Rules must be a JSON object.');
@@ -49,6 +49,53 @@ export class UsagePricingService {
     return profile
       ? { source: 'SHOP', version: profile.version, rules: profile.rules, updatedAt: profile.updatedAt, history }
       : { source: 'ENVIRONMENT', version: 0, rules: readPricingRules(), updatedAt: null, history };
+  }
+
+  /**
+   * Read-only quote of the previous 30 days using PROPOSED rates.
+   * Does not mutate event snapshots, write prices, or call a provider.
+   * Events reporting unknown usage are intentionally excluded from cost estimates.
+   */
+  async preview(shopifyDomain: string, body: { rules?: unknown }) {
+    const shopId = await this.shopId(shopifyDomain);
+    const rules = validateUsagePricingRules(body?.rules);
+    const from = new Date();
+    from.setUTCDate(from.getUTCDate() - 29);
+    from.setUTCHours(0, 0, 0, 0);
+
+    const where = { shopId, createdAt: { gte: from } };
+    const totalEvents = await this.prisma.translationUsageEvent.count({ where });
+    const maxEvents = 10000;
+    const events = await this.prisma.translationUsageEvent.findMany({
+      where,
+      select: { provider: true, model: true, usageKnown: true, billedCharacters: true, inputTokens: true, outputTokens: true },
+      orderBy: { createdAt: 'desc' },
+      take: maxEvents,
+    });
+    let costedEvents = 0;
+    let unpricedEvents = 0;
+    let unknownUsageEvents = 0;
+    let totalMicrousd = 0;
+    for (const event of events) {
+      if (!event.usageKnown) { unknownUsageEvents++; continue; }
+      const result = estimateUsageCost(event, { rules, version: 'PREVIEW' });
+      if (result.estimatedCostMicrousd === null) { unpricedEvents++; continue; }
+      costedEvents++;
+      totalMicrousd += result.estimatedCostMicrousd;
+    }
+    return {
+      dryRun: true,
+      days: 30,
+      totalEvents,
+      sampledEvents: events.length,
+      truncated: totalEvents > maxEvents,
+      costedEvents,
+      unpricedEvents,
+      unknownUsageEvents,
+      estimatedCostUsd: Number((totalMicrousd / 1000000).toFixed(6)),
+      complete: totalEvents <= maxEvents && unpricedEvents === 0 && unknownUsageEvents === 0,
+      note: 'Retrospective simulation only. Does not change historical charges or guarantee future invoices.',
+    };
   }
 
   async update(shopifyDomain: string, body: { rules?: unknown; expectedVersion?: unknown }) {
