@@ -59,6 +59,46 @@ export function summarizeBudgetEvents(
   };
 }
 
+/** Classify provider failures without returning raw messages or translation contents. */
+export function classifyProviderError(message: string | null): string {
+  if (!message) return 'UNSPECIFIED';
+  if (/\b(429|rate.limit|too.many.requests|quota)\b/i.test(message)) return 'RATE_LIMIT';
+  if (/\b(401|403|unauthori[sz]ed|forbidden|invalid.api.key|authentication)\b/i.test(message)) return 'AUTHENTICATION';
+  if (/\b(timeout|timed.out|ETIMEDOUT|abort)\b/i.test(message)) return 'TIMEOUT';
+  if (/\b(500|502|503|504|unavailable|ECONNRESET|ECONNREFUSED)\b/i.test(message)) return 'PROVIDER_UNAVAILABLE';
+  if (/\b(400|422|invalid.request|validation)\b/i.test(message)) return 'INVALID_REQUEST';
+  return 'OTHER';
+}
+
+export type FailureSnapshot = {
+  id: string;
+  createdAt: Date;
+  provider: string;
+  model: string | null;
+  stage: string;
+  fallback: boolean;
+  errorMessage: string | null;
+};
+
+export function buildOperationalAlerts(input: {
+  threshold: string;
+  incomplete: boolean;
+  unpricedEvents: number;
+  unknownUsageEvents: number;
+  failedEvents: number;
+  truncated: boolean;
+  fallbackEvents: number;
+}) {
+  const alerts: Array<{ code: string; severity: 'INFO' | 'WARNING' | 'CRITICAL'; title: string; detail: string }> = [];
+  if (input.threshold === 'OVER_100' || input.threshold === 'OVER_80' || input.threshold === 'OVER_50') {
+    alerts.push({ code: 'BUDGET_' + input.threshold, severity: input.threshold === 'OVER_100' ? 'CRITICAL' : 'WARNING', title: 'Advisory budget threshold', detail: `Known estimated costs reached the ${input.threshold === 'OVER_100' ? '100' : input.threshold === 'OVER_80' ? '80' : '50'}% threshold. No automatic blocking is enabled.` });
+  }
+  if (input.incomplete) alerts.push({ code: 'INCOMPLETE_COST_COVERAGE', severity: 'WARNING', title: 'Incomplete AI cost coverage', detail: `${input.unpricedEvents} unpriced and ${input.unknownUsageEvents} unknown-usage events. Budget percentage is a lower bound${input.truncated ? '; report is also truncated' : ''}.` });
+  if (input.failedEvents > 0) alerts.push({ code: 'PROVIDER_FAILURES', severity: 'WARNING', title: 'Provider calls failed', detail: `${input.failedEvents} failed provider calls this month. See recent failure history below.` });
+  if (input.fallbackEvents > 0) alerts.push({ code: 'FALLBACK_OBSERVED', severity: 'INFO', title: 'Fallback usage observed', detail: `${input.fallbackEvents} events were recorded with fallback=true this month; existing fallback configuration was not changed.` });
+  return alerts;
+}
+
 @Injectable()
 export class AiBudgetService {
   constructor(private readonly prisma: PrismaService) {}
@@ -79,9 +119,29 @@ export class AiBudgetService {
     const totalEvents = await this.prisma.translationUsageEvent.count({ where });
     const events = await this.prisma.translationUsageEvent.findMany({
       where, orderBy: { createdAt: 'desc' }, take: 10000,
-      select: { provider: true, model: true, success: true, usageKnown: true, estimatedCostMicrousd: true },
+      select: { provider: true, model: true, success: true, usageKnown: true, estimatedCostMicrousd: true, fallback: true },
     });
-    return summarizeBudgetEvents(events, totalEvents, profile?.monthlyBudgetCents ?? 0, from.toISOString().slice(0,7), profile?.version ?? 0);
+    const summary = summarizeBudgetEvents(events, totalEvents, profile?.monthlyBudgetCents ?? 0, from.toISOString().slice(0,7), profile?.version ?? 0);
+    // Failure list comes from the existing, shop-scoped usage ledger. No raw error text is sent to the browser.
+    const failures = await this.prisma.translationUsageEvent.findMany({
+      where: { ...where, success: false }, orderBy: { createdAt: 'desc' }, take: 30,
+      select: { id: true, createdAt: true, provider: true, model: true, stage: true, fallback: true, errorMessage: true },
+    });
+    const fallbackEvents = await this.prisma.translationUsageEvent.count({ where: { ...where, fallback: true } });
+    const recentFailures = failures.map((event: FailureSnapshot) => ({
+      id: event.id, createdAt: event.createdAt.toISOString(), provider: event.provider.toUpperCase(),
+      model: event.model, stage: event.stage, fallback: event.fallback,
+      category: classifyProviderError(event.errorMessage),
+    }));
+    return {
+      ...summary,
+      fallbackEvents,
+      recentFailures,
+      failureHistoryTruncated: summary.failedEvents > recentFailures.length,
+      alerts: buildOperationalAlerts({ ...summary, fallbackEvents }),
+      alertDelivery: 'IN_APP_ONLY',
+      fallbackPolicy: 'UNCHANGED',
+    };
   }
 
   async update(shopifyDomain: string, body: { monthlyBudgetUsd?: unknown; expectedVersion?: unknown }) {

@@ -118,6 +118,12 @@ type AiBudgetSummary = {
   unpricedEvents: number;
   unknownUsageEvents: number;
   failedEvents: number;
+  fallbackEvents?: number;
+  alertDelivery?: "IN_APP_ONLY";
+  fallbackPolicy?: "UNCHANGED";
+  alerts?: Array<{ code: string; severity: "INFO" | "WARNING" | "CRITICAL"; title: string; detail: string }>;
+  recentFailures?: Array<{ id: string; createdAt: string; provider: string; model: string | null; stage: string; fallback: boolean; category: string }>;
+  failureHistoryTruncated?: boolean;
   byProvider: Array<{ provider: string; events: number; failed: number; unpriced: number; estimatedCostUsd: number }>;
   byModel: Array<{ provider: string; model: string; events: number; failed: number; estimatedCostUsd: number }>;
 };
@@ -2627,7 +2633,31 @@ export default function Index() {
                     <InfoCallout tone="orange">Budget threshold reached: {aiBudget.threshold === "OVER_100" ? "100%+" : aiBudget.threshold === "OVER_80" ? "80%+" : "50%+"} of the monthly limit based on known estimated costs.</InfoCallout>
                   ) : null}
                   {aiBudget.incomplete ? <InfoCallout tone="orange">Incomplete cost coverage: {aiBudget.unpricedEvents} unpriced events, {aiBudget.unknownUsageEvents} unknown-usage events{aiBudget.truncated ? ", and more than 10,000 events" : ""}. Total spend may be higher than shown; do not treat the percentage as final.</InfoCallout> : null}
-                  <p className="aca-muted-small">{aiBudget.totalEvents} calls this month. Notifications are visible only inside this dashboard. No email alerts and no automatic blocking.</p>
+                  <p className="aca-muted-small">{aiBudget.totalEvents} calls this month. Notifications are derived from recorded usage on every refresh; no email alerts and no automatic blocking.</p>
+                  <strong>Operational alerts (current UTC month)</strong>
+                  {(aiBudget.alerts ?? []).length ? (aiBudget.alerts ?? []).map((alert) => (
+                    <div key={alert.code} role="status" style={{ border: "1px solid #e4d8b9", borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                      <strong>{alert.severity}: {alert.title}</strong>
+                      <p className="aca-muted-small">{alert.detail}</p>
+                    </div>
+                  )) : <p className="aca-muted-small">No active operational alerts.</p>}
+                  <div className="aca-stat-grid-3">
+                    <MiniStat label="Recorded fallback events" value={String(aiBudget.fallbackEvents ?? 0)} />
+                    <MiniStat label="Recent failures available" value={String(aiBudget.recentFailures?.length ?? 0)} />
+                    <MiniStat label="Alerts delivery" value="In-app only" />
+                  </div>
+                  <strong>Recent provider errors (up to 30, current UTC month)</strong>
+                  <p className="aca-muted-small">Error categories are classified server-side. Raw exception messages, prompts and credentials are never exposed in this table. Existing fallback policy remains unchanged.</p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="aca-pricing-table"><thead><tr><th>Time (UTC)</th><th>Provider</th><th>Model</th><th>Stage</th><th>Category</th><th>Fallback</th></tr></thead><tbody>
+                      {(aiBudget.recentFailures ?? []).map((entry) => <tr key={entry.id}>
+                        <td>{new Date(entry.createdAt).toLocaleString("en-GB", { timeZone: "UTC" })}</td>
+                        <td>{entry.provider}</td><td>{entry.model ?? "(none)"}</td><td>{entry.stage}</td><td>{entry.category}</td><td>{entry.fallback ? "Yes" : "No"}</td>
+                      </tr>)}
+                    </tbody></table>
+                    {!aiBudget.recentFailures?.length ? <p className="aca-muted-small">No recorded provider failures this month.</p> : null}
+                    {aiBudget.failureHistoryTruncated ? <p className="aca-muted-small">Showing the latest 30 failed events.</p> : null}
+                  </div>
                   <div style={{ overflowX: "auto" }}>
                     <table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Calls</th><th>Failures</th><th>Unpriced</th><th>Known USD</th></tr></thead>
                       <tbody>{aiBudget.byProvider.map((entry) => <tr key={entry.provider}>
