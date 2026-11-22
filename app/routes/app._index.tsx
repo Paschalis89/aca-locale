@@ -132,6 +132,16 @@ type AiBudgetSummary = {
   byModel: Array<{ provider: string; model: string; events: number; failed: number; estimatedCostUsd: number }>;
 };
 
+type AutomationMonitor = {
+  periodDays: number;
+  snapshotAt: string;
+  events: { total: number; PROCESSING: number; COMPLETED: number; FAILED: number };
+  automaticJobs: { total: number; stages: Record<string, number>; statuses: Record<string, number> };
+  pendingRetries: number;
+  recentFailures: Array<{ id: string; topic: string; resourceType: string; attempts: number; createdAt: string }>;
+  note: string;
+};
+
 type UsageTotals = {
   estimatedCostMicrousd: number;
   billedCharacters: number;
@@ -304,6 +314,9 @@ export default function Index() {
 
   const [activeTab, setActiveTab] = useState<AppTab>("overview");
   const [jobs, setJobs] = useState<TranslationJob[]>([]);
+  const [automationMonitor, setAutomationMonitor] = useState<AutomationMonitor | null>(null);
+  const [automationMonitorError, setAutomationMonitorError] = useState<string | null>(null);
+  const [automationMonitorLoading, setAutomationMonitorLoading] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
@@ -446,6 +459,19 @@ export default function Index() {
       shopify.toast.show(message, { isError: true });
     } finally {
       setBusyAction(null);
+    }
+  };
+
+  const loadAutomationMonitor = async () => {
+    setAutomationMonitorLoading(true);
+    setAutomationMonitorError(null);
+    try {
+      const result = await apiCall('/api/backend/translation-automation-monitor', {}, false);
+      setAutomationMonitor(result as AutomationMonitor);
+    } catch (error) {
+      setAutomationMonitorError(error instanceof Error ? error.message : 'Unable to load automation monitor.');
+    } finally {
+      setAutomationMonitorLoading(false);
     }
   };
 
@@ -712,6 +738,7 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
+    if (activeTab === "jobs") void loadAutomationMonitor();
     if (activeTab === "settings") { void loadPricing(); void loadAiBudget(); }
     if (activeTab === "usage") void loadAiBudget();
     if (activeTab === "glossary" && !glossary && !loadingGlossary) {
@@ -1665,6 +1692,31 @@ export default function Index() {
         {activeTab === "jobs" ? (
           <div className="aca-layout-jobs">
             <div className="aca-column-stack">
+              <Card title="Translation Automation Monitor" subtitle="Read-only 30-day Shopify change and automatic job recovery snapshot. No jobs or retries are triggered.">
+                <div className="aca-actions">
+                  <button type="button" className="aca-btn" onClick={() => void loadAutomationMonitor()} disabled={automationMonitorLoading}>
+                    {automationMonitorLoading ? 'Refreshing...' : 'Refresh automation status'}
+                  </button>
+                </div>
+                {automationMonitorError ? <p style={{ color: ACA.danger }}>{automationMonitorError}</p> : null}
+                {automationMonitor ? <>
+                  <div className="aca-stat-grid-4" style={{ marginTop: 12 }}>
+                    <MiniStat label="Change events (30d)" value={String(automationMonitor.events.total)} />
+                    <MiniStat label="Failed events" value={String(automationMonitor.events.FAILED)} />
+                    <MiniStat label="Automatic jobs" value={String(automationMonitor.automaticJobs.total)} />
+                    <MiniStat label="Jobs with retry scheduled" value={String(automationMonitor.pendingRetries)} />
+                  </div>
+                  <p style={mutedTextStyle}>Webhook events: {automationMonitor.events.COMPLETED} completed, {automationMonitor.events.PROCESSING} processing, {automationMonitor.events.FAILED} failed.</p>
+                  <p style={mutedTextStyle}>Automation stages: {Object.entries(automationMonitor.automaticJobs.stages).map(([stage, count]) => `${stage}: ${count}`).join(' · ') || 'No automatic jobs in the last 30 days'}.</p>
+                  {automationMonitor.recentFailures.length > 0 ? <div>
+                    <strong>Recent failed changes (max 10)</strong>
+                    {automationMonitor.recentFailures.map(event => <p key={event.id} style={mutedTextStyle}>
+                      {event.resourceType} · {event.topic} · {event.attempts} attempts · {new Date(event.createdAt).toLocaleString()}
+                    </p>)}
+                  </div> : null}
+                  <p style={mutedTextStyle}>{automationMonitor.note}</p>
+                </> : !automationMonitorLoading ? <p style={mutedTextStyle}>Open this tab to load a shop-scoped snapshot.</p> : null}
+              </Card>
               <Card title="Create Job" subtitle="Create and enqueue a background translation job.">
                 <div className="aca-form-grid-3">
                   <Field label="Target locale">

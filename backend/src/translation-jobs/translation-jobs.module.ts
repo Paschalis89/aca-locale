@@ -15,6 +15,7 @@ import { TranslationJobsController } from './translation-jobs.controller.js';
 import { TranslationJobsService } from './translation-jobs.service.js';
 
 import { TranslationQueueService } from './translation-queue.service.js';
+import { TranslationAutomationMonitorService } from './translation-automation-monitor.service.js';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { TranslationQueueService } from './translation-queue.service.js';
 
   controllers: [TranslationJobsController],
 
-  providers: [TranslationJobsService, TranslationQueueService],
+  providers: [TranslationJobsService, TranslationQueueService, TranslationAutomationMonitorService],
 
   exports: [TranslationJobsService, TranslationQueueService],
 })

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Optional,
   Post,
   Query,
   UseGuards,
@@ -45,6 +46,7 @@ import {
 import { TranslationJobsService } from './translation-jobs.service.js';
 
 import { TranslationQueueService } from './translation-queue.service.js';
+import { TranslationAutomationMonitorService } from './translation-automation-monitor.service.js';
 
 @ApiTags('Translation Jobs')
 @ApiBearerAuth()
@@ -63,6 +65,7 @@ export class TranslationJobsController {
     private readonly translationPublicationService: TranslationPublicationService,
 
     private readonly translationQueueService: TranslationQueueService,
+    @Optional() private readonly automationMonitor?: TranslationAutomationMonitorService,
   ) {}
 
   @Post()
@@ -133,6 +136,12 @@ export class TranslationJobsController {
     return this.translationJobsService.reviewQueue(shop.shopDomain, {
       page, limit, locale, resourceType, status, search,
     });
+  }
+
+  @Get('automation/monitor')
+  @ApiOperation({ summary: 'Shop-scoped, read-only 30-day automation and recovery snapshot' })
+  automationMonitorStatus(@CurrentShop() shop: ShopifyAuthContext) {
+    return this.automationMonitor!.get(shop.shopDomain);
   }
 
   @Get(':id/queue')
