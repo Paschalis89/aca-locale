@@ -29,6 +29,68 @@ export function validateUsagePricingRules(value: unknown): Record<string, UsageP
   return normalized;
 }
 
+/** A bounded, read-only aggregation over recorded provider usage; no pricing writes. */
+export function analyzePricingPreview(
+  events: Array<{ provider: string; model: string | null; usageKnown: boolean; billedCharacters: number; inputTokens: number; outputTokens: number; stage?: string }>,
+  rules: Record<string, UsagePricingRule>,
+  totalEvents: number,
+) {
+  const groups = new Map<string, { provider: string; model: string | null; stage: string; events: number; priced: number; unpriced: number; unknownUsage: number; estimatedCostMicrousd: number }>();
+  let costedEvents = 0;
+  let unpricedEvents = 0;
+  let unknownUsageEvents = 0;
+  let totalMicrousd = 0;
+  const missingRateKeys = new Set<string>();
+  for (const event of events) {
+    const provider = event.provider.trim().toUpperCase();
+    const model = event.model?.trim() || null;
+    const stage = event.stage ?? 'UNKNOWN';
+    const key = JSON.stringify([provider, model, stage]);
+    const row = groups.get(key) ?? { provider, model, stage, events: 0, priced: 0, unpriced: 0, unknownUsage: 0, estimatedCostMicrousd: 0 };
+    row.events++;
+    if (!event.usageKnown) {
+      unknownUsageEvents++;
+      row.unknownUsage++;
+    } else {
+      const result = estimateUsageCost(event, { rules, version: 'PREVIEW' });
+      if (result.estimatedCostMicrousd === null) {
+        unpricedEvents++;
+        row.unpriced++;
+        missingRateKeys.add(`${provider}:${model ?? '*'}`);
+      } else {
+        costedEvents++;
+        row.priced++;
+        totalMicrousd += result.estimatedCostMicrousd;
+        row.estimatedCostMicrousd += result.estimatedCostMicrousd;
+      }
+    }
+    groups.set(key, row);
+  }
+  const truncated = totalEvents > events.length;
+  const complete = !truncated && !unpricedEvents && !unknownUsageEvents;
+  const usd = (micros: number) => Number((micros / 1_000_000).toFixed(6));
+  const estimatedCostUsd = usd(totalMicrousd);
+  return {
+    totalEvents,
+    sampledEvents: events.length,
+    truncated,
+    costedEvents,
+    unpricedEvents,
+    unknownUsageEvents,
+    estimatedCostUsd,
+    complete,
+    costCoveragePercent: totalEvents ? Number((costedEvents / totalEvents * 100).toFixed(2)) : 100,
+    projected30DayUsd: complete && events.length ? estimatedCostUsd : null,
+    projectedMonthUsd: complete && events.length ? usd(totalMicrousd / 30 * new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0)).getUTCDate()) : null,
+    lowerBound30DayUsd: estimatedCostUsd,
+    missingRateKeys: [...missingRateKeys].sort().slice(0, 50),
+    missingRateKeysTruncated: missingRateKeys.size > 50,
+    byProviderModel: [...groups.values()].sort((a, b) => b.events - a.events || a.provider.localeCompare(b.provider))
+      .slice(0, 50).map((g) => ({ ...g, estimatedCostUsd: usd(g.estimatedCostMicrousd), estimatedCostMicrousd: undefined })),
+    groupsTruncated: groups.size > 50,
+  };
+}
+
 @Injectable()
 export class UsagePricingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -68,33 +130,16 @@ export class UsagePricingService {
     const maxEvents = 10000;
     const events = await this.prisma.translationUsageEvent.findMany({
       where,
-      select: { provider: true, model: true, usageKnown: true, billedCharacters: true, inputTokens: true, outputTokens: true },
+      select: { provider: true, model: true, stage: true, usageKnown: true, billedCharacters: true, inputTokens: true, outputTokens: true },
       orderBy: { createdAt: 'desc' },
       take: maxEvents,
     });
-    let costedEvents = 0;
-    let unpricedEvents = 0;
-    let unknownUsageEvents = 0;
-    let totalMicrousd = 0;
-    for (const event of events) {
-      if (!event.usageKnown) { unknownUsageEvents++; continue; }
-      const result = estimateUsageCost(event, { rules, version: 'PREVIEW' });
-      if (result.estimatedCostMicrousd === null) { unpricedEvents++; continue; }
-      costedEvents++;
-      totalMicrousd += result.estimatedCostMicrousd;
-    }
+    const intelligence = analyzePricingPreview(events, rules, totalEvents);
     return {
       dryRun: true,
       days: 30,
-      totalEvents,
-      sampledEvents: events.length,
-      truncated: totalEvents > maxEvents,
-      costedEvents,
-      unpricedEvents,
-      unknownUsageEvents,
-      estimatedCostUsd: Number((totalMicrousd / 1000000).toFixed(6)),
-      complete: totalEvents <= maxEvents && unpricedEvents === 0 && unknownUsageEvents === 0,
-      note: 'Retrospective simulation only. Does not change historical charges or guarantee future invoices.',
+      ...intelligence,
+      note: 'Retrospective simulation only. Projection is a 30-day observed run-rate, not an invoice or guarantee. Historical snapshots remain unchanged.',
     };
   }
 

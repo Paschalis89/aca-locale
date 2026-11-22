@@ -377,7 +377,14 @@ export default function Index() {
   const [pricingDirty, setPricingDirty] = useState(false);
   const [pricingHistory, setPricingHistory] = useState<Array<{version: number; createdAt: string}>>([]);
   const [pricingError, setPricingError] = useState<string | null>(null);
-  const [pricingPreview, setPricingPreview] = useState<null | { dryRun: boolean; totalEvents: number; sampledEvents: number; truncated: boolean; costedEvents: number; unpricedEvents: number; unknownUsageEvents: number; estimatedCostUsd: number; complete: boolean }>(null);
+  const [pricingPreview, setPricingPreview] = useState<null | {
+    dryRun: boolean; totalEvents: number; sampledEvents: number; truncated: boolean; costedEvents: number;
+    unpricedEvents: number; unknownUsageEvents: number; estimatedCostUsd: number; complete: boolean;
+    costCoveragePercent?: number; projected30DayUsd?: number | null; projectedMonthUsd?: number | null; lowerBound30DayUsd?: number;
+    missingRateKeys?: string[]; missingRateKeysTruncated?: boolean;
+    byProviderModel?: Array<{ provider: string; model: string | null; stage: string; events: number; priced: number; unpriced: number; unknownUsage: number; estimatedCostUsd: number }>;
+    groupsTruncated?: boolean;
+  }>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
@@ -2604,6 +2611,29 @@ export default function Index() {
                     <strong>30-day cost simulation — not saved</strong>
                     <p className="aca-muted-small">Previewed {pricingPreview.sampledEvents} of {pricingPreview.totalEvents} events. Priced: {pricingPreview.costedEvents}; unpriced: {pricingPreview.unpricedEvents}; usage unknown: {pricingPreview.unknownUsageEvents}.</p>
                     <p style={{ fontWeight: 700 }}>Simulated USD ${pricingPreview.estimatedCostUsd.toFixed(6)} {pricingPreview.complete ? "(complete for observed events)" : "(INCOMPLETE — not an invoice)"}</p>
+                    <h4 style={{ marginTop: 12, color: ACA.blue }}>Cost intelligence — simulated rates only</h4>
+                    <div className="aca-actions">
+                      <span className="aca-muted-small">Priced coverage: {pricingPreview.costCoveragePercent?.toFixed(2) ?? "—"}% of recorded events</span>
+                      <span className="aca-muted-small">30-day cost lower bound: ${pricingPreview.lowerBound30DayUsd?.toFixed(6) ?? pricingPreview.estimatedCostUsd.toFixed(6)}</span>
+                    </div>
+                    <p className="aca-muted-small">{pricingPreview.projected30DayUsd === null || pricingPreview.projected30DayUsd === undefined
+                      ? "Forecast unavailable: some events have missing prices, unknown usage or truncated history. The known amount is only a lower bound."
+                      : `Observed 30-day run-rate: $${pricingPreview.projected30DayUsd.toFixed(6)}; illustrative current-month run-rate: $${pricingPreview.projectedMonthUsd?.toFixed(6) ?? "—"}. Assumes the last 30 days repeat daily; not an invoice forecast.`}</p>
+                    {aiBudget?.monthlyBudgetUsd ? (
+                      <p className="aca-muted-small">Simulated share of the ${aiBudget.monthlyBudgetUsd.toFixed(2)} USD advisory monthly budget: {(pricingPreview.estimatedCostUsd / aiBudget.monthlyBudgetUsd * 100).toFixed(2)}% {pricingPreview.complete ? "(observed 30-day comparison)" : "(minimum only — incomplete)"}. This does not change budget alerts.</p>
+                    ) : null}
+                    {(pricingPreview.missingRateKeys?.length ?? 0) > 0 ? (
+                      <div><strong>Missing pricing entries</strong><p className="aca-muted-small">Configure contractual rates for these observed provider/model pairs. No automatic prices are imported.</p>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{pricingPreview.missingRateKeys?.map((key) => <span key={key} style={{ border: `1px solid ${ACA.line}`, borderRadius: 6, padding: "4px 8px", fontSize: 12 }}>{key}</span>)}</div>
+                        {pricingPreview.missingRateKeysTruncated ? <p className="aca-muted-small">Additional missing keys are not shown.</p> : null}
+                      </div>
+                    ) : null}
+                    {(pricingPreview.byProviderModel?.length ?? 0) > 0 ? (
+                      <div style={{ overflowX: "auto", marginTop: 12 }}><table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Model</th><th>Stage</th><th>Events</th><th>Priced</th><th>Unpriced</th><th>Unknown usage</th><th>Known USD</th></tr></thead>
+                        <tbody>{pricingPreview.byProviderModel?.map((g, index) => <tr key={`${g.provider}:${g.model}:${g.stage}:${index}`}><td>{g.provider}</td><td>{g.model ?? "—"}</td><td>{g.stage}</td><td>{g.events}</td><td>{g.priced}</td><td>{g.unpriced}</td><td>{g.unknownUsage}</td><td>${g.estimatedCostUsd.toFixed(6)}</td></tr>)}</tbody></table>
+                        {pricingPreview.groupsTruncated ? <p role="alert">Only the first 50 provider/model groups are displayed.</p> : null}
+                      </div>
+                    ) : null}
                     {pricingPreview.truncated ? <p role="alert">More than 10,000 events in the period: this preview covers only the most recent 10,000.</p> : null}
                     <p className="aca-muted-small">These rates are only simulated against recorded usage. Historical event costs and provider invoices are unchanged.</p>
                   </div>
