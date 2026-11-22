@@ -7,6 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { formatUsageUsd, usageHasUnpricedCosts } from "../lib/usage-analytics";
 import { pricingRowsFromRules, rulesFromPricingRows, type PricingEditorRow } from "../lib/usage-pricing-editor";
+import { qualitySnapshot } from "../lib/translation-quality";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -63,6 +64,9 @@ type JobItem = {
   humanReviewNote?: string | null;
   validationWarnings?: number;
   validationErrors?: number;
+  validationPassed?: boolean | null;
+  validationVersion?: string | null;
+  validationIssues?: unknown;
   errorMessage?: string | null;
   regeneratedFromItemId?: string | null;
   field?: {
@@ -855,7 +859,7 @@ export default function Index() {
     const targets = filteredReviewQueue.filter(({ item }) =>
       selectedReviewIds.includes(item.id) &&
       (item.status === "VALIDATED" || item.status === "NEEDS_REVIEW") &&
-      Boolean(item.translatedValue?.trim()),
+      Boolean(item.translatedValue?.trim()) && qualitySnapshot(item).state !== "BLOCKED",
     );
     if (targets.length === 0) {
       shopify.toast.show("Select reviewable items with generated translations.", { isError: true });
@@ -1910,7 +1914,7 @@ export default function Index() {
               <div className="aca-actions" style={{ margin: "12px 0" }}>
                 <span className="aca-muted-small">{filteredReviewQueue.length} on page · {reviewPageData?.total ?? "—"} total · {selectedReviewIds.length} selected</span>
                 <button type="button" className="aca-mini-action" disabled={busyAction !== null} onClick={() => {
-                  const visibleIds = filteredReviewQueue.filter(({ item }) => Boolean(item.translatedValue?.trim())).map(({ item }) => item.id);
+                  const visibleIds = filteredReviewQueue.filter(({ item }) => Boolean(item.translatedValue?.trim()) && qualitySnapshot(item).state !== "BLOCKED").map(({ item }) => item.id);
                   setSelectedReviewIds((current) => Array.from(new Set([...current, ...visibleIds])));
                 }}>Select filtered</button>
                 <button type="button" className="aca-mini-action" onClick={() => setSelectedReviewIds([])}>Clear selection</button>
@@ -1929,7 +1933,7 @@ export default function Index() {
                     <div key={item.id} className="aca-review-choice">
                       <input type="checkbox" aria-label={`Select ${item.field?.key ?? item.id}`}
                         checked={selectedReviewIds.includes(item.id)}
-                        disabled={!item.translatedValue?.trim() || busyAction !== null}
+                        disabled={!item.translatedValue?.trim() || qualitySnapshot(item).state === "BLOCKED" || busyAction !== null}
                         onChange={(event) => setSelectedReviewIds((current) => event.target.checked
                           ? [...current.filter((id) => id !== item.id), item.id]
                           : current.filter((id) => id !== item.id))} />
@@ -1951,7 +1955,7 @@ export default function Index() {
                       <div style={{ textAlign: "right" }}>
                         {statusBadge(item.status)}
                         <div className="aca-muted-small" style={{ marginTop: 6 }}>
-                          AI {item.aiReviewScore ?? "—"}
+                          Technical QA {qualitySnapshot(item).score === null ? "not checked" : `${qualitySnapshot(item).score}/100 · ${qualitySnapshot(item).state}`} · AI {item.aiReviewScore ?? "—"}
                         </div>
                       </div>
                     </button>
@@ -1980,6 +1984,30 @@ export default function Index() {
                     <MiniStat label="Field" value={selectedItem.field?.key ?? "—"} />
                     <MiniStat label="Type" value={selectedItem.field?.type ?? "—"} />
                     <MiniStat label="AI score" value={selectedItem.aiReviewScore?.toString() ?? "—"} />
+                  </div>
+
+                  <div className="aca-column-stack" style={{ border: "1px solid #d4d9e1", borderRadius: 10, padding: 14 }}>
+                    <h3 style={sectionHeadingStyle}>Translation Quality Studio</h3>
+                    <p className="aca-muted-small">Deterministic technical checks from the generated translation. This is not a linguistic quality rating. Edited approval text is validated again on the server.</p>
+                    <div className="aca-stat-grid-4">
+                      <MiniStat label="Technical score" value={qualitySnapshot(selectedItem).score === null ? "Not checked" : `${qualitySnapshot(selectedItem).score}/100`} />
+                      <MiniStat label="Gate" value={qualitySnapshot(selectedItem).state} />
+                      <MiniStat label="Critical issues" value={String(qualitySnapshot(selectedItem).errors)} />
+                      <MiniStat label="Warnings" value={String(qualitySnapshot(selectedItem).warnings)} />
+                    </div>
+                    {qualitySnapshot(selectedItem).state === "BLOCKED" ? <InfoCallout tone="orange">Critical deterministic issues detected. Server approval validation must pass before publication. Regenerate or correct the translation.</InfoCallout> : null}
+                    {qualitySnapshot(selectedItem).state === "NOT_CHECKED" ? <InfoCallout tone="orange">No saved deterministic validation snapshot. A score cannot be computed. Server validation remains authoritative.</InfoCallout> : null}
+                    {qualitySnapshot(selectedItem).issues.length > 0 ? (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {qualitySnapshot(selectedItem).issues.map((issue, index) => (
+                          <div key={`${issue.code}-${index}`} style={{ border: "1px solid #d4d9e1", borderRadius: 7, padding: 10 }}>
+                            <strong>{issue.severity} · {issue.group} · {issue.code}</strong>
+                            <div className="aca-muted-small">{issue.message}</div>
+                          </div>
+                        ))}
+                        {qualitySnapshot(selectedItem).moreIssues > 0 ? <p className="aca-muted-small">Additional stored issues: {qualitySnapshot(selectedItem).moreIssues}</p> : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   {selectedJob.items && selectedJob.items.length > 1 ? (
