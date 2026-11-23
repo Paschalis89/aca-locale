@@ -2154,7 +2154,7 @@ export default function Index() {
 
         {activeTab === "review" ? (
           <div className="aca-layout-review">
-            <Card title="Review Queue" subtitle="Server-side review queue across all jobs. Filters apply to the entire shop; approvals never publish automatically.">
+            <Card title="Review Queue & History" subtitle="All statuses shows items awaiting review. Select Approved, Published or Rejected to view history. Filters are scoped to this shop; approvals never publish automatically.">
               <div className="aca-review-filters">
                 <input aria-label="Search review queue" placeholder="Search field, source text or product ID"
                   value={reviewSearch} onChange={(event) => { setReviewSearch(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle} />
@@ -2170,12 +2170,15 @@ export default function Index() {
                   <option value="ALL">All statuses</option>
                   <option value="VALIDATED">Validated</option>
                   <option value="NEEDS_REVIEW">Needs review</option>
+                  <option value="APPROVED">Approved (history)</option>
+                  <option value="PUBLISHED">Published (history)</option>
+                  <option value="REJECTED">Rejected (history)</option>
                 </select>
               </div>
               <div className="aca-actions" style={{ margin: "12px 0" }}>
                 <span className="aca-muted-small">{filteredReviewQueue.length} on page · {reviewPageData?.total ?? "—"} total · {selectedReviewIds.length} selected</span>
                 <button type="button" className="aca-mini-action" disabled={busyAction !== null} onClick={() => {
-                  const visibleIds = filteredReviewQueue.filter(({ item }) => Boolean(item.translatedValue?.trim()) && qualitySnapshot(item).state !== "BLOCKED").map(({ item }) => item.id);
+                  const visibleIds = filteredReviewQueue.filter(({ item }) => (item.status === "VALIDATED" || item.status === "NEEDS_REVIEW") && Boolean(item.translatedValue?.trim()) && qualitySnapshot(item).state !== "BLOCKED").map(({ item }) => item.id);
                   setSelectedReviewIds((current) => Array.from(new Set([...current, ...visibleIds])));
                 }}>Select filtered</button>
                 <button type="button" className="aca-mini-action" onClick={() => setSelectedReviewIds([])}>Clear selection</button>
@@ -2187,14 +2190,14 @@ export default function Index() {
               {reviewPageLoading ? <p className="aca-muted-small">Loading review queue…</p> : null}
               {reviewPageError ? <p role="alert" style={{ color: ACA.danger }}>{reviewPageError}</p> : null}
               {!reviewPageLoading && !reviewPageError && filteredReviewQueue.length === 0 ? (
-                <EmptyState title="Review queue is empty" text="Validated and NEEDS_REVIEW items will appear here." />
+                <EmptyState title="No translations match the selected filters" text="All statuses shows actionable review items. Select Published or another history status to inspect completed work." />
               ) : (
                 <div className="aca-review-list">
                   {filteredReviewQueue.map(({ job, item }) => (
                     <div key={item.id} className="aca-review-choice">
                       <input type="checkbox" aria-label={`Select ${item.field?.key ?? item.id}`}
                         checked={selectedReviewIds.includes(item.id)}
-                        disabled={!item.translatedValue?.trim() || qualitySnapshot(item).state === "BLOCKED" || busyAction !== null}
+                        disabled={(item.status !== "VALIDATED" && item.status !== "NEEDS_REVIEW") || !item.translatedValue?.trim() || qualitySnapshot(item).state === "BLOCKED" || busyAction !== null}
                         onChange={(event) => setSelectedReviewIds((current) => event.target.checked
                           ? [...current.filter((id) => id !== item.id), item.id]
                           : current.filter((id) => id !== item.id))} />

@@ -86,10 +86,20 @@ export class TranslationJobsService {
       ),
     );
 
-    if (body.shopifyProductId !== undefined &&
-        (!/^gid:\/\/shopify\/Product\/[1-9]\d{0,19}$/.test(body.shopifyProductId) ||
-         resourceTypes.length !== 1 || resourceTypes[0] !== 'PRODUCT')) {
-      throw new BadRequestException('Targeted jobs require exactly one valid PRODUCT GID.');
+    // A targeted job must be restricted to one canonical Shopify Product GID.
+    // Validate before acquiring a DB transaction/lock to prevent a malformed
+    // product identifier from silently falling back to a catalog-wide job.
+    const isTargeted = body.shopifyProductId !== undefined;
+    const shopifyProductId = body.shopifyProductId?.trim();
+    if (isTargeted && (
+      !shopifyProductId ||
+      !/^gid:\/\/shopify\/Product\/[1-9][0-9]*$/.test(shopifyProductId) ||
+      resourceTypes.length !== 1 ||
+      resourceTypes[0] !== 'PRODUCT'
+    )) {
+      throw new BadRequestException(
+        'A targeted translation job requires one valid Shopify Product GID and PRODUCT as the only resource type.',
+      );
     }
 
     const maxItems = body.maxItems ?? 100;
@@ -124,7 +134,8 @@ export class TranslationJobsService {
               resourceType: {
                 in: resourceTypes,
               },
-              ...(body.shopifyProductId ? { shopifyResourceId: body.shopifyProductId } : {}),
+
+              ...(shopifyProductId ? { shopifyResourceId: shopifyProductId } : {}),
 
               deletedAt: null,
             },
@@ -675,8 +686,12 @@ export class TranslationJobsService {
 
     const page = this.boundedInteger(query.page, 1, 1, 100000);
     const limit = this.boundedInteger(query.limit, 30, 1, 100);
-    const statuses = ['VALIDATED', 'NEEDS_REVIEW'] as const;
-    if (query.status && query.status !== 'ALL' && !statuses.includes(query.status as typeof statuses[number])) {
+    // ALL remains the actionable review queue; terminal states are available only
+    // when explicitly requested for translation history / Shopify verification.
+    const actionableStatuses = ['VALIDATED', 'NEEDS_REVIEW'] as const;
+    const historyStatuses = ['APPROVED', 'PUBLISHED', 'REJECTED'] as const;
+    const allowedStatuses = [...actionableStatuses, ...historyStatuses] as const;
+    if (query.status && query.status !== 'ALL' && !allowedStatuses.includes(query.status as (typeof allowedStatuses)[number])) {
       throw new BadRequestException('Invalid review status.');
     }
     const locale = query.locale && query.locale !== 'ALL' ? query.locale.trim() : undefined;
@@ -684,7 +699,7 @@ export class TranslationJobsService {
     const search = query.search?.trim().slice(0, 200);
     const where: Prisma.TranslationJobItemWhereInput = {
       job: { shopId: shop.id, ...(locale ? { targetLocale: locale } : {}) },
-      status: { in: query.status && query.status !== 'ALL' ? [query.status as typeof statuses[number]] : [...statuses] },
+      status: { in: query.status && query.status !== 'ALL' ? [query.status as (typeof allowedStatuses)[number]] : [...actionableStatuses] },
       ...(resourceType ? { field: { resource: { resourceType } } } : {}),
       ...(search ? {
         OR: [
