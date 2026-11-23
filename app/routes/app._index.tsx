@@ -9,6 +9,7 @@ import { formatUsageUsd, usageHasUnpricedCosts } from "../lib/usage-analytics";
 import { pricingRowsFromRules, rulesFromPricingRows, type PricingEditorRow } from "../lib/usage-pricing-editor";
 import { qualitySnapshot } from "../lib/translation-quality";
 import { auditSeoField, summarizeSeoAudit } from "../lib/international-seo";
+import { summarizeLocalization, type ShopifyMarketSnapshot, type ShopifyLocaleSnapshot } from "../lib/market-localization";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -21,6 +22,7 @@ type AppTab =
   | "jobs"
   | "review"
   | "seo"
+  | "markets"
   | "languages"
   | "glossary"
   | "usage"
@@ -297,6 +299,7 @@ const tabs: Array<{ id: AppTab; label: string; short: string }> = [
   { id: "jobs", label: "Jobs", short: "Jobs" },
   { id: "review", label: "Review", short: "Review" },
   { id: "seo", label: "International SEO", short: "SEO" },
+  { id: "markets", label: "Markets & Localization", short: "Markets" },
   { id: "languages", label: "Languages", short: "Lang" },
   { id: "glossary", label: "Glossary", short: "Terms" },
   { id: "usage", label: "Usage", short: "Usage" },
@@ -367,6 +370,11 @@ export default function Index() {
   const [seoFilter, setSeoFilter] = useState("ALL");
 
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [liveMarkets, setLiveMarkets] = useState<ShopifyMarketSnapshot[] | null>(null);
+  const [liveLocales, setLiveLocales] = useState<ShopifyLocaleSnapshot[] | null>(null);
+  const [marketSnapshotAt, setMarketSnapshotAt] = useState<string | null>(null);
+  const [marketsLoading, setMarketsLoading] = useState(false);
+  const [marketsError, setMarketsError] = useState<string | null>(null);
 
   const [glossary, setGlossary] = useState<GlossaryData | null>(null);
   const [loadingGlossary, setLoadingGlossary] = useState(false);
@@ -466,6 +474,32 @@ export default function Index() {
       shopify.toast.show(message, { isError: true });
     } finally {
       setBusyAction(null);
+    }
+  };
+
+  const loadMarketSnapshot = async () => {
+    setMarketsLoading(true);
+    setMarketsError(null);
+    try {
+      // GET-only Shopify Admin queries. No backend sync, writes, or translation jobs.
+      const [marketData, localeData] = await Promise.all([
+        apiCall("/api/shopify/markets", {}, false),
+        apiCall("/api/shopify/locales", {}, false),
+      ]);
+      if (!Array.isArray(marketData?.markets) || !Array.isArray(localeData?.locales)) {
+        throw new Error("Unexpected Shopify Markets/Locales API response.");
+      }
+      setLiveMarkets(marketData.markets);
+      setLiveLocales(localeData.locales);
+      setMarketSnapshotAt(new Date().toISOString());
+    } catch (error) {
+      setMarketsError(error instanceof Error ? error.message : "Unable to load Shopify market snapshot.");
+      // Never keep presenting stale market data as a successful fresh snapshot.
+      setLiveMarkets(null);
+      setLiveLocales(null);
+      setMarketSnapshotAt(null);
+    } finally {
+      setMarketsLoading(false);
     }
   };
 
@@ -746,6 +780,7 @@ export default function Index() {
 
   useEffect(() => {
     if (activeTab === "jobs") void loadAutomationMonitor();
+    if (activeTab === "markets") void loadMarketSnapshot();
     if (activeTab === "settings") { void loadPricing(); void loadAiBudget(); }
     if (activeTab === "usage") void loadAiBudget();
     if (activeTab === "glossary" && !glossary && !loadingGlossary) {
@@ -1556,6 +1591,12 @@ export default function Index() {
   const locales =
     syncResult?.languages ?? syncResult?.locales ?? syncResult?.shopLanguages ?? [];
   const markets = syncResult?.markets ?? [];
+  const marketLocalization = useMemo(
+    () => liveMarkets !== null && liveLocales !== null
+      ? summarizeLocalization(liveMarkets, liveLocales, jobs)
+      : null,
+    [liveMarkets, liveLocales, jobs],
+  );
 
   return (
     <div className="aca-app-shell">
@@ -2240,6 +2281,62 @@ export default function Index() {
               ) : (
                 <EmptyState title="Select an item" text="Choose a translation from the review queue or a job detail." />
               )}
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "markets" ? (
+          <div className="aca-column-stack">
+            <Card title="Markets & Localization" subtitle="Live read-only Shopify Markets and published locales. Country-level translation coverage is not inferred from job history.">
+              <div className="aca-actions">
+                <button type="button" className="aca-btn" disabled={marketsLoading} onClick={() => void loadMarketSnapshot()}>
+                  {marketsLoading ? "Loading Shopify Markets..." : "Refresh Shopify Markets (read only)"}
+                </button>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <InfoCallout tone="orange">
+                  Market configuration comes from Shopify Admin; ACA job counts are matched by language only and are NOT market-specific publication or storefront translation coverage. No Shopify writes are performed.
+                </InfoCallout>
+              </div>
+              {marketsError ? <div style={{ marginTop: 12 }}><InfoCallout tone="orange">Shopify Markets lookup failed: {marketsError}</InfoCallout></div> : null}
+              {marketSnapshotAt ? <p className="aca-muted-small">Snapshot: {new Date(marketSnapshotAt).toLocaleString()} · Live API data, not cached sync</p> : null}
+              {marketLocalization ? (
+                <div className="aca-column-stack" style={{ marginTop: 16 }}>
+                  <div className="aca-stats-grid">
+                    <MiniStat label="Markets returned" value={String(marketLocalization.marketCount)} />
+                    <MiniStat label="Markets with web presence" value={String(marketLocalization.marketsWithWebPresence)} />
+                    <MiniStat label="Published Shopify locales" value={String(marketLocalization.publishedLocaleCount)} />
+                    <MiniStat label="ACA jobs without matching market locale" value={String(marketLocalization.jobsWithoutMarketLocale)} />
+                  </div>
+                  {marketLocalization.marketCount === 0 ? <EmptyState title="No Markets returned" text="Check Markets setup and API permissions in Shopify Admin." /> : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="aca-table">
+                        <thead><tr><th>Shopify Market</th><th>Status</th><th>Web presence locales</th><th>Published locales</th><th>Unpublished locales</th><th>ACA jobs (locale match only)</th><th>Shopify URLs</th></tr></thead>
+                        <tbody>
+                          {marketLocalization.rows.map(row => (
+                            <tr key={row.id}>
+                              <td><strong>{row.name}</strong>{row.localization !== "CONFIGURED" ? <div className="aca-muted-small">{row.localization === "NO_WEB_PRESENCE" ? "No web presence in API response" : "No locale provided"}</div> : null}</td>
+                              <td>{row.status}</td>
+                              <td>{row.locales.join(", ") || "Not available"}</td>
+                              <td>{row.publishedLocales.join(", ") || "—"}</td>
+                              <td>{row.unpublishedLocales.join(", ") || "—"}</td>
+                              <td>{row.jobCount} matching · {row.completedJobCount} completed</td>
+                              <td>{row.rootUrls.length ? row.rootUrls.map(url => <div key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></div>) : "Not returned"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="aca-muted-small">Shopify Markets may share the same locale: job counts can overlap across markets. A completed job does not imply approved or published translations. To verify true localization coverage, use the Store Scan for each locale and inspect the storefront.</p>
+                  <h3 style={sectionHeadingStyle}>Published languages from Shopify</h3>
+                  {liveLocales?.length ? (
+                    <div style={{ overflowX: "auto" }}><table className="aca-table"><thead><tr><th>Locale</th><th>Name</th><th>Published</th><th>Primary</th></tr></thead><tbody>
+                      {liveLocales.map(item => <tr key={item.locale}><td>{item.locale}</td><td>{item.name ?? "—"}</td><td>{item.published ? "Yes" : "No"}</td><td>{item.primary ? "Yes" : "No"}</td></tr>)}
+                    </tbody></table></div>
+                  ) : <p className="aca-muted-small">No locales returned.</p>}
+                </div>
+              ) : !marketsLoading && !marketsError ? <EmptyState title="No live market snapshot" text="Refresh Shopify Markets to inspect market locales without changing store configuration." /> : null}
             </Card>
           </div>
         ) : null}
