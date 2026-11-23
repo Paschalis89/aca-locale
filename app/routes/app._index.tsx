@@ -1312,7 +1312,7 @@ export default function Index() {
         const data = await apiCall(
           `/api/shopify/translatable-resources?resourceType=${encodeURIComponent(
             scannerResourceType,
-          )}&locale=${encodeURIComponent(scannerLocale)}${productId ? `&productId=${encodeURIComponent(productId)}` : ""}`,
+          )}&locale=${encodeURIComponent(scannerLocale)}${productId ? `&productId=${encodeURIComponent(scannerProductId.trim())}` : ""}`,
           { method: "POST" },
         );
 
@@ -1750,9 +1750,9 @@ export default function Index() {
                   Limit scan and new jobs to one product (safe QA mode)
                 </label>
                 {targetedProductScan ? (
-                  <Field label="Shopify Product ID (number or gid://shopify/Product/...)" >
+                  <Field label="Shopify Product ID, GID or Admin product URL" >
                     <input value={scannerProductId} onChange={event => setScannerProductId(event.target.value)}
-                      placeholder="gid://shopify/Product/123456789" style={inputStyle} />
+                      placeholder="https://admin.shopify.com/store/your-store/products/123456789" style={inputStyle} />
                   </Field>
                 ) : (
                   <InfoCallout tone="orange">Full resource-type scan enabled. This may update scanner states for every product. No translation is published by scanning.</InfoCallout>

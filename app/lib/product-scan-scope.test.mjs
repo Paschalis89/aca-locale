@@ -13,3 +13,23 @@ test("rejects other resource types and malformed IDs", () => {
     assert.equal(normalizeProductId(input), null, input);
   }
 });
+test('accepts a full Shopify Admin product URL', () => {
+  const url = 'https://admin.shopify.com/store/f84c20-60/products/11593966518599';
+  assert.equal(normalizeProductId(url), 'gid://shopify/Product/11593966518599');
+  assert.equal(normalizeProductId(url + '?foo=bar', 'f84c20-60.myshopify.com'), 'gid://shopify/Product/11593966518599');
+});
+test('rejects admin links belonging to another shop', () => {
+  const url = 'https://admin.shopify.com/store/other-shop/products/11593966518599';
+  assert.equal(normalizeProductId(url, 'f84c20-60.myshopify.com'), null);
+});
+test('rejects lookalike hosts, non-product routes and invalid URLs', () => {
+  for (const url of [
+    'https://admin.shopify.com.evil.example/store/f84c20-60/products/123',
+    'http://admin.shopify.com/store/f84c20-60/products/123',
+    'https://admin.shopify.com/store/f84c20-60/collections/123',
+    'https://admin.shopify.com/store/f84c20-60/products/123/variants',
+    'https://admin.shopify.com/store/f84c20-60/products/0',
+    'https://admin.shopify.com/store/f84c20-60/products/123#fragment',
+    'https://admin.shopify.com@evil.example/store/f84c20-60/products/123',
+  ]) assert.equal(normalizeProductId(url, 'f84c20-60.myshopify.com'), null, url);
+});

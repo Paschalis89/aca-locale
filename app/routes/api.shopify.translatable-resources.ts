@@ -394,7 +394,7 @@ export async function action({
 
   const requestedProductId = url.searchParams.get("productId");
   const targeted = requestedProductId !== null;
-  const productId = targeted ? normalizeProductId(requestedProductId) : null;
+  const productId = targeted ? normalizeProductId(requestedProductId, session.shop) : null;
   if (targeted && (!productId || resourceType !== "PRODUCT")) {
     return Response.json({ message: "Targeted scan requires a valid Shopify PRODUCT ID." }, { status: 400 });
   }
