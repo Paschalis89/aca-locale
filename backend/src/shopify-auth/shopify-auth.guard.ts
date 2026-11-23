@@ -90,22 +90,44 @@ export class ShopifyAuthGuard implements CanActivate {
         return fail('Invalid Shopify ID token URLs.');
       }
 
-      if (destinationUrl.protocol !== 'https:') {
+      // A verified signature alone is not sufficient: reject malformed or
+      // ambiguous shop origins before attaching a tenant to the request.
+      const shopDomain = destinationUrl.hostname.toLowerCase();
+      if (
+        destinationUrl.protocol !== 'https:' ||
+        destinationUrl.username ||
+        destinationUrl.password ||
+        destinationUrl.port ||
+        destinationUrl.pathname !== '/' ||
+        destinationUrl.search ||
+        destinationUrl.hash ||
+        !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shopDomain)
+      ) {
         return fail('Invalid Shopify destination.');
       }
 
-      if (issuerUrl.protocol !== 'https:') {
+      if (
+        issuerUrl.protocol !== 'https:' ||
+        issuerUrl.username ||
+        issuerUrl.password ||
+        issuerUrl.port ||
+        issuerUrl.hostname.toLowerCase() !== shopDomain ||
+        !['/admin', '/admin/'].includes(issuerUrl.pathname) ||
+        issuerUrl.search ||
+        issuerUrl.hash
+      ) {
         return fail('Invalid Shopify issuer.');
       }
 
-      if (destinationUrl.hostname !== issuerUrl.hostname) {
-        return fail('Shopify issuer does not match destination.');
-      }
-
-      const shopDomain = destinationUrl.hostname.toLowerCase();
-
-      if (!shopDomain.endsWith('.myshopify.com')) {
-        return fail('Invalid Shopify shop domain.');
+      // jose validates exp/nbf when present, but exp is optional by JWT spec.
+      // Shopify ID tokens must contain their own finite validity window.
+      if (
+        !Number.isInteger(payload.iat) ||
+        !Number.isInteger(payload.exp) ||
+        (payload.exp as number) <= (payload.iat as number) ||
+        (payload.iat as number) > Math.floor(Date.now() / 1000) + 5
+      ) {
+        return fail('Invalid Shopify ID token lifetime.');
       }
 
       request.shopifyAuth = {

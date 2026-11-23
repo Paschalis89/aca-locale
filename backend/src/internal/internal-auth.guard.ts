@@ -47,10 +47,15 @@ implements CanActivate {
         'x-aca-locale-internal-secret'
       ];
 
-    const provided =
-      Array.isArray(rawProvided)
-        ? rawProvided[0]
-        : rawProvided;
+    // Duplicate secret headers are ambiguous across proxies and runtimes.
+    // Fail closed rather than trusting only the first supplied value.
+    if (Array.isArray(rawProvided)) {
+      throw new UnauthorizedException(
+        'Ambiguous internal API secret.',
+      );
+    }
+
+    const provided = rawProvided;
 
     if (!provided) {
       throw new UnauthorizedException(

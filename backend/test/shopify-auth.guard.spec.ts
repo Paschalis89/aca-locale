@@ -128,3 +128,52 @@ describe('ShopifyAuthGuard', () => {
     );
   });
 });
+
+
+describe('ShopifyAuthGuard hardened tenant identity', () => {
+  it('rejects a signed destination with a non-root path', async () => {
+    const guard = createGuard();
+    const token = await signToken({ dest: 'https://aca-test.myshopify.com/other' });
+    const { context } = createContext(`Bearer ${token}`);
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects a signed issuer outside Shopify admin', async () => {
+    const guard = createGuard();
+    const token = await signToken({ issuer: 'https://aca-test.myshopify.com/other' });
+    const { context } = createContext(`Bearer ${token}`);
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects a signed token without an expiration', async () => {
+    const token = await new SignJWT({ dest: 'https://aca-test.myshopify.com' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setAudience(API_KEY)
+      .setIssuer('https://aca-test.myshopify.com/admin')
+      .sign(new TextEncoder().encode(API_SECRET));
+    const { context } = createContext(`Bearer ${token}`);
+    await expect(createGuard().canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects a signed token with a future issued-at claim', async () => {
+    const token = await new SignJWT({ dest: 'https://aca-test.myshopify.com' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(Math.floor(Date.now() / 1000) + 600)
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 900)
+      .setAudience(API_KEY)
+      .setIssuer('https://aca-test.myshopify.com/admin')
+      .sign(new TextEncoder().encode(API_SECRET));
+    const { context } = createContext(`Bearer ${token}`);
+    await expect(createGuard().canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects a malformed myshopify.com subdomain', async () => {
+    const token = await signToken({
+      dest: 'https://bad..myshopify.com',
+      issuer: 'https://bad..myshopify.com/admin',
+    });
+    const { context } = createContext(`Bearer ${token}`);
+    await expect(createGuard().canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
