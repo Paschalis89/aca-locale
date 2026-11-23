@@ -1284,7 +1284,24 @@ export default function Index() {
   };
 
   const publishItem = async () => {
-    if (!requireItem()) return;
+    if (!requireItem() || !selectedItem || !selectedJob) return;
+
+    // Client-side second check only. The publication API remains the authority
+    // for approved state, source freshness, Shopify shop and field ownership.
+    const resourceId = selectedItem.field?.resource?.shopifyResourceId;
+    if (!resourceId) {
+      shopify.toast.show("Cannot publish: Shopify resource ID is missing. Refresh the job.", { isError: true });
+      return;
+    }
+    const confirmation = [
+      "Publish this APPROVED translation to Shopify?",
+      `Resource: ${selectedItem.field?.resource?.resourceType ?? "UNKNOWN"} / ${resourceId}`,
+      `Field: ${selectedItem.field?.key ?? "UNKNOWN"}`,
+      `Locale: ${selectedJob.targetLocale}`,
+      `Job: ${selectedJob.id}`,
+      "This writes a translation to Shopify. It does not change the source language.",
+    ].join("\n");
+    if (!window.confirm(confirmation)) return;
 
     await runAction(
       "publish-item",
@@ -2166,6 +2183,12 @@ export default function Index() {
                         <div className="aca-muted-small">
                           {item.field?.resource?.resourceType ?? "—"} · {job.sourceLocale} → {job.targetLocale}
                         </div>
+                        <div className="aca-muted-small" title={item.field?.resource?.shopifyResourceId ?? "Resource ID unavailable"} style={{ overflowWrap: "anywhere" }}>
+                          Resource: {item.field?.resource?.shopifyResourceId ?? "Unavailable"}
+                        </div>
+                        <div className="aca-muted-small" title={job.id} style={{ overflowWrap: "anywhere" }}>
+                          Job: {job.id}
+                        </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         {statusBadge(item.status)}
@@ -2194,6 +2217,15 @@ export default function Index() {
             >
               {selectedItem && selectedJob ? (
                 <div className="aca-column-stack">
+                  <div style={{ border: "1px solid #d4d9e1", borderRadius: 10, padding: 12 }}>
+                    <strong>Shopify resource identity</strong>
+                    <div className="aca-muted-small" style={{ overflowWrap: "anywhere", marginTop: 6 }}>
+                      Resource: {selectedItem.field?.resource?.resourceType ?? "UNKNOWN"} / {selectedItem.field?.resource?.shopifyResourceId ?? "Unavailable"}
+                    </div>
+                    <div className="aca-muted-small" style={{ overflowWrap: "anywhere", marginTop: 4 }}>
+                      Job: {selectedJob.id} · Item: {selectedItem.id} · Target locale: {selectedJob.targetLocale}
+                    </div>
+                  </div>
                   <div className="aca-stat-grid-4">
                     <MiniStat label="Status" valueNode={statusBadge(selectedItem.status)} />
                     <MiniStat label="Field" value={selectedItem.field?.key ?? "—"} />
