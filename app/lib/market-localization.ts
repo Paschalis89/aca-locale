@@ -13,6 +13,14 @@ export type ShopifyMarketSnapshot = {
   status?: string | null;
   handle?: string | null;
   webPresences?: { nodes?: MarketPresence[] | null } | null;
+  conditions?: {
+    regionsCondition?: {
+      regions?: {
+        nodes?: Array<{ __typename?: string; name?: string; code?: string | null }> | null;
+        pageInfo?: { hasNextPage?: boolean } | null;
+      } | null;
+    } | null;
+  } | null;
 };
 export type ShopifyLocaleSnapshot = {
   locale: string;
@@ -31,6 +39,9 @@ export type LocalizationMarketRow = {
   locales: string[];
   rootUrls: string[];
   hasWebPresence: boolean;
+  countryCodes: string[];
+  regionNames: string[];
+  regionsTruncated: boolean;
   localization: 'CONFIGURED' | 'NO_WEB_PRESENCE' | 'NO_LOCALES';
   jobCount: number;
   completedJobCount: number;
@@ -66,6 +77,13 @@ export function makeMarketLocalizationRows(
         if (typeof root.url === 'string' && /^https:\/\//i.test(root.url)) urls.add(root.url);
       }
     }
+    const regions = market.conditions?.regionsCondition?.regions;
+    const countryCodes = [...new Set((regions?.nodes ?? [])
+      .filter((node) => node.__typename === 'MarketRegionCountry' && typeof node.code === 'string' && /^[A-Z]{2}$/.test(node.code))
+      .map((node) => node.code as string))].sort();
+    const regionNames = [...new Set((regions?.nodes ?? [])
+      .map((node) => typeof node.name === 'string' ? node.name : '')
+      .filter(Boolean))].sort();
     const marketLocales = [...localeSet].sort();
     const matchingJobs = jobs.filter((job) => marketLocales.includes(normalizeLocale(job.targetLocale)));
     return {
@@ -75,6 +93,9 @@ export function makeMarketLocalizationRows(
       locales: marketLocales,
       rootUrls: [...urls].sort(),
       hasWebPresence: presences.length > 0,
+      countryCodes,
+      regionNames,
+      regionsTruncated: regions?.pageInfo?.hasNextPage === true,
       localization: !presences.length ? 'NO_WEB_PRESENCE' : !marketLocales.length ? 'NO_LOCALES' : 'CONFIGURED',
       jobCount: matchingJobs.length,
       completedJobCount: matchingJobs.filter((job) => job.status === 'COMPLETED').length,
@@ -97,5 +118,9 @@ export function summarizeLocalization(
     publishedLocaleCount: locales.filter((item) => item.published).length,
     jobsWithMarketLocale: jobs.filter((job) => rows.some((row) => row.locales.includes(normalizeLocale(job.targetLocale)))).length,
     jobsWithoutMarketLocale: jobs.filter((job) => !rows.some((row) => row.locales.includes(normalizeLocale(job.targetLocale)))).length,
+    marketsWithoutDedicatedWebPresence: rows.filter((row) => !row.hasWebPresence).length,
+    // Lack of web-presence locale mappings means these jobs cannot be attributed to a market.
+    // It is NOT proof of missing translations or store-wide publishing failure.
+    jobsWithoutVerifiableMarketMapping: jobs.filter((job) => !rows.some((row) => row.locales.includes(normalizeLocale(job.targetLocale)))).length,
   };
 }

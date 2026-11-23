@@ -2306,17 +2306,21 @@ export default function Index() {
                     <MiniStat label="Markets returned" value={String(marketLocalization.marketCount)} />
                     <MiniStat label="Markets with web presence" value={String(marketLocalization.marketsWithWebPresence)} />
                     <MiniStat label="Published Shopify locales" value={String(marketLocalization.publishedLocaleCount)} />
-                    <MiniStat label="ACA jobs without matching market locale" value={String(marketLocalization.jobsWithoutMarketLocale)} />
+                    <MiniStat label="Jobs not attributable from web-presence locale data" value={String(marketLocalization.jobsWithoutVerifiableMarketMapping)} />
                   </div>
+                  {marketLocalization.marketsWithoutDedicatedWebPresence > 0 ? (
+                    <InfoCallout tone="blue">{marketLocalization.marketsWithoutDedicatedWebPresence} market(s) have no dedicated web presence returned. Shopify may serve them on the primary domain via country selection. Country conditions below are not language coverage, and unmatched ACA jobs do not indicate missing translations.</InfoCallout>
+                  ) : null}
                   {marketLocalization.marketCount === 0 ? <EmptyState title="No Markets returned" text="Check Markets setup and API permissions in Shopify Admin." /> : (
                     <div style={{ overflowX: "auto" }}>
                       <table className="aca-table">
-                        <thead><tr><th>Shopify Market</th><th>Status</th><th>Web presence locales</th><th>Published locales</th><th>Unpublished locales</th><th>ACA jobs (locale match only)</th><th>Shopify URLs</th></tr></thead>
+                        <thead><tr><th>Shopify Market</th><th>Status</th><th>Country conditions (Shopify)</th><th>Web presence locales</th><th>Published locales</th><th>Unpublished locales</th><th>ACA jobs (locale match only)</th><th>Shopify URLs</th></tr></thead>
                         <tbody>
                           {marketLocalization.rows.map(row => (
                             <tr key={row.id}>
-                              <td><strong>{row.name}</strong>{row.localization !== "CONFIGURED" ? <div className="aca-muted-small">{row.localization === "NO_WEB_PRESENCE" ? "No web presence in API response" : "No locale provided"}</div> : null}</td>
+                              <td><strong>{row.name}</strong>{row.localization !== "CONFIGURED" ? <div className="aca-muted-small">{row.localization === "NO_WEB_PRESENCE" ? "No dedicated web presence; primary-domain country selector may apply" : "No locale returned by web presence"}</div> : null}</td>
                               <td>{row.status}</td>
+                              <td>{row.countryCodes.length ? row.countryCodes.join(", ") : row.regionNames.length ? row.regionNames.slice(0, 8).join(", ") : "Not returned"}{row.regionsTruncated ? " (partial: more regions)" : ""}</td>
                               <td>{row.locales.join(", ") || "Not available"}</td>
                               <td>{row.publishedLocales.join(", ") || "—"}</td>
                               <td>{row.unpublishedLocales.join(", ") || "—"}</td>
@@ -2328,7 +2332,7 @@ export default function Index() {
                       </table>
                     </div>
                   )}
-                  <p className="aca-muted-small">Shopify Markets may share the same locale: job counts can overlap across markets. A completed job does not imply approved or published translations. To verify true localization coverage, use the Store Scan for each locale and inspect the storefront.</p>
+                  <p className="aca-muted-small">Country conditions describe the market audience, not which translations are published. A market may have no dedicated web presence and still be available via the primary domain. Shopify Markets may share the same locale: job counts can overlap across markets. A completed job does not imply approved or published translations. To verify true localization coverage, use the Store Scan for each locale and inspect the storefront.</p>
                   <h3 style={sectionHeadingStyle}>Published languages from Shopify</h3>
                   {liveLocales?.length ? (
                     <div style={{ overflowX: "auto" }}><table className="aca-table"><thead><tr><th>Locale</th><th>Name</th><th>Published</th><th>Primary</th></tr></thead><tbody>

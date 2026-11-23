@@ -60,3 +60,33 @@ test('filters unsafe/unknown URLs and does not fabricate route', () => {
   }], locales, jobs);
   assert.deepEqual(row.rootUrls, ['https://example.com/en']);
 });
+
+test('country conditions are shown independently of missing web presence', () => {
+  const [row] = makeMarketLocalizationRows([{
+    id: 'm-us', name: 'International', status: 'ACTIVE',
+    webPresences: { nodes: [] },
+    conditions: { regionsCondition: { regions: {
+      nodes: [{ __typename: 'MarketRegionCountry', name: 'United States', code: 'US' },
+              { __typename: 'MarketRegionCountry', name: 'Japan', code: 'JP' }],
+      pageInfo: { hasNextPage: false },
+    } } },
+  }], locales, jobs);
+  assert.deepEqual(row.countryCodes, ['JP', 'US']);
+  assert.deepEqual(row.locales, []);
+  assert.equal(row.jobCount, 0);
+  assert.equal(row.localization, 'NO_WEB_PRESENCE');
+});
+
+test('region query truncation is disclosed and does not infer locale mappings', () => {
+  const result = summarizeLocalization([{
+    id: 'm', name: 'Broad market',
+    conditions: { regionsCondition: { regions: {
+      nodes: [{ __typename: 'MarketRegionSubdivision', name: 'California' }],
+      pageInfo: { hasNextPage: true },
+    } } },
+  }], locales, jobs);
+  assert.deepEqual(result.rows[0].countryCodes, []);
+  assert.equal(result.rows[0].regionsTruncated, true);
+  assert.equal(result.jobsWithoutVerifiableMarketMapping, 3);
+  assert.equal(result.marketsWithoutDedicatedWebPresence, 1);
+});

@@ -29,6 +29,25 @@ export async function loader({
               status
               type
 
+              # A market can use the primary domain without a dedicated web presence.
+              # Country conditions are independent of its localized SEO URLs.
+              conditions {
+                regionsCondition {
+                  regions(first: 250) {
+                    nodes {
+                      __typename
+                      name
+                      ... on MarketRegionCountry {
+                        code
+                      }
+                    }
+                    pageInfo {
+                      hasNextPage
+                    }
+                  }
+                }
+              }
+
               webPresences(first: 10) {
                 nodes {
                   id
