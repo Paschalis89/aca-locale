@@ -10,6 +10,7 @@ import { pricingRowsFromRules, rulesFromPricingRows, type PricingEditorRow } fro
 import { qualitySnapshot } from "../lib/translation-quality";
 import { auditSeoField, summarizeSeoAudit } from "../lib/international-seo";
 import { summarizeLocalization, type ShopifyMarketSnapshot, type ShopifyLocaleSnapshot } from "../lib/market-localization";
+import { createAiCoreReadiness } from "../lib/ai-core-readiness";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -23,6 +24,7 @@ type AppTab =
   | "review"
   | "seo"
   | "markets"
+  | "ai-core"
   | "languages"
   | "glossary"
   | "usage"
@@ -300,6 +302,7 @@ const tabs: Array<{ id: AppTab; label: string; short: string }> = [
   { id: "review", label: "Review", short: "Review" },
   { id: "seo", label: "International SEO", short: "SEO" },
   { id: "markets", label: "Markets & Localization", short: "Markets" },
+  { id: "ai-core", label: "ACA AI Core", short: "AI Core" },
   { id: "languages", label: "Languages", short: "Lang" },
   { id: "glossary", label: "Glossary", short: "Terms" },
   { id: "usage", label: "Usage", short: "Usage" },
@@ -1591,6 +1594,7 @@ export default function Index() {
   const locales =
     syncResult?.languages ?? syncResult?.locales ?? syncResult?.shopLanguages ?? [];
   const markets = syncResult?.markets ?? [];
+  const aiCoreReadiness = useMemo(() => createAiCoreReadiness({ config: aiConfiguration, providerHealth: aiProviderHealth, budget: aiBudget }), [aiConfiguration, aiProviderHealth, aiBudget]);
   const marketLocalization = useMemo(
     () => liveMarkets !== null && liveLocales !== null
       ? summarizeLocalization(liveMarkets, liveLocales, jobs)
@@ -2341,6 +2345,42 @@ export default function Index() {
                   ) : <p className="aca-muted-small">No locales returned.</p>}
                 </div>
               ) : !marketsLoading && !marketsError ? <EmptyState title="No live market snapshot" text="Refresh Shopify Markets to inspect market locales without changing store configuration." /> : null}
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "ai-core" ? (
+          <div className="aca-layout-two">
+            <Card title="ACA AI Core — Integration Readiness" subtitle="Preview-only integration contract. ACA Locale continues using its current translation adapters.">
+              <div className="aca-column-stack">
+                <InfoCallout tone="blue">ACA AI Core is NOT connected. This view makes no network request to an AI Core gateway, does not invoke a model, and does not save routing changes. Translation, review and fallback remain on the existing ACA Locale backend.</InfoCallout>
+                <div className="aca-stat-grid-3">
+                  <MiniStat label="Core connection" value="NOT CONNECTED" />
+                  <MiniStat label="Routing mode" value="LOCAL ONLY" />
+                  <MiniStat label="Core executions" value="DISABLED" />
+                </div>
+                <h3 style={{ color: ACA.blue }}>Routing contract preview</h3>
+                <table className="aca-pricing-table"><thead><tr><th>Stage</th><th>Role</th><th>Provider</th><th>Model</th></tr></thead><tbody>
+                  {aiCoreReadiness.routes.map((route, idx) => <tr key={`${route.stage}:${route.role}:${idx}`}><td>{route.stage}</td><td>{route.role}</td><td>{route.provider}</td><td>{route.model || "Not required / unspecified"}</td></tr>)}
+                </tbody></table>
+                <p className="aca-muted-small">This is a deterministic preview of the current Settings form. Unsaved model choices may appear here; they do not change saved job configuration.</p>
+                <p className="aca-muted-small">The future gateway will require server-side authentication, tenant isolation, auditable usage and bounded failover before any traffic is redirected.</p>
+              </div>
+            </Card>
+            <Card title="Readiness Checks & Contract" subtitle="An exportable, credential-free draft for the future ACA AI Core integration.">
+              <div className="aca-column-stack">
+                <div className="aca-actions">
+                  <button type="button" className="aca-mini-action" onClick={() => { setActiveTab("settings"); }}>Open provider settings</button>
+                  <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}>Inspect AI usage</button>
+                </div>
+                {aiCoreReadiness.findings.length ? aiCoreReadiness.findings.map((finding, idx) => (
+                  <InfoCallout key={`${finding.code}:${idx}`} tone={finding.level === "WARNING" ? "orange" : "blue"}>{finding.level}: {finding.detail}</InfoCallout>
+                )) : <InfoCallout tone="blue">Configured routes have no detected issues in the available snapshots. This does not establish that ACA AI Core is connected or safe to enable.</InfoCallout>}
+                <Field label="Routing contract JSON — read-only (copy manually)">
+                  <textarea aria-label="ACA AI Core preview contract JSON" readOnly rows={13} spellCheck={false} value={JSON.stringify(aiCoreReadiness.contract, null, 2)} style={{ ...inputStyle, width: "100%", fontFamily: "monospace" }} />
+                </Field>
+                <p className="aca-muted-small">No secrets, prompts or Shopify shop identifiers are included. There is no gateway endpoint or live connection in this release.</p>
+              </div>
             </Card>
           </div>
         ) : null}
