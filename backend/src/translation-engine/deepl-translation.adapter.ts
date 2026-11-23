@@ -6,6 +6,7 @@ import {
 } from '../glossary/glossary-rule.utils.js';
 
 import { DeepLTranslationService } from './deepl-translation.service.js';
+import { assertSafeDeepLHtmlResult, assertTranslatableDeepLHtml } from './deepl-html-guard.js';
 
 import type {
   TranslationProviderAdapter,
@@ -22,6 +23,12 @@ export class DeepLTranslationAdapter implements TranslationProviderAdapter {
   async translate(
     input: TranslationProviderInput,
   ): Promise<TranslationProviderResult> {
+    const isHtml = input.contentType?.toUpperCase() === 'HTML';
+
+    if (isHtml) {
+      assertTranslatableDeepLHtml(input.text);
+    }
+
     const protectedInput =
       protectGlossaryTerms(
         input.text,
@@ -38,11 +45,22 @@ export class DeepLTranslationAdapter implements TranslationProviderAdapter {
       contentType: input.contentType,
     });
 
+    const restoredText = restoreGlossaryTerms(
+      result.text,
+      protectedInput.protections,
+    );
+
+    if (isHtml) {
+      assertSafeDeepLHtmlResult(
+        input.text,
+        restoredText,
+        input.sourceLocale,
+        input.targetLocale,
+      );
+    }
+
     return {
-      text: restoreGlossaryTerms(
-        result.text,
-        protectedInput.protections,
-      ),
+      text: restoredText,
 
       provider: 'DEEPL',
 
