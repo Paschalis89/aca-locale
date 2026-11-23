@@ -7,15 +7,17 @@ import {
   authenticate,
 } from "../shopify.server";
 
+import { normalizeProductId } from "../lib/product-scan-scope";
+
 import {
   isShopifyTranslatableResourceType,
 } from "../lib/shopify-translatable-resource-types";
 
 import {
+  fetchAllTranslationResources,
   fetchTranslationPage,
+  fetchSingleProductTranslationResource,
 } from "../lib/shopify-translation-scanner.server";
-
-import { syncTranslationResourceType } from "../lib/shopify-translation-scan-sync.server";
 
 type ScannerStatus =
   | "EMPTY_SOURCE"
@@ -390,6 +392,13 @@ export async function action({
     );
   }
 
+  const requestedProductId = url.searchParams.get("productId");
+  const targeted = requestedProductId !== null;
+  const productId = targeted ? normalizeProductId(requestedProductId) : null;
+  if (targeted && (!productId || resourceType !== "PRODUCT")) {
+    return Response.json({ message: "Targeted scan requires a valid Shopify PRODUCT ID." }, { status: 400 });
+  }
+
   const authorization =
     request.headers.get(
       "authorization",
@@ -408,17 +417,128 @@ export async function action({
   }
 
   try {
+    /*
+     * Read ALL Shopify pages for
+     * the selected resource type.
+     */
+    const resources = targeted && productId
+      ? [await fetchSingleProductTranslationResource(admin, productId, targetLocale)]
+      : await fetchAllTranslationResources(admin, resourceType, targetLocale);
+
     const backendUrl =
-      process.env.ACA_LOCALE_BACKEND_URL ??
+      process.env
+        .ACA_LOCALE_BACKEND_URL ??
       "http://127.0.0.1:3001";
 
-    const backendData = await syncTranslationResourceType({
-      admin,
-      resourceType,
-      targetLocale,
-      backendUrl,
-      authorization,
-    });
+    /*
+     * Send the raw Shopify state
+     * to NestJS.
+     *
+     * NestJS remains responsible for:
+     *
+     * - persistence
+     * - MISSING calculation
+     * - TRANSLATED calculation
+     * - OUTDATED calculation
+     * - EMPTY_SOURCE calculation
+     * - stale resource cleanup
+     */
+    const backendResponse =
+      await fetch(
+        `${backendUrl}/api/v1/translations/scanner/sync`,
+        {
+          method:
+            "POST",
+
+          headers: {
+            Authorization:
+              authorization,
+
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify({
+              resourceType,
+
+              targetLocale,
+
+              /*
+               * fetchAllTranslationResources()
+               * fetched every Shopify page.
+               *
+               * NestJS can therefore safely
+               * remove resources that are no
+               * longer present on Shopify.
+               */
+              completeScan: !targeted,
+              ...(targeted ? { scopedResourceId: productId } : {}),
+
+              resources:
+                resources.map(
+                  (
+                    resource:
+                      any,
+                  ) => ({
+                    resourceId:
+                      resource.resourceId,
+
+                    content:
+                      resource
+                        .translatableContent ??
+                      [],
+
+                    translations:
+                      resource
+                        .translations ??
+                      [],
+                  }),
+                ),
+            }),
+        },
+      );
+
+    const responseText =
+      await backendResponse.text();
+
+    if (
+      !backendResponse.ok
+    ) {
+      console.error(
+        "[ACA Locale] Translation scan persistence failed:",
+        responseText,
+      );
+
+      return new Response(
+        responseText,
+        {
+          status:
+            backendResponse.status,
+
+          headers: {
+            "Content-Type":
+              backendResponse.headers.get(
+                "content-type",
+              ) ??
+              "application/json",
+          },
+        },
+      );
+    }
+
+    let backendData:
+      unknown;
+
+    try {
+      backendData =
+        JSON.parse(
+          responseText,
+        );
+    } catch {
+      backendData =
+        responseText;
+    }
 
     return Response.json({
       shop:
@@ -426,6 +546,8 @@ export async function action({
 
       persisted:
         true,
+      scanScope: targeted ? "PRODUCT" : "RESOURCE_TYPE",
+      ...(targeted ? { productId } : {}),
 
       ...(
         typeof backendData ===
@@ -437,6 +559,7 @@ export async function action({
                 backendData,
             }
       ),
+      ...(targeted ? { summary: buildScannerView(resources).summary } : {}),
     });
   } catch (error) {
     console.error(

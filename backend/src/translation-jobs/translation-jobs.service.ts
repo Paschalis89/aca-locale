@@ -86,6 +86,12 @@ export class TranslationJobsService {
       ),
     );
 
+    if (body.shopifyProductId !== undefined &&
+        (!/^gid:\/\/shopify\/Product\/[1-9]\d{0,19}$/.test(body.shopifyProductId) ||
+         resourceTypes.length !== 1 || resourceTypes[0] !== 'PRODUCT')) {
+      throw new BadRequestException('Targeted jobs require exactly one valid PRODUCT GID.');
+    }
+
     const maxItems = body.maxItems ?? 100;
 
     return this.prisma.$transaction(async (tx) => {
@@ -118,6 +124,7 @@ export class TranslationJobsService {
               resourceType: {
                 in: resourceTypes,
               },
+              ...(body.shopifyProductId ? { shopifyResourceId: body.shopifyProductId } : {}),
 
               deletedAt: null,
             },

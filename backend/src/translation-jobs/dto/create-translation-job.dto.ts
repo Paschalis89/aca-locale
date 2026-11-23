@@ -52,4 +52,9 @@ export class CreateTranslationJobDto {
   @Min(1)
   @Max(500)
   maxItems?: number;
+
+  @ApiPropertyOptional({ description: 'Optional Shopify Product GID, restricts job candidates to exactly one product.' })
+  @IsOptional()
+  @IsString()
+  shopifyProductId?: string;
 }

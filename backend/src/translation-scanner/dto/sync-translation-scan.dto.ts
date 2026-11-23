@@ -2,8 +2,8 @@ import { Type } from 'class-transformer';
 
 import {
   IsArray,
-  IsBoolean,
   IsDateString,
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -145,16 +145,22 @@ export class SyncTranslationScanDto {
 
   @ApiPropertyOptional({
     type: [String],
-    description: 'Full Shopify resource ID set, provided only on finalization after all scan pages succeeded.',
+    description: 'Full Shopify resource ID set from all pages, supplied on finalization after a successful complete scan.',
   })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   seenResourceIds?: string[];
 
-  @ApiPropertyOptional({ description: 'Start timestamp of this Shopify scan. Prevents older overlapping scans from tombstoning resources refreshed by a newer scan.' })
+  @ApiPropertyOptional({
+    description: 'Start timestamp of the scan, used to avoid tombstoning resources refreshed by a newer overlapping scan.',
+  })
   @IsOptional()
   @IsDateString()
   scanStartedAt?: string;
 
+  @ApiPropertyOptional({ description: 'Exact Shopify Product GID for a single-resource scan. Never combine with completeScan=true.' })
+  @IsOptional()
+  @IsString()
+  scopedResourceId?: string;
 }

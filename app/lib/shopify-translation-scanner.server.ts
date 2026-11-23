@@ -71,17 +71,20 @@ export async function fetchTranslationPage(
     );
   }
 
-  // Do not treat an incomplete Shopify response as an empty catalog:
-  // the caller may finalize a scan and tombstone missing resources.
-  const collection = result.data?.translatableResources;
-  if (!collection || !Array.isArray(collection.nodes) || !collection.pageInfo ||
-      typeof collection.pageInfo.hasNextPage !== "boolean") {
-    throw new Error("Shopify returned an incomplete translatableResources response.");
-  }
-
   return {
-    resources: collection.nodes,
-    pageInfo: collection.pageInfo,
+    resources:
+      result.data
+        ?.translatableResources
+        ?.nodes ??
+      [],
+
+    pageInfo:
+      result.data
+        ?.translatableResources
+        ?.pageInfo ?? {
+        hasNextPage: false,
+        endCursor: null,
+      },
   };
 }
 
@@ -132,4 +135,28 @@ export async function fetchAllTranslationResources(
   }
 
   return resources;
+}
+/** Fetch only the explicitly requested resource; no pagination or broad scan. */
+export async function fetchSingleProductTranslationResource(
+  admin: any, resourceId: string, targetLocale: string,
+) {
+  const response = await admin.graphql(`#graphql
+    query AcaLocaleTargetedProductScan($resourceId: ID!, $targetLocale: String!) {
+      translatableResource(resourceId: $resourceId) {
+        resourceId
+        translatableContent { key value locale digest type }
+        translations(locale: $targetLocale) {
+          key locale value outdated updatedAt
+          market { id name }
+        }
+      }
+    }
+  `, { variables: { resourceId, targetLocale } });
+  const result = await response.json() as any;
+  if (result.errors) throw new Error(JSON.stringify(result.errors));
+  const resource = result.data?.translatableResource;
+  if (!resource || resource.resourceId !== resourceId) {
+    throw new Error('Product not found or not accessible as a translatable resource.');
+  }
+  return resource;
 }

@@ -10,6 +10,7 @@ import { pricingRowsFromRules, rulesFromPricingRows, type PricingEditorRow } fro
 import { qualitySnapshot } from "../lib/translation-quality";
 import { auditSeoField, summarizeSeoAudit } from "../lib/international-seo";
 import { summarizeLocalization, type ShopifyMarketSnapshot, type ShopifyLocaleSnapshot } from "../lib/market-localization";
+import { normalizeProductId } from "../lib/product-scan-scope";
 import { createAiCoreReadiness } from "../lib/ai-core-readiness";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -364,7 +365,9 @@ export default function Index() {
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
 
-  const [scannerLocale, setScannerLocale] = useState("it");
+  const [scannerLocale, setScannerLocale] = useState("en");
+  const [targetedProductScan, setTargetedProductScan] = useState(true);
+  const [scannerProductId, setScannerProductId] = useState("");
   const [scannerResourceType, setScannerResourceType] = useState("PRODUCT");
   const [scannerResult, setScannerResult] = useState<ScannerResult | null>(null);
   const [seoLocale, setSeoLocale] = useState("en");
@@ -1106,6 +1109,15 @@ export default function Index() {
   };
 
   const createJob = async () => {
+    const productId = targetedProductScan ? normalizeProductId(scannerProductId) : null;
+    if (targetedProductScan && !productId) {
+      shopify.toast.show("Enter the Shopify Product ID before creating a targeted job.", { isError: true });
+      return;
+    }
+    if (targetedProductScan && (resourceType !== "PRODUCT" || targetLocale !== scannerLocale)) {
+      shopify.toast.show("For a targeted job, select PRODUCT and use the scanned target locale.", { isError: true });
+      return;
+    }
     await runAction(
       "create-job",
       async () => {
@@ -1115,6 +1127,7 @@ export default function Index() {
             targetLocale,
             resourceTypes: [resourceType],
             maxItems,
+            ...(productId ? { shopifyProductId: productId } : {}),
           }),
         });
 
@@ -1288,13 +1301,18 @@ export default function Index() {
   };
 
   const scanStore = async () => {
+    const productId = targetedProductScan ? normalizeProductId(scannerProductId) : null;
+    if (targetedProductScan && (!productId || scannerResourceType !== "PRODUCT")) {
+      shopify.toast.show("Enter a valid Product ID and select PRODUCT.", { isError: true });
+      return;
+    }
     await runAction(
       "scan-store",
       async () => {
         const data = await apiCall(
           `/api/shopify/translatable-resources?resourceType=${encodeURIComponent(
             scannerResourceType,
-          )}&locale=${encodeURIComponent(scannerLocale)}`,
+          )}&locale=${encodeURIComponent(scannerLocale)}${productId ? `&productId=${encodeURIComponent(productId)}` : ""}`,
           { method: "POST" },
         );
 
@@ -1315,6 +1333,10 @@ export default function Index() {
           ...data,
           summary,
         });
+        if (productId) {
+          setResourceType("PRODUCT");
+          setTargetLocale(scannerLocale);
+        }
       },
       "Shopify scan completed.",
     );
@@ -1722,9 +1744,25 @@ export default function Index() {
                 </div>
               </div>
 
+              <div style={{ marginTop: 14, marginBottom: 14 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>
+                  <input type="checkbox" checked={targetedProductScan} onChange={event => setTargetedProductScan(event.target.checked)} />
+                  Limit scan and new jobs to one product (safe QA mode)
+                </label>
+                {targetedProductScan ? (
+                  <Field label="Shopify Product ID (number or gid://shopify/Product/...)" >
+                    <input value={scannerProductId} onChange={event => setScannerProductId(event.target.value)}
+                      placeholder="gid://shopify/Product/123456789" style={inputStyle} />
+                  </Field>
+                ) : (
+                  <InfoCallout tone="orange">Full resource-type scan enabled. This may update scanner states for every product. No translation is published by scanning.</InfoCallout>
+                )}
+                {targetedProductScan ? (
+                  <InfoCallout tone="blue">Targeted scan reads and updates only the selected PRODUCT. New jobs are also restricted to that Product ID while safe QA mode remains enabled. Product variants and metafields are not included automatically.</InfoCallout>
+                ) : null}
+              </div>
               <InfoCallout tone="blue">
-                A complete scan updates MISSING, TRANSLATED, OUTDATED and
-                EMPTY_SOURCE states before new jobs are created.
+                {targetedProductScan ? "Only the specified product is refreshed; other products remain unchanged." : "A complete scan updates MISSING, TRANSLATED, OUTDATED and EMPTY_SOURCE states for all resources of the selected type."}
               </InfoCallout>
             </Card>
 

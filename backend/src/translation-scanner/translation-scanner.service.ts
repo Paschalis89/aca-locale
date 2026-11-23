@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
 
@@ -60,14 +60,24 @@ export class TranslationScannerService {
       throw new NotFoundException('Shop is not registered.');
     }
 
-    // Each resource has its own bounded transaction. A large Shopify catalog
-    // must not hold one Prisma interactive transaction open for the entire scan.
-    // If a page fails, already persisted resources can be safely replayed;
-    // stale resources are tombstoned only in the final successful request.
+    if (scan.scopedResourceId !== undefined) {
+      if (scan.completeScan || scan.resourceType !== 'PRODUCT' ||
+          !/^gid:\/\/shopify\/Product\/[1-9]\d{0,19}$/.test(scan.scopedResourceId) ||
+          scan.resources.length !== 1 || scan.resources[0]?.resourceId !== scan.scopedResourceId) {
+        throw new BadRequestException('Targeted scan must contain exactly one matching PRODUCT and completeScan=false.');
+      }
+    }
+
     const scannedAt = new Date();
 
+    /*
+     * Save each Shopify resource in its own transaction so that
+     * large scans do not hold a single long-running transaction.
+     * The scoped QA path uses the same safe per-resource persistence.
+     */
     for (const resource of scan.resources) {
       await this.prisma.$transaction(async (tx) => {
+
         const savedResource = await tx.translationResource.upsert({
           where: {
             shopId_resourceType_shopifyResourceId: {
@@ -237,13 +247,24 @@ export class TranslationScannerService {
       }, { maxWait: 10000, timeout: 30000 });
     }
 
+    /*
+     * Cleanup is a separate transaction and is only authorized by
+     * an authoritative full scan. A targeted scan never reaches it.
+     */
     if (scan.completeScan) {
-      // A finalization-only request supplies all IDs seen across the pages.
-      // Legacy callers still work by deriving the IDs from scan.resources.
+      // A completed multi-page scan may finalize with resources=[] while
+      // supplying all IDs gathered across previous page requests.
+      // Preserve the legacy full-payload case when seenResourceIds is omitted.
       const seenShopifyResourceIds = scan.seenResourceIds ??
         scan.resources.map((resource) => resource.resourceId);
       await this.prisma.$transaction(async (tx) => {
-
+      /*
+       * Because the React Router gateway
+       * fetched every Shopify page,
+       * completeScan=true means this is the
+       * authoritative current resource list
+       * for this type.
+       */
         const staleResourceWhere =
           seenShopifyResourceIds.length === 0
             ? {
