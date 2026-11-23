@@ -8,6 +8,7 @@ import { authenticate } from "../shopify.server";
 import { formatUsageUsd, usageHasUnpricedCosts } from "../lib/usage-analytics";
 import { pricingRowsFromRules, rulesFromPricingRows, type PricingEditorRow } from "../lib/usage-pricing-editor";
 import { qualitySnapshot } from "../lib/translation-quality";
+import { auditSeoField, summarizeSeoAudit } from "../lib/international-seo";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -19,6 +20,7 @@ type AppTab =
   | "scanner"
   | "jobs"
   | "review"
+  | "seo"
   | "languages"
   | "glossary"
   | "usage"
@@ -294,6 +296,7 @@ const tabs: Array<{ id: AppTab; label: string; short: string }> = [
   { id: "scanner", label: "Store Scan", short: "Scan" },
   { id: "jobs", label: "Jobs", short: "Jobs" },
   { id: "review", label: "Review", short: "Review" },
+  { id: "seo", label: "International SEO", short: "SEO" },
   { id: "languages", label: "Languages", short: "Lang" },
   { id: "glossary", label: "Glossary", short: "Terms" },
   { id: "usage", label: "Usage", short: "Usage" },
@@ -358,6 +361,10 @@ export default function Index() {
   const [scannerLocale, setScannerLocale] = useState("it");
   const [scannerResourceType, setScannerResourceType] = useState("PRODUCT");
   const [scannerResult, setScannerResult] = useState<ScannerResult | null>(null);
+  const [seoLocale, setSeoLocale] = useState("en");
+  const [seoField, setSeoField] = useState("meta_title");
+  const [seoValue, setSeoValue] = useState("");
+  const [seoFilter, setSeoFilter] = useState("ALL");
 
   const [syncResult, setSyncResult] = useState<any>(null);
 
@@ -855,6 +862,21 @@ export default function Index() {
 
     return { totalJobs, activeJobs, reviewItems, publishedItems };
   }, [jobs]);
+
+  // Only the first 15 jobs are loaded with item details by the current Jobs API.
+  // This local SEO audit must never be presented as a complete Shopify store crawl.
+  const seoLoadedRows = useMemo(() => jobs.flatMap(job => (job.items ?? []).map(item => ({
+    jobId: job.id,
+    itemId: item.id,
+    key: item.field?.key ?? "",
+    locale: job.targetLocale,
+    resourceType: item.field?.resource?.resourceType ?? "UNKNOWN",
+    value: item.approvedValue ?? item.translatedValue ?? "",
+    status: item.status,
+  }))), [jobs]);
+  const seoAudit = useMemo(() => summarizeSeoAudit(seoLoadedRows.filter(row => seoLocale === "ALL" || row.locale === seoLocale)), [seoLoadedRows, seoLocale]);
+  const seoDraft = useMemo(() => auditSeoField({ key: seoField, locale: seoLocale, value: seoValue }), [seoField, seoLocale, seoValue]);
+  const seoVisibleRows = seoAudit.rows.filter(row => seoFilter === "ALL" || row.audit.status === seoFilter).slice(0, 50);
 
   const reviewQueue = useMemo(
     () =>
@@ -1685,6 +1707,64 @@ export default function Index() {
                   text="Choose a locale and resource type, then run a Shopify scan."
                 />
               )}
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "seo" ? (
+          <div className="aca-layout-two">
+            <Card title="International SEO — Existing Translations" subtitle="Read-only inspection of translated SEO fields present in currently loaded job details. No Shopify writes.">
+              <InfoCallout tone="orange">Partial audit: the Jobs API loads details for up to 15 jobs. Counts below do not cover the full store, Shopify Markets configuration, hreflang, live URLs, or images not represented as translation fields.</InfoCallout>
+              <div className="aca-form-grid-3" style={{ marginTop: 14 }}>
+                <Field label="Target locale">
+                  <select value={seoLocale} onChange={event => setSeoLocale(event.target.value)} style={inputStyle}>
+                    <option value="ALL">All loaded locales</option>
+                    {Array.from(new Set(jobs.map(job => job.targetLocale))).sort().map(locale => <option key={locale} value={locale}>{locale}</option>)}
+                  </select>
+                </Field>
+                <Field label="Issue filter">
+                  <select value={seoFilter} onChange={event => setSeoFilter(event.target.value)} style={inputStyle}>
+                    <option value="ALL">All results</option>
+                    <option value="ERROR">Errors</option>
+                    <option value="REVIEW">Needs review</option>
+                    <option value="PASS">Pass</option>
+                  </select>
+                </Field>
+                <div className="aca-field-action"><button type="button" className="aca-btn" onClick={() => void loadJobs(true)} disabled={loadingJobs}>{loadingJobs ? "Refreshing..." : "Refresh loaded jobs"}</button></div>
+              </div>
+              <div className="aca-stat-grid-4" style={{ marginTop: 14 }}>
+                <MiniStat label="SEO fields evaluated" value={String(seoAudit.evaluated)} />
+                <MiniStat label="Pass" value={String(seoAudit.passing)} />
+                <MiniStat label="Needs review" value={String(seoAudit.review)} />
+                <MiniStat label="Errors" value={String(seoAudit.errors)} />
+              </div>
+              {jobsError ? <InfoCallout tone="orange">{jobsError}</InfoCallout> : null}
+              {seoVisibleRows.length ? <div style={{ overflowX: "auto", marginTop: 14 }}><table className="aca-table"><thead><tr><th>Locale</th><th>Resource</th><th>Field</th><th>Status</th><th>Length</th><th>Notes</th></tr></thead><tbody>
+                {seoVisibleRows.map((row, index) => <tr key={`${row.locale}:${row.resourceType ?? ""}:${row.key}:${index}`}><td>{row.locale}</td><td>{row.resourceType}</td><td>{row.key}</td><td>{row.audit.status}</td><td>{row.audit.length}</td><td>{row.audit.findings.map(issue => issue.message).join(" ") || "No heuristic issues"}</td></tr>)}
+              </tbody></table></div> : <p className="aca-muted-small" style={{ marginTop: 14 }}>No matching SEO translation fields in the currently loaded jobs.</p>}
+              {seoAudit.rows.length > 50 ? <p className="aca-muted-small">Showing the first 50 matching fields only.</p> : null}
+            </Card>
+            <Card title="SEO Draft Checker" subtitle="Evaluate a proposed translation before approval. Nothing is saved or published.">
+              <div className="aca-form-grid-3">
+                <Field label="Field">
+                  <select value={seoField} onChange={event => setSeoField(event.target.value)} style={inputStyle}>
+                    <option value="meta_title">SEO title</option>
+                    <option value="meta_description">Meta description</option>
+                    <option value="handle">Localized slug / handle</option>
+                    <option value="image_alt">Image ALT text</option>
+                  </select>
+                </Field>
+              </div>
+              <Field label="Proposed translation">
+                <textarea value={seoValue} onChange={event => setSeoValue(event.target.value)} rows={5} style={{ ...inputStyle, width: "100%" }} placeholder="Paste a proposed localized SEO text..." />
+              </Field>
+              <div className="aca-stat-grid-3" style={{ marginTop: 14 }}>
+                <MiniStat label="Characters" value={String(seoDraft.length)} />
+                <MiniStat label="Heuristic status" value={seoDraft.status} />
+                <MiniStat label="Findings" value={String(seoDraft.findings.length)} />
+              </div>
+              {seoDraft.findings.map((issue, index) => <InfoCallout key={`${issue.code}-${index}`} tone={issue.severity === "ERROR" ? "orange" : "blue"}>{issue.message}</InfoCallout>)}
+              <p className="aca-muted-small" style={{ marginTop: 14 }}>Length ranges are editorial heuristics, not Shopify or Google ranking guarantees. This checker does not validate live hreflang tags, canonical URLs, search indexation, Shopify Markets routing, or actual image accessibility.</p>
             </Card>
           </div>
         ) : null}
