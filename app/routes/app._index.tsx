@@ -26,7 +26,6 @@ type AppTab =
   | "seo"
   | "markets"
   | "ai-core"
-  | "languages"
   | "glossary"
   | "usage"
   | "settings";
@@ -304,7 +303,6 @@ const tabs: Array<{ id: AppTab; label: string; short: string }> = [
   { id: "seo", label: "International SEO", short: "SEO" },
   { id: "markets", label: "Markets & Localization", short: "Markets" },
   { id: "ai-core", label: "ACA AI Core", short: "AI Core" },
-  { id: "languages", label: "Languages", short: "Lang" },
   { id: "glossary", label: "Glossary", short: "Terms" },
   { id: "usage", label: "Usage", short: "Usage" },
   { id: "settings", label: "Settings", short: "Settings" },
@@ -378,6 +376,7 @@ export default function Index() {
   const [seoFilter, setSeoFilter] = useState("ALL");
 
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [shopifySyncAt, setShopifySyncAt] = useState<string | null>(null);
   const [liveMarkets, setLiveMarkets] = useState<ShopifyMarketSnapshot[] | null>(null);
   const [liveLocales, setLiveLocales] = useState<ShopifyLocaleSnapshot[] | null>(null);
   const [marketSnapshotAt, setMarketSnapshotAt] = useState<string | null>(null);
@@ -1394,6 +1393,8 @@ export default function Index() {
       async () => {
         const data = await apiCall("/api/shopify/sync", { method: "POST" });
         setSyncResult(data);
+        setShopifySyncAt(new Date().toISOString());
+        await loadMarketSnapshot();
       },
       "Shopify languages and markets synchronized.",
     );
@@ -1659,9 +1660,6 @@ export default function Index() {
     selectedItem?.status === "REJECTED";
   const canPublishItem = selectedItem?.status === "APPROVED";
 
-  const locales =
-    syncResult?.languages ?? syncResult?.locales ?? syncResult?.shopLanguages ?? [];
-  const markets = syncResult?.markets ?? [];
   const aiCoreReadiness = useMemo(() => createAiCoreReadiness({ config: aiConfiguration, providerHealth: aiProviderHealth, budget: aiBudget }), [aiConfiguration, aiProviderHealth, aiBudget]);
   const marketLocalization = useMemo(
     () => liveMarkets !== null && liveLocales !== null
@@ -2419,6 +2417,17 @@ export default function Index() {
                   {marketsLoading ? "Loading Shopify Markets..." : "Refresh Shopify Markets (read only)"}
                 </button>
               </div>
+              <div style={{ marginTop: 12, padding: 14, border: "1px solid #d9d6c8", borderRadius: 8 }}>
+                <strong>Shopify language and market synchronization</strong>
+                <p className="aca-muted-small">Shopify is the source of truth. Synchronize ACA Locale after changing store languages or market configuration. The button is an action, not a persistent toggle.</p>
+                <div className="aca-actions">
+                  <ActionButton label="Sync Shopify configuration" actionKey="sync-shopify" busyAction={busyAction} onClick={syncShopifyConfiguration} primary />
+                </div>
+                <div role="status" style={{ marginTop: 8 }}>
+                  {shopifySyncAt ? `Last successful configuration sync in this session: ${new Date(shopifySyncAt).toLocaleString()}` : "No configuration synchronization performed in this session."}
+                  {syncResult ? <p className="aca-muted-small">Configuration sync completed. Live language and market information refreshed separately from Shopify.</p> : null}
+                </div>
+              </div>
               <div style={{ marginTop: 12 }}>
                 <InfoCallout tone="orange">
                   Market configuration comes from Shopify Admin; ACA job counts are matched by language only and are NOT market-specific publication or storefront translation coverage. No Shopify writes are performed.
@@ -2462,7 +2471,7 @@ export default function Index() {
                   <h3 style={sectionHeadingStyle}>Published languages from Shopify</h3>
                   {liveLocales?.length ? (
                     <div style={{ overflowX: "auto" }}><table className="aca-table"><thead><tr><th>Locale</th><th>Name</th><th>Published</th><th>Primary</th></tr></thead><tbody>
-                      {liveLocales.map(item => <tr key={item.locale}><td>{item.locale}</td><td>{item.name ?? "—"}</td><td>{item.published ? "Yes" : "No"}</td><td>{item.primary ? "Yes" : "No"}</td></tr>)}
+                      {liveLocales.map(item => <tr key={item.locale}><td>{item.locale}</td><td>{item.name || item.locale || "Unknown"}</td><td>{item.published ? "Yes" : "No"}</td><td>{item.primary ? "Yes" : "No"}</td></tr>)}
                     </tbody></table></div>
                   ) : <p className="aca-muted-small">No locales returned.</p>}
                 </div>
@@ -2503,74 +2512,6 @@ export default function Index() {
                 </Field>
                 <p className="aca-muted-small">No secrets, prompts or Shopify shop identifiers are included. There is no gateway endpoint or live connection in this release.</p>
               </div>
-            </Card>
-          </div>
-        ) : null}
-
-        {activeTab === "languages" ? (
-          <div className="aca-layout-two">
-            <Card
-              title="Shopify Configuration"
-              subtitle="Synchronize source language, published locales and Shopify Markets."
-            >
-              <div className="aca-actions">
-                <ActionButton
-                  label="Sync Shopify"
-                  actionKey="sync-shopify"
-                  busyAction={busyAction}
-                  onClick={syncShopifyConfiguration}
-                  primary
-                />
-              </div>
-              <div style={{ marginTop: 18 }}>
-                <InfoCallout tone="green">
-                  ACA Locale uses Shopify as the source of truth. Run this sync after changing languages or Markets in Shopify Admin.
-                </InfoCallout>
-              </div>
-            </Card>
-
-            <Card title="Languages & Markets" subtitle="Last synchronized Shopify configuration.">
-              {syncResult ? (
-                <div className="aca-column-stack">
-                  {Array.isArray(locales) && locales.length > 0 ? (
-                    <div>
-                      <h3 style={sectionHeadingStyle}>Languages</h3>
-                      <div className="aca-language-grid">
-                        {locales.map((locale: any, index: number) => (
-                          <div key={locale.locale ?? locale.id ?? index} className="aca-language-card">
-                            <strong>{locale.name ?? locale.locale ?? "Language"}</strong>
-                            <div className="aca-muted-small">{locale.locale ?? "—"}</div>
-                            <div style={{ marginTop: 8 }}>
-                              {locale.primary ? <Pill text="Primary" tone="blue" /> : null}
-                              {locale.published ? <Pill text="Published" tone="green" /> : <Pill text="Unpublished" tone="orange" />}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {Array.isArray(markets) && markets.length > 0 ? (
-                    <div>
-                      <h3 style={sectionHeadingStyle}>Markets</h3>
-                      <div className="aca-language-grid">
-                        {markets.map((market: any, index: number) => (
-                          <div key={market.id ?? index} className="aca-language-card">
-                            <strong>{market.name ?? "Market"}</strong>
-                            <div className="aca-muted-small">{market.handle ?? market.status ?? "—"}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {!Array.isArray(locales) && !Array.isArray(markets) ? (
-                    <pre style={debugStyle}>{JSON.stringify(syncResult, null, 2)}</pre>
-                  ) : null}
-                </div>
-              ) : (
-                <EmptyState title="Not synchronized in this session" text="Run Shopify sync to view current languages and markets." />
-              )}
             </Card>
           </div>
         ) : null}

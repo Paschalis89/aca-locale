@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { verifySourceIdentity } from './shopify-source-identity.ts';
+const exp={resourceId:'gid://shopify/Product/123',sourceLocale:'it',fieldKey:'body_html'};
+const good={resourceId:exp.resourceId,translatableContent:[{key:'body_html',locale:'it',digest:'d-1',value:'<p>Ciao</p>'}]};
+test('valid Shopify source identity allows digest comparison',()=>assert.equal(verifySourceIdentity(exp,good).ok,true));
+test('wrong resource is rejected',()=>assert.equal(verifySourceIdentity(exp,{...good,resourceId:'gid://shopify/Product/456'}).code,'SOURCE_RESOURCE_MISMATCH'));
+test('missing resource is rejected',()=>assert.equal(verifySourceIdentity(exp,null).code,'SOURCE_RESOURCE_MISMATCH'));
+test('wrong locale is rejected',()=>assert.equal(verifySourceIdentity(exp,{...good,translatableContent:[{key:'body_html',locale:'en',digest:'d'}]}).code,'SOURCE_LOCALE_MISMATCH'));
+test('missing field is rejected',()=>assert.equal(verifySourceIdentity(exp,{...good,translatableContent:[]}).code,'SOURCE_FIELD_MISSING'));
+test('missing digest is rejected',()=>assert.equal(verifySourceIdentity(exp,{...good,translatableContent:[{key:'body_html',locale:'it'}]}).code,'SOURCE_DIGEST_MISSING'));

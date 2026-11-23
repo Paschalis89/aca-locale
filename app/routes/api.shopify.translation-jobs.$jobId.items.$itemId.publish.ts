@@ -1,6 +1,7 @@
 import type {
   ActionFunctionArgs,
 } from "react-router";
+import { verifySourceIdentity } from "../lib/shopify-source-identity";
 
 import {
   authenticate,
@@ -273,8 +274,10 @@ export async function action({
       );
 
     const resourceJson =
-      (await resourceResponse.json()) as
-        Awaited<ReturnType<typeof resourceResponse.json>> & { errors?: unknown };
+      (await resourceResponse.json()) as unknown as {
+        errors?: unknown;
+        data?: { translatableResource?: any };
+      };
 
     if (
       resourceJson.errors
@@ -299,48 +302,17 @@ export async function action({
       );
     }
 
-    const content =
-      resourceJson.data
-        ?.translatableResource
-        ?.translatableContent
-        ?.find(
-          (
-            candidate:
-              any,
-          ) =>
-            candidate.key ===
-            fieldKey,
-        );
-
-    if (
-      !content
-    ) {
+    const identity = verifySourceIdentity(
+      { resourceId, sourceLocale: job.sourceLocale, fieldKey },
+      resourceJson.data?.translatableResource,
+    );
+    if (!identity.ok) {
       return Response.json(
-        {
-          message:
-            `Shopify translatable content "${fieldKey}" was not found.`,
-        },
-        {
-          status:
-            409,
-        },
+        { message: "Shopify source identity verification failed. Rescan the resource before publishing.", code: identity.code },
+        { status: 409 },
       );
     }
-
-    if (
-      !content.digest
-    ) {
-      return Response.json(
-        {
-          message:
-            "Shopify did not return a translatable content digest.",
-        },
-        {
-          status:
-            409,
-        },
-      );
-    }
+    const content = identity.content;
 
     /*
      * Critical optimistic concurrency check.
@@ -447,8 +419,10 @@ export async function action({
       );
 
     const registerJson =
-      (await registerResponse.json()) as
-        Awaited<ReturnType<typeof registerResponse.json>> & { errors?: unknown };
+      (await registerResponse.json()) as unknown as {
+        errors?: unknown;
+        data?: { translationsRegister?: any };
+      };
 
     if (
       registerJson.errors
