@@ -338,6 +338,8 @@ export default function Index() {
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<unknown>(null);
+  const [publicationVerification, setPublicationVerification] = useState<{ status: string; reason?: string; verifiedAt?: string; actualValue?: string | null; expectedValue?: string } | null>(null);
+  const [publicationVerificationItemId, setPublicationVerificationItemId] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
 
   const [targetLocale, setTargetLocale] = useState("it");
@@ -1283,6 +1285,22 @@ export default function Index() {
     );
   };
 
+  const verifyPublishedItem = async (jobId = selectedJobId, itemId = selectedItemId) => {
+    setPublicationVerification(null);
+    setPublicationVerificationItemId(null);
+    await runAction(
+      "verify-publication",
+      async () => {
+        const result = await apiCall(
+          `/api/shopify/translation-jobs/${encodeURIComponent(jobId)}/items/${encodeURIComponent(itemId)}/verify`,
+        );
+        setPublicationVerification(result.verification);
+        setPublicationVerificationItemId(itemId);
+      },
+      "Shopify read-back completed. Check verification status below.",
+    );
+  };
+
   const publishItem = async () => {
     if (!requireItem() || !selectedItem || !selectedJob) return;
 
@@ -1310,6 +1328,17 @@ export default function Index() {
           `/api/shopify/translation-jobs/${selectedJobId}/items/${selectedItemId}/publish`,
           { method: "POST" },
         );
+        // Shopify mutation and NestJS confirmation have already completed.
+        // A failed read-back must NEVER be reported as a failed publication.
+        try {
+          const check = await apiCall(
+            `/api/shopify/translation-jobs/${encodeURIComponent(selectedJobId)}/items/${encodeURIComponent(selectedItemId)}/verify`,
+          );
+          setPublicationVerification(check.verification);
+        } catch {
+          setPublicationVerification({ status: "VERIFICATION_FAILED", reason: "Published, but Shopify read-back could not be completed." });
+        }
+        setPublicationVerificationItemId(selectedItemId);
         await loadJobDetail(selectedJobId);
         await loadJobs();
       },
@@ -2348,9 +2377,29 @@ export default function Index() {
                       />
                     ) : null}
                     {selectedItem.status === "PUBLISHED" ? (
-                      <span className="aca-published-note">Published to Shopify</span>
+                      <>
+                        <span className="aca-published-note">Published to Shopify</span>
+                        <ActionButton
+                          label="Verify on Shopify"
+                          actionKey="verify-publication"
+                          busyAction={busyAction}
+                          onClick={() => verifyPublishedItem()}
+                        />
+                      </>
                     ) : null}
                   </div>
+                  {selectedItem.status === "PUBLISHED" &&
+                    publicationVerificationItemId === selectedItem.id && publicationVerification ? (
+                    <div role="status" style={{ marginTop: 12, padding: 12, border: "1px solid #d9d6c8", borderRadius: 8 }}>
+                      <strong>Shopify read-back: {publicationVerification.status}</strong>
+                      {publicationVerification.verifiedAt ? <p>Checked: {publicationVerification.verifiedAt}</p> : null}
+                      {publicationVerification.reason ? <p>{publicationVerification.reason}</p> : null}
+                      {publicationVerification.status === "MISMATCH" ?
+                        <p>Shopify value differs from the approved translation or is outdated. Do not republish without reviewing the source.</p> : null}
+                      {publicationVerification.status === "VERIFIED" ?
+                        <p>Exact approved value confirmed in Shopify for this field and locale.</p> : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <EmptyState title="Select an item" text="Choose a translation from the review queue or a job detail." />
