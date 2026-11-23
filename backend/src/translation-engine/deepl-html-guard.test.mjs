@@ -29,3 +29,8 @@ test('blocks modified HTML tags but preserves valid inline formatting', () => {
   assert.throws(() => assertSafeDeepLHtmlResult(source, '<div>Hello</div>', 'it', 'en'), /tag structure/);
   assert.doesNotThrow(() => assertSafeDeepLHtmlResult('<p><strong>Bellissimo piatto di ceramica</strong></p>', '<p><strong>Beautiful ceramic plate</strong></p>', 'it', 'en'));
 });
+
+test('blocks nested escaped HTML in source and output', () => {
+  assert.throws(() => assertTranslatableDeepLHtml('<p>&amp;lt;p&amp;gt;Testo italiano&amp;lt;/p&amp;gt;</p>'), /escaped markup/);
+  assert.throws(() => assertSafeDeepLHtmlResult(source, '<p>&amp;lt;p&amp;gt;Hello&amp;lt;/p&amp;gt;</p>', 'it', 'en'), /escaped HTML markup/);
+});

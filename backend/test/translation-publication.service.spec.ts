@@ -152,3 +152,45 @@ describe('TranslationPublicationService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+
+describe('Publication HTML safety', () => {
+  it('rejects a previously approved malformed HTML translation before publication', async () => {
+    const prisma = createPrisma();
+    const approved = item('APPROVED');
+    approved.field.type = 'HTML';
+    approved.field.key = 'body_html';
+    approved.field.sourceValue = '<p>Descrizione italiana</p>';
+    approved.approvedValue = '<p>&amp;lt;p&amp;gt;English text&amp;lt;/p&amp;gt;</p>';
+    prisma.translationJobItem.findFirst.mockResolvedValue(approved);
+    const service = new TranslationPublicationService(prisma);
+    await expect(service.prepare('shop-a.myshopify.com', 'job-1', 'item-1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects a malformed scanner source even if the approved HTML is clean', async () => {
+    const prisma = createPrisma();
+    const approved = item('APPROVED');
+    approved.field.type = 'HTML';
+    approved.field.key = 'body_html';
+    approved.field.sourceValue = '<p>&amp;lt;p&amp;gt;Descrizione italiana&amp;lt;/p&amp;gt;</p>';
+    approved.approvedValue = '<p>English description</p>';
+    prisma.translationJobItem.findFirst.mockResolvedValue(approved);
+    const service = new TranslationPublicationService(prisma);
+    await expect(service.prepare('shop-a.myshopify.com', 'job-1', 'item-1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows a clean HTML translation when source and approved value are safe', async () => {
+    const prisma = createPrisma();
+    const approved = item('APPROVED');
+    approved.field.type = 'HTML';
+    approved.field.key = 'body_html';
+    approved.field.sourceValue = '<p>Descrizione italiana</p>';
+    approved.approvedValue = '<p>English description</p>';
+    prisma.translationJobItem.findFirst.mockResolvedValue(approved);
+    const service = new TranslationPublicationService(prisma);
+    await expect(service.prepare('shop-a.myshopify.com', 'job-1', 'item-1')).resolves.toMatchObject({
+      alreadyPublished: false,
+      value: '<p>English description</p>',
+    });
+  });
+});

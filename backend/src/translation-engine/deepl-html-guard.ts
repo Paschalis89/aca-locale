@@ -56,7 +56,7 @@ export function assertSafeDeepLHtmlResult(
 }
 
 function hasEncodedMarkup(html: string): boolean {
-  return /&lt;\/?(?:p|div|span|h[1-6]|ul|ol|li|br|strong|em|code|a)(?:\s|&gt;|\/)/i.test(html);
+  return /&(?:amp;){0,6}lt;\s*\/?\s*(?:p|div|span|h[1-6]|ul|ol|li|br|strong|em|code|a|blockquote|table|thead|tbody|tr|td|th|pre|img|section|article|b|i)\b[\s\S]{0,300}?&(?:amp;){0,6}gt;/i.test(html);
 }
 
 function isOnlyCodeContent(html: string): boolean {

@@ -326,7 +326,37 @@ describe('TranslationValidatorService', () => {
     });
 
     expect(result.passed).toBe(true);
-    expect(result.version).toBe('deterministic-v2-glossary');
+    expect(result.version).toBe('deterministic-v3-html-safety');
   });
 
+});
+
+
+describe('HTML safety at deterministic validation boundary', () => {
+  const validator = new TranslationValidatorService();
+  const check = (sourceValue: string, translatedValue: string) => validator.validate({
+    sourceValue, translatedValue, sourceLocale: 'it', targetLocale: 'en', contentType: 'HTML', resourceType: 'PRODUCT', fieldKey: 'body_html',
+  });
+  it('accepts clean formatted HTML and ordinary escaped comparisons', () => {
+    expect(check('<p>Questo piatto e fatto a mano.</p>', '<p>This plate is handmade.</p>').passed).toBe(true);
+    expect(check('<p>2 &lt; 3 e vero</p>', '<p>2 &lt; 3 is true</p>').passed).toBe(true);
+  });
+  it('blocks encoded HTML from Shopify before review', () => {
+    const outcome = check('<p>&lt;p&gt;Descrizione&lt;/p&gt;</p>', '<p>&lt;p&gt;Description&lt;/p&gt;</p>');
+    expect(outcome.passed).toBe(false);
+    expect(outcome.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'HTML_ESCAPED_MARKUP', severity: 'ERROR' })]));
+  });
+  it('blocks multiple levels of HTML escaping', () => {
+    const outcome = check('<p>&amp;lt;p&amp;gt;Descrizione&amp;lt;/p&amp;gt;</p>', '<p>&amp;lt;p&amp;gt;Description&amp;lt;/p&amp;gt;</p>');
+    expect(outcome.passed).toBe(false);
+    expect(outcome.issues.some(issue => issue.code === 'HTML_ESCAPED_MARKUP')).toBe(true);
+  });
+  it('blocks a code-only source, preserving normal inline code', () => {
+    expect(check('<p><code>Testo italiano</code></p>', '<p><code>English text</code></p>').passed).toBe(false);
+    expect(check('<p>Scrivi <code>npm test</code> ora.</p>', '<p>Run <code>npm test</code> now.</p>').passed).toBe(true);
+  });
+  it('blocks malformed nested tags and unsafe active content', () => {
+    expect(check('<p><strong>Testo</p></strong>', '<p><strong>Text</p></strong>').passed).toBe(false);
+    expect(check('<p>Testo</p>', '<p><script>alert(1)</script>Text</p>').passed).toBe(false);
+  });
 });

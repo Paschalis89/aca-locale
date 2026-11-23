@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { glossaryTermMatches } from '../glossary/glossary-rule.utils.js';
+import { inspectShopifyHtml } from './html-safety.js';
 
 import type {
   TranslationValidationInput,
@@ -10,7 +11,7 @@ import type {
 
 @Injectable()
 export class TranslationValidatorService {
-  private readonly version = 'deterministic-v2-glossary';
+  private readonly version = 'deterministic-v3-html-safety';
 
   validate(input: TranslationValidationInput): TranslationValidationResult {
     const issues: TranslationValidationIssue[] = [];
@@ -46,6 +47,15 @@ export class TranslationValidatorService {
     this.validateUrls(source, translated, issues);
 
     this.validateEmails(source, translated, issues);
+
+    if (input.contentType?.toUpperCase() === 'HTML') {
+      for (const problem of inspectShopifyHtml(source, { source: true })) {
+        issues.push({ code: problem.code, severity: 'ERROR', message: `Source: ${problem.message}` });
+      }
+      for (const problem of inspectShopifyHtml(translated)) {
+        issues.push({ code: problem.code, severity: 'ERROR', message: `Translation: ${problem.message}` });
+      }
+    }
 
     this.validateHtml(source, translated, issues);
 

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service.js';
+import { inspectShopifyHtml } from '../translation-validation/html-safety.js';
 
 @Injectable()
 export class TranslationPublicationService {
@@ -52,6 +53,20 @@ export class TranslationPublicationService {
 
     if (!item.approvedValue || item.approvedValue.trim().length === 0) {
       throw new BadRequestException('Translation item has no approved value.');
+    }
+
+    if (item.field.type?.toUpperCase() === 'HTML') {
+      const problems = [
+        ...inspectShopifyHtml(item.field.sourceValue, { source: true }),
+        ...inspectShopifyHtml(item.approvedValue),
+      ];
+      if (problems.length) {
+        throw new ConflictException({
+          code: 'HTML_UNSAFE_FOR_PUBLICATION',
+          message: 'HTML did not pass publication safety checks. Correct the Shopify source and regenerate/approve the translation.',
+          issues: problems,
+        });
+      }
     }
 
     if (item.field.deletedAt) {
