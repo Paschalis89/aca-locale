@@ -103,3 +103,10 @@ temp/
 # ============================================================
 *.local
 .local/
+
+# TypeScript incremental compilation artifacts
+*.tsbuildinfo
+
+# Python test cache
+__pycache__/
+*.py[cod]
