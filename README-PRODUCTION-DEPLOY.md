@@ -1,187 +1,79 @@
-# ACA Locale - production deployment baseline
+# ACA Locale — Production deployment and recovery
 
-Target architecture for the internal Amalfi Coast Artistry installation:
+This is the **operating guide**, not a first-install ZIP patch. The current stack runs on the ACA Locale Contabo VPS with domain `locale.amalficoastartistry.com`.
 
-- `locale.amalficoastartistry.com`
-- Traefik 3.7.x with Let's Encrypt
-- React Router Shopify application
-- NestJS backend
-- PostgreSQL 16
-- Redis 7.4 extended-support branch
-- persistent SQLite volume for the Shopify session store
-- no public host ports for PostgreSQL, Redis or NestJS
+## Stack and boundaries
 
-## Files in this deployment patch
+- `docker-compose.production.yml` with `deploy/.env.production`
+- `web`: React Router embedded Shopify UI
+- `backend`: NestJS/Prisma API
+- `postgres`: PostgreSQL 16 application database
+- `redis`: job queue
+- `traefik`: TLS routing / Let's Encrypt
+- Persistent **separate** Shopify session-storage volume (SQLite); session data is not contained in the PostgreSQL dump
 
-Replace:
+Never publish PostgreSQL, Redis or backend direct host ports; keep production secrets outside Git.
 
-- `Dockerfile`
-- `.dockerignore`
-- `.gitignore`
-- `app/shopify.server.ts`
-- `prisma/schema.prisma`
-
-Add:
-
-- `backend/Dockerfile`
-- `backend/.dockerignore`
-- `docker-compose.production.yml`
-- `shopify.app.production.toml`
-- `deploy/.env.production.example`
-- `deploy/scripts/deploy.sh`
-- `deploy/scripts/healthcheck.sh`
-- `deploy/scripts/backup.sh`
-- `deploy/scripts/restore.sh`
-
-## Important local-development change
-
-The root Prisma session database is now configured through:
-
-```env
-SHOPIFY_SESSION_DATABASE_URL=file:./dev.sqlite
-```
-
-Add that variable to the root local `.env` before running `shopify app dev` again.
-The backend database configuration is unchanged.
-
-## Production preparation
-
-On the server:
+## Baseline verification (read-only)
 
 ```bash
-cp deploy/.env.production.example deploy/.env.production
-chmod 600 deploy/.env.production
+cd /opt/aca-locale
+git status -sb
+git log -1 --oneline
+docker compose --env-file deploy/.env.production \
+  -f docker-compose.production.yml ps -a
 ```
 
-Fill every `REPLACE_...` value. Generate strong secrets locally, for example:
+If the working tree is dirty or services unhealthy, investigate before a deployment.
+
+## Safe source update
 
 ```bash
-openssl rand -hex 32
+cd /opt/aca-locale
+test -z "$(git status --porcelain)" || { echo 'STOP: dirty worktree'; exit 1; }
+git fetch origin main
+git merge --ff-only origin/main
 ```
 
-Do not paste production secrets into source control.
+A documentation-only change requires **no Docker rebuild**. For a frontend-only change, build/recreate **only** `web` following backup validation. Do not use `docker compose down` or remove volumes.
 
-## DNS
-
-Create an `A` record:
-
-```text
-locale.amalficoastartistry.com -> <ACA Locale VPS public IP>
-```
-
-Ports 80 and 443 must reach Traefik. PostgreSQL, Redis and NestJS stay internal to Docker.
-
-## First server deploy
+## Backups (PostgreSQL + Shopify sessions)
 
 ```bash
-chmod +x deploy/scripts/*.sh
-./deploy/scripts/deploy.sh
+cd /opt/aca-locale
+ACA_LOCALE_BACKUP_DIR=/var/backups/aca-locale \
+  bash deploy/scripts/backup.sh
 ```
 
-The backend container runs `prisma migrate deploy` before NestJS starts. The web container runs the Shopify session Prisma migration before React Router starts.
+Confirm both database dump and session backup, their SHA-256 manifest and the script's PASS result. Backups must remain outside the Git repository. Verify retention, off-site copy and restore drills separately. Never log session tokens.
 
-## Shopify production app
-
-Create/select the production Shopify app and choose **Custom distribution** for the ACA store. Set its Client ID in:
-
-```text
-shopify.app.production.toml
-```
-
-and set the same Client ID/secret in `deploy/.env.production`.
-
-The React Router runtime uses:
-
-```env
-SHOPIFY_APP_DISTRIBUTION=single_merchant
-```
-
-Development can keep:
-
-```env
-SHOPIFY_APP_DISTRIBUTION=app_store
-```
-
-if the current development app uses public/App Store style distribution.
-
-When the domain is online and HTTPS is valid:
+## Production acceptance
 
 ```bash
-shopify app deploy -c production
+ACA_LOCALE_BACKUP_DIR=/var/backups/aca-locale \
+  bash deploy/acceptance/aca-production-acceptance.sh
 ```
 
-Do this only after confirming the production `client_id` and URLs.
+This checks service health, internal readiness, unauthenticated endpoint rejection, backups and operations warnings. It is **not** a substitute for real authenticated Shopify/manual testing or an executed disaster-recovery rollback.
 
-## Safe first ACA settings
+Additional tools:
 
-Keep the initial live shop conservative:
+- `deploy/operations/aca-ops-health.sh` — operational snapshot
+- `deploy/operations/aca-restore-drill.sh` — isolated PostgreSQL restore drill
+- `deploy/rc/aca-session-recovery-drill.py` — session backup inspection in isolation
+- `deploy/rc/aca-rollback-preflight.sh` — image availability preflight only
+- `deploy/rc/aca-rc-final-qa.sh` — RC test gate
 
-```text
-autoTranslate       false
-enableAiReview      true
-requireHumanReview  true
-autoPublish         false
-```
+Read each script and its environment requirements prior to execution. The presence of a rollback image tag does not prove a successful live rollback.
 
-Then run the real Languages/Markets sync and a Store Scan before translating a small first batch.
+## Actual restore / rollback
 
-## Backup
+A true restoration can overwrite state. Use `deploy/scripts/restore.sh` only under an approved maintenance procedure, after checking the current backup pair and exact image/schema compatibility. Do not run manual SQL migrations or restore production sessions to a developer laptop.
 
-Manual backup:
+## Shopify configuration
 
-```bash
-sudo ACA_LOCALE_BACKUP_DIR=/var/backups/aca-locale ./deploy/scripts/backup.sh
-```
+Shopify application configuration resides in `shopify.app*.toml`; secrets and live values reside in the VPS environment. Shopify app CLI deployment changes app configuration and must be reviewed separately from Docker deployment. Do not trigger Shopify app reinstallation or change the installed app Client ID casually.
 
-Recommended cron after the first successful restore test:
+## Historical first-deployment guidance
 
-```text
-15 2 * * * cd /opt/aca-locale && ACA_LOCALE_BACKUP_DIR=/var/backups/aca-locale ./deploy/scripts/backup.sh >> /var/log/aca-locale-backup.log 2>&1
-```
-
-The script keeps 14 days locally. Add off-site backup after the initial production launch.
-
-## Restore protection
-
-Restore is intentionally blocked unless explicitly confirmed:
-
-```bash
-sudo CONFIRM_RESTORE=YES ./deploy/scripts/restore.sh /var/backups/aca-locale/<backup>.dump
-```
-
-## Production smoke checks
-
-```bash
-docker compose --env-file deploy/.env.production -f docker-compose.production.yml ps
-curl -I https://locale.amalficoastartistry.com/
-```
-
-Backend health is not publicly exposed; inspect it from Docker:
-
-```bash
-docker compose --env-file deploy/.env.production -f docker-compose.production.yml \
-  exec -T backend node -e \
-  "fetch('http://127.0.0.1:3001/api/v1/health/ready').then(async r=>{console.log(r.status, await r.text()); process.exit(r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"
-```
-
-## Mandatory migration preflight
-
-Before the first server deployment, the repository must contain the real NestJS Prisma migrations created during development:
-
-```text
-backend/prisma/migrations/<timestamp>_.../migration.sql
-```
-
-The production script deliberately refuses to deploy if those files are missing. `schema.prisma` alone is not a safe production migration strategy.
-
-Run locally before pushing the production branch:
-
-```bash
-./deploy/scripts/preflight.sh
-```
-
-For the React Router production OAuth callback, the production config uses the current Shopify deployment convention:
-
-```text
-https://locale.amalficoastartistry.com/auth/callback
-```
+The previous version of this document contained a first-time installation walkthrough (including the initial `shopify app deploy -c production` instructions). It remains available through Git history at `0ada7b1`. This document intentionally focuses on **maintenance of the already deployed application**.
