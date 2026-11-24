@@ -28,7 +28,8 @@ type AppTab =
   | "ai-core"
   | "glossary"
   | "usage"
-  | "settings";
+  | "settings"
+  | "operations";
 
 type JobStatus =
   | "QUEUED"
@@ -136,6 +137,18 @@ type AiBudgetSummary = {
   failureHistoryTruncated?: boolean;
   byProvider: Array<{ provider: string; events: number; failed: number; unpriced: number; estimatedCostUsd: number }>;
   byModel: Array<{ provider: string; model: string; events: number; failed: number; estimatedCostUsd: number }>;
+};
+
+type OperationsSnapshot = {
+  snapshotAt: string;
+  periodHours: number;
+  staleThresholdMinutes: number;
+  state: "HEALTHY" | "RECOVERED" | "DEGRADED" | "UNKNOWN";
+  errors24h: number;
+  shop: { jobsFailed: number; jobsStaleRunning: number; jobsDueRetry: number; itemsFailed: number; webhooksFailed: number; webhooksStaleProcessing: number };
+  providers: Array<{ provider: string; successes24h: number; errors24h: number; lastSuccessAt: string | null; lastErrorAt: string | null; state: "HEALTHY" | "RECOVERED" | "DEGRADED" }>;
+  advisoryOnly: boolean;
+  note: string;
 };
 
 type AutomationMonitor = {
@@ -305,6 +318,7 @@ const tabs: Array<{ id: AppTab; label: string; short: string }> = [
   { id: "ai-core", label: "ACA AI Core", short: "AI Core" },
   { id: "glossary", label: "Glossary", short: "Terms" },
   { id: "usage", label: "Usage", short: "Usage" },
+  { id: "operations", label: "Operations", short: "Ops" },
   { id: "settings", label: "Settings", short: "Settings" },
 ];
 
@@ -321,6 +335,9 @@ export default function Index() {
   const shopify = useAppBridge();
 
   const [activeTab, setActiveTab] = useState<AppTab>("overview");
+  const [operations, setOperations] = useState<OperationsSnapshot | null>(null);
+  const [operationsLoading, setOperationsLoading] = useState(false);
+  const [operationsError, setOperationsError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<TranslationJob[]>([]);
   const [automationMonitor, setAutomationMonitor] = useState<AutomationMonitor | null>(null);
   const [automationMonitorError, setAutomationMonitorError] = useState<string | null>(null);
@@ -507,6 +524,20 @@ export default function Index() {
       setMarketSnapshotAt(null);
     } finally {
       setMarketsLoading(false);
+    }
+  };
+
+  const loadOperations = async () => {
+    setOperationsLoading(true);
+    setOperationsError(null);
+    try {
+      const result = await apiCall('/api/backend/operations', {}, false);
+      setOperations(result as OperationsSnapshot);
+    } catch (error) {
+      setOperations(null);
+      setOperationsError(error instanceof Error ? error.message : 'Operations unavailable.');
+    } finally {
+      setOperationsLoading(false);
     }
   };
 
@@ -787,6 +818,7 @@ export default function Index() {
 
   useEffect(() => {
     if (activeTab === "jobs") void loadAutomationMonitor();
+    if (activeTab === "operations") void loadOperations();
     if (activeTab === "markets") void loadMarketSnapshot();
     if (activeTab === "settings") { void loadPricing(); void loadAiBudget(); }
     if (activeTab === "usage") void loadAiBudget();
@@ -1892,6 +1924,43 @@ export default function Index() {
               </div>
               {seoDraft.findings.map((issue, index) => <InfoCallout key={`${issue.code}-${index}`} tone={issue.severity === "ERROR" ? "orange" : "blue"}>{issue.message}</InfoCallout>)}
               <p className="aca-muted-small" style={{ marginTop: 14 }}>Length ranges are editorial heuristics, not Shopify or Google ranking guarantees. This checker does not validate live hreflang tags, canonical URLs, search indexation, Shopify Markets routing, or actual image accessibility.</p>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "operations" ? (
+          <div className="aca-column-stack">
+            <Card title="Operations & Health" subtitle="Read-only, shop-scoped operational snapshot. Host infrastructure is monitored separately by the administrator CLI.">
+              <div className="aca-actions">
+                <button type="button" className="aca-btn" disabled={operationsLoading} onClick={() => void loadOperations()}>
+                  {operationsLoading ? 'Refreshing...' : 'Refresh snapshot'}
+                </button>
+              </div>
+              {operationsError ? <InfoCallout tone="orange">Unable to load operations: {operationsError}</InfoCallout> : null}
+              {operations ? <>
+                <p style={mutedTextStyle}>Overall status: <strong style={{ color: operations.state === 'DEGRADED' ? ACA.danger : operations.state === 'RECOVERED' ? ACA.warning : ACA.success }}>{operations.state}</strong> · Snapshot: {new Date(operations.snapshotAt).toLocaleString()} · Window: {operations.periodHours}h</p>
+                <div className="aca-stat-grid-4">
+                  <MiniStat label="Failed jobs" value={String(operations.shop.jobsFailed)} />
+                  <MiniStat label="Stale running" value={String(operations.shop.jobsStaleRunning)} />
+                  <MiniStat label="Due retries" value={String(operations.shop.jobsDueRetry)} />
+                  <MiniStat label="Failed items" value={String(operations.shop.itemsFailed)} />
+                  <MiniStat label="Failed webhooks" value={String(operations.shop.webhooksFailed)} />
+                  <MiniStat label="Stale webhooks" value={String(operations.shop.webhooksStaleProcessing)} />
+                  <MiniStat label="Provider errors (24h)" value={String(operations.errors24h)} />
+                  <MiniStat label="Providers observed" value={String(operations.providers.length)} />
+                </div>
+                <div style={{ marginTop: 18 }}>
+                  <strong>Provider activity (last 24 hours)</strong>
+                  {operations.providers.length ? operations.providers.map(provider => (
+                    <p key={provider.provider} style={mutedTextStyle}>
+                      <strong>{provider.provider}</strong> · {provider.state} · {provider.successes24h} success · {provider.errors24h} failed
+                      {provider.lastSuccessAt ? ` · Last success: ${new Date(provider.lastSuccessAt).toLocaleString()}` : ''}
+                      {provider.lastErrorAt ? ` · Last error: ${new Date(provider.lastErrorAt).toLocaleString()}` : ''}
+                    </p>
+                  )) : <p style={mutedTextStyle}>No provider activity recorded within the last 24 hours. Availability is unknown.</p>}
+                </div>
+                <p style={mutedTextStyle}>{operations.note} The CLI on the VPS separately reports Docker health, disk and backup freshness.</p>
+              </> : !operationsLoading && !operationsError ? <p style={mutedTextStyle}>Open this tab to retrieve a read-only snapshot.</p> : null}
             </Card>
           </div>
         ) : null}

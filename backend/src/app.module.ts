@@ -42,6 +42,8 @@ import {
   MarketsModule,
 } from './markets/markets.module.js';
 
+import { OperationsModule } from './operations/operations.module.js';
+
 import {
   ReadinessModule,
 } from './readiness/readiness.module.js';
@@ -79,6 +81,7 @@ import {
     HealthModule,
     GlossaryModule,
     ReadinessModule,
+    OperationsModule,
     InternalModule,
     ShopsModule,
     DemoModule,
