@@ -1969,13 +1969,26 @@ export default function Index() {
                 </div>
                 <div style={{ marginTop: 18 }}>
                   <strong>Provider activity (last 24 hours)</strong>
-                  {operations.providers.length ? operations.providers.map(provider => (
-                    <p key={provider.provider} style={mutedTextStyle}>
-                      <strong>{provider.provider}</strong> · {provider.state} · {provider.successes24h} success · {provider.errors24h} failed
-                      {provider.lastSuccessAt ? ` · Last success: ${new Date(provider.lastSuccessAt).toLocaleString()}` : ''}
-                      {provider.lastErrorAt ? ` · Last error: ${new Date(provider.lastErrorAt).toLocaleString()}` : ''}
-                    </p>
-                  )) : <p style={mutedTextStyle}>No provider activity recorded within the last 24 hours. Availability is unknown.</p>}
+                  {operations.providers.length ? (
+                    <div className="aca-ops-provider-grid">
+                      {operations.providers.map(provider => (
+                        <div className="aca-ops-provider-card" key={provider.provider}>
+                          <div className="aca-ops-provider-heading">
+                            <strong>{provider.provider}</strong>
+                            <span className={`aca-ops-provider-state aca-ops-provider-state--${provider.state.toLowerCase()}`}>{provider.state}</span>
+                          </div>
+                          <div className="aca-ops-provider-counts">
+                            <span><strong>{provider.successes24h}</strong> successful</span>
+                            <span><strong>{provider.errors24h}</strong> failed</span>
+                          </div>
+                          <div className="aca-ops-provider-dates">
+                            {provider.lastSuccessAt ? <span>Last success: {new Date(provider.lastSuccessAt).toLocaleString()}</span> : null}
+                            {provider.lastErrorAt ? <span>Last error: {new Date(provider.lastErrorAt).toLocaleString()}</span> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p style={mutedTextStyle}>No provider activity recorded within the last 24 hours. Availability is unknown.</p>}
                 </div>
                 <p style={mutedTextStyle}>{operations.note} The CLI on the VPS separately reports Docker health, disk and backup freshness.</p>
               </> : !operationsLoading && !operationsError ? <p style={mutedTextStyle}>Open this tab to retrieve a read-only snapshot.</p> : null}
@@ -2534,20 +2547,27 @@ export default function Index() {
                     <InfoCallout tone="blue">{marketLocalization.marketsWithoutDedicatedWebPresence} market(s) have no dedicated web presence returned. Shopify may serve them on the primary domain via country selection. Country conditions below are not language coverage, and unmatched ACA jobs do not indicate missing translations.</InfoCallout>
                   ) : null}
                   {marketLocalization.marketCount === 0 ? <EmptyState title="No Markets returned" text="Check Markets setup and API permissions in Shopify Admin." /> : (
-                    <div style={{ overflowX: "auto" }}>
-                      <table className="aca-table">
-                        <thead><tr><th>Shopify Market</th><th>Status</th><th>Country conditions (Shopify)</th><th>Web presence locales</th><th>Published locales</th><th>Unpublished locales</th><th>ACA jobs (locale match only)</th><th>Shopify URLs</th></tr></thead>
+                    <div className="aca-markets-table-wrap" role="region" aria-label="Shopify Markets comparison" tabIndex={0}>
+                      <table className="aca-markets-table">
+                        <thead><tr><th scope="col">Shopify Market</th><th scope="col">Status</th><th scope="col">Country conditions (Shopify)</th><th scope="col">Web presence locales</th><th scope="col">Published locales</th><th scope="col">Unpublished locales</th><th scope="col">ACA jobs (locale match only)</th><th scope="col">Shopify URLs</th></tr></thead>
                         <tbody>
                           {marketLocalization.rows.map(row => (
                             <tr key={row.id}>
-                              <td><strong>{row.name}</strong>{row.localization !== "CONFIGURED" ? <div className="aca-muted-small">{row.localization === "NO_WEB_PRESENCE" ? "No dedicated web presence; primary-domain country selector may apply" : "No locale returned by web presence"}</div> : null}</td>
-                              <td>{row.status}</td>
-                              <td>{row.countryCodes.length ? row.countryCodes.join(", ") : row.regionNames.length ? row.regionNames.slice(0, 8).join(", ") : "Not returned"}{row.regionsTruncated ? " (partial: more regions)" : ""}</td>
+                              <td className="aca-market-name"><strong>{row.name}</strong>{row.localization !== "CONFIGURED" ? <div className="aca-muted-small">{row.localization === "NO_WEB_PRESENCE" ? "No dedicated web presence; primary-domain country selector may apply" : "No locale returned by web presence"}</div> : null}</td>
+                              <td><span className={`aca-market-status ${row.status === "ACTIVE" ? "aca-market-status--active" : ""}`}>{row.status}</span></td>
+                              <td className="aca-market-countries">
+                                {row.countryCodes.length > 12 ? (
+                                  <details className="aca-market-country-details">
+                                    <summary>{row.countryCodes.slice(0, 8).join(", ")} <span className="aca-market-country-more">+{row.countryCodes.length - 8} more · Show all</span></summary>
+                                    <div className="aca-market-country-full">{row.countryCodes.join(", ")}{row.regionsTruncated ? " (partial: more regions)" : ""}</div>
+                                  </details>
+                                ) : row.countryCodes.length ? `${row.countryCodes.join(", ")}${row.regionsTruncated ? " (partial: more regions)" : ""}` : row.regionNames.length ? `${row.regionNames.slice(0, 8).join(", ")}${row.regionsTruncated ? " (partial: more regions)" : ""}` : "Not returned"}
+                              </td>
                               <td>{row.locales.join(", ") || "Not available"}</td>
                               <td>{row.publishedLocales.join(", ") || "—"}</td>
                               <td>{row.unpublishedLocales.join(", ") || "—"}</td>
-                              <td>{row.jobCount} matching · {row.completedJobCount} completed</td>
-                              <td>{row.rootUrls.length ? row.rootUrls.map(url => <div key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></div>) : "Not returned"}</td>
+                              <td><strong className="aca-market-jobs-count">{row.jobCount}</strong> matching <span className="aca-market-muted">· {row.completedJobCount} completed</span></td>
+                              <td className="aca-market-urls">{row.rootUrls.length ? row.rootUrls.map(url => <div key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></div>) : "Not returned"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2557,9 +2577,19 @@ export default function Index() {
                   <p className="aca-muted-small">Country conditions describe the market audience, not which translations are published. A market may have no dedicated web presence and still be available via the primary domain. Shopify Markets may share the same locale: job counts can overlap across markets. A completed job does not imply approved or published translations. To verify true localization coverage, use the Store Scan for each locale and inspect the storefront.</p>
                   <h3 style={sectionHeadingStyle}>Published languages from Shopify</h3>
                   {liveLocales?.length ? (
-                    <div style={{ overflowX: "auto" }}><table className="aca-table"><thead><tr><th>Locale</th><th>Name</th><th>Published</th><th>Primary</th></tr></thead><tbody>
-                      {liveLocales.map(item => <tr key={item.locale}><td>{item.locale}</td><td>{item.name || item.locale || "Unknown"}</td><td>{item.published ? "Yes" : "No"}</td><td>{item.primary ? "Yes" : "No"}</td></tr>)}
-                    </tbody></table></div>
+                    <div className="aca-market-locales-wrap" role="region" aria-label="Shopify language publication status" tabIndex={0}>
+                      <table className="aca-market-locales-table">
+                        <thead><tr><th scope="col">Locale</th><th scope="col">Name</th><th scope="col">Published</th><th scope="col">Primary</th></tr></thead>
+                        <tbody>{liveLocales.map(item => (
+                          <tr key={item.locale}>
+                            <td><span className="aca-seo-locale">{item.locale}</span></td>
+                            <td>{item.name || item.locale || "Unknown"}</td>
+                            <td><span className={`aca-market-status ${item.published ? "aca-market-status--active" : "aca-market-status--inactive"}`}>{item.published ? "Published" : "Not published"}</span></td>
+                            <td>{item.primary ? <span className="aca-market-primary-badge">Primary</span> : <span className="aca-market-muted">—</span>}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
                   ) : <p className="aca-muted-small">No locales returned.</p>}
                 </div>
               ) : !marketsLoading && !marketsError ? <EmptyState title="No live market snapshot" text="Refresh Shopify Markets to inspect market locales without changing store configuration." /> : null}
@@ -4159,6 +4189,68 @@ const responsiveCss = `
   .aca-seo-status--error { background: #FDECEC; color: ${ACA.danger}; }
   .aca-seo-length { font-weight: 800; font-variant-numeric: tabular-nums; }
   .aca-seo-notes { color: ${ACA.textSoft}; min-width: 170px; }
+
+  /* Markets & Localization: bounded tables, readable countries and locale states. */
+  .aca-markets-table-wrap, .aca-market-locales-wrap {
+    max-width: 100%; overflow-x: auto; margin-top: 12px;
+    border: 1px solid ${ACA.line}; border-radius: 13px; background: ${ACA.white};
+  }
+  .aca-markets-table-wrap:focus-visible, .aca-market-locales-wrap:focus-visible { outline: 3px solid ${ACA.orange}; outline-offset: 2px; }
+  .aca-markets-table, .aca-market-locales-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+  .aca-markets-table { min-width: 960px; table-layout: fixed; }
+  .aca-markets-table th:nth-child(1) { width: 16%; }
+  .aca-markets-table th:nth-child(2) { width: 9%; }
+  .aca-markets-table th:nth-child(3) { width: 23%; }
+  .aca-markets-table th:nth-child(4) { width: 10%; }
+  .aca-markets-table th:nth-child(5) { width: 10%; }
+  .aca-markets-table th:nth-child(6) { width: 10%; }
+  .aca-markets-table th:nth-child(7) { width: 12%; }
+  .aca-markets-table th:nth-child(8) { width: 10%; }
+  .aca-market-locales-table { min-width: 480px; }
+  .aca-markets-table th, .aca-market-locales-table th {
+    padding: 12px; text-align: left; vertical-align: top;
+    background: ${ACA.cream}; color: ${ACA.textSoft};
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.04em; line-height: 1.5; border-bottom: 1px solid ${ACA.line};
+  }
+  .aca-markets-table td, .aca-market-locales-table td {
+    padding: 13px 12px; vertical-align: top; color: ${ACA.ink};
+    border-bottom: 1px solid ${ACA.line}; line-height: 1.5; overflow-wrap: anywhere;
+  }
+  .aca-markets-table tbody tr:last-child td, .aca-market-locales-table tbody tr:last-child td { border-bottom: 0; }
+  .aca-markets-table tbody tr:nth-child(even), .aca-market-locales-table tbody tr:nth-child(even) { background: #FBFAF6; }
+  .aca-markets-table tbody tr:hover, .aca-market-locales-table tbody tr:hover { background: ${ACA.blueSoft}; }
+  .aca-market-name strong { display: block; color: ${ACA.blue}; font-size: 12px; }
+  .aca-market-name .aca-muted-small { margin-top: 5px; line-height: 1.5; }
+  .aca-market-status, .aca-market-primary-badge {
+    display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px;
+    font-size: 10px; font-weight: 800; white-space: nowrap;
+    background: ${ACA.blueSoft}; color: ${ACA.blue};
+  }
+  .aca-market-status--active { background: ${ACA.greenSoft}; color: ${ACA.success}; }
+  .aca-market-status--inactive { background: ${ACA.cream}; color: ${ACA.textSoft}; }
+  .aca-market-primary-badge { background: ${ACA.orangeSoft}; color: ${ACA.warning}; }
+  .aca-market-countries { overflow-wrap: anywhere; }
+  .aca-market-country-details summary { cursor: pointer; color: ${ACA.ink}; }
+  .aca-market-country-details summary:focus-visible { outline: 2px solid ${ACA.orange}; outline-offset: 3px; }
+  .aca-market-country-more { display: inline-block; color: ${ACA.blue}; font-size: 11px; font-weight: 800; }
+  .aca-market-country-full { padding: 10px; margin-top: 9px; background: ${ACA.cream}; border-radius: 9px; color: ${ACA.textSoft}; font-size: 11px; }
+  .aca-market-muted { color: ${ACA.textSoft}; }
+  .aca-market-jobs-count { color: ${ACA.blue}; }
+  .aca-market-urls a { color: ${ACA.blue}; overflow-wrap: anywhere; }
+
+  /* Operations: readable provider result cards instead of raw inline paragraphs. */
+  .aca-ops-provider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 10px; margin-top: 12px; }
+  .aca-ops-provider-card { padding: 14px; border: 1px solid ${ACA.line}; border-radius: 13px; background: ${ACA.cream}; }
+  .aca-ops-provider-heading { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .aca-ops-provider-heading > strong { color: ${ACA.blue}; font-size: 13px; }
+  .aca-ops-provider-state { padding: 5px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; background: ${ACA.blueSoft}; color: ${ACA.blue}; }
+  .aca-ops-provider-state--healthy { background: ${ACA.greenSoft}; color: ${ACA.success}; }
+  .aca-ops-provider-state--recovered { background: ${ACA.orangeSoft}; color: ${ACA.warning}; }
+  .aca-ops-provider-state--degraded { background: #FDECEC; color: ${ACA.danger}; }
+  .aca-ops-provider-counts { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; color: ${ACA.textSoft}; font-size: 11px; }
+  .aca-ops-provider-counts strong { color: ${ACA.ink}; font-size: 15px; }
+  .aca-ops-provider-dates { display: grid; gap: 4px; margin-top: 10px; color: ${ACA.textSoft}; font-size: 10.5px; line-height: 1.5; }
 
   .aca-actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
   .aca-glossary-checks { display: flex; gap: 18px; flex-wrap: wrap; color: ${ACA.ink}; font-size: 12px; font-weight: 700; }
