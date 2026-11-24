@@ -270,6 +270,16 @@ export class InternalTranslationChangeService {
         input.eventId,
       );
 
+    // Verify the claimed event identity even when it was completed before
+    // this delivery. A completed event must never acknowledge an unrelated
+    // Shopify resource or an operation of the opposite type.
+    this.assertEventMatches(
+      event,
+      input.resourceType,
+      input.shopifyResourceId,
+      'UPSERT',
+    );
+
     if (
       event.status ===
       'COMPLETED'
@@ -285,13 +295,6 @@ export class InternalTranslationChangeService {
           true,
       };
     }
-
-    this.assertEventMatches(
-      event,
-      input.resourceType,
-      input.shopifyResourceId,
-      'UPSERT',
-    );
 
     const summaries = [];
     const automaticJobs = [];
@@ -446,6 +449,13 @@ export class InternalTranslationChangeService {
         input.eventId,
       );
 
+    this.assertEventMatches(
+      event,
+      input.resourceType,
+      input.shopifyResourceId,
+      'DELETE',
+    );
+
     if (
       event.status ===
       'COMPLETED'
@@ -461,12 +471,6 @@ export class InternalTranslationChangeService {
           true,
       };
     }
-
-    this.assertEventResourceMatches(
-      event,
-      input.resourceType,
-      input.shopifyResourceId,
-    );
 
     const deletion =
       await this.scanner.markResourceDeleted(

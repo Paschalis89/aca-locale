@@ -108,9 +108,13 @@ export async function action({
       )
       ?.trim();
 
+  // Fetch Headers may coalesce duplicate header values with a comma.
+  // Refuse ambiguous credentials instead of accepting whichever comes first.
   if (
     !configuredSecret ||
+    configuredSecret.includes(',') ||
     !suppliedSecret ||
+    suppliedSecret.includes(',') ||
     !secureEqual(
       configuredSecret,
       suppliedSecret,
@@ -149,6 +153,17 @@ export async function action({
   }
 
   try {
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      Array.isArray(payload)
+    ) {
+      return Response.json(
+        { message: 'Invalid publication payload.' },
+        { status: 400 },
+      );
+    }
+
     const shopifyDomain =
       requiredString(
         payload.shopifyDomain,
@@ -303,6 +318,16 @@ export async function action({
     const resource =
       currentJson.data
         ?.translatableResource;
+
+    if (
+      resource &&
+      resource.resourceId !== resourceId
+    ) {
+      return Response.json(
+        { message: 'Shopify resource identity mismatch.', code: 'RESOURCE_ID_MISMATCH' },
+        { status: 409 },
+      );
+    }
 
     if (!resource) {
       return Response.json(

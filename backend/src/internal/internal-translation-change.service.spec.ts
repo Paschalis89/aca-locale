@@ -131,4 +131,57 @@ describe('InternalTranslationChangeService 10D automatic execution', () => {
       }),
     );
   });
+
+  it('rejects a completed UPSERT for a different resource before acknowledging it', async () => {
+    const { service, prisma, scanner, jobs, queue } = build({});
+    prisma.translationChangeEvent.findFirst.mockResolvedValue({
+      id: 'event-1',
+      status: 'COMPLETED',
+      resourceType: 'PRODUCT',
+      shopifyResourceId: 'gid://shopify/Product/1',
+      action: 'UPSERT',
+    });
+    await expect(service.processUpsert({
+      ...input,
+      shopifyResourceId: 'gid://shopify/Product/2',
+    })).rejects.toThrow('does not match');
+    expect(scanner.sync).not.toHaveBeenCalled();
+    expect(jobs.createFromShopifyChange).not.toHaveBeenCalled();
+    expect(queue.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('rejects a completed DELETE for a different operation', async () => {
+    const { service, prisma, scanner } = build({});
+    prisma.translationChangeEvent.findFirst.mockResolvedValue({
+      id: 'event-1',
+      status: 'COMPLETED',
+      resourceType: 'PRODUCT',
+      shopifyResourceId: 'gid://shopify/Product/1',
+      action: 'UPSERT',
+    });
+    await expect(service.processDelete({
+      shopifyDomain: 'shop-a.myshopify.com',
+      eventId: 'event-1',
+      resourceType: 'PRODUCT',
+      shopifyResourceId: 'gid://shopify/Product/1',
+    } as any)).rejects.toThrow('does not match');
+    expect(scanner.sync).not.toHaveBeenCalled();
+  });
+
+  it('preserves idempotent acknowledgement for a completed matching UPSERT', async () => {
+    const { service, prisma, scanner, jobs } = build({});
+    prisma.translationChangeEvent.findFirst.mockResolvedValue({
+      id: 'event-1',
+      status: 'COMPLETED',
+      resourceType: 'PRODUCT',
+      shopifyResourceId: 'gid://shopify/Product/1',
+      action: 'UPSERT',
+    });
+    await expect(service.processUpsert(input)).resolves.toEqual({
+      eventId: 'event-1', completed: true, alreadyCompleted: true,
+    });
+    expect(scanner.sync).not.toHaveBeenCalled();
+    expect(jobs.createFromShopifyChange).not.toHaveBeenCalled();
+  });
+
 });
