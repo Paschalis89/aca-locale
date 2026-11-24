@@ -1898,9 +1898,27 @@ export default function Index() {
                 <MiniStat label="Errors" value={String(seoAudit.errors)} />
               </div>
               {jobsError ? <InfoCallout tone="orange">{jobsError}</InfoCallout> : null}
-              {seoVisibleRows.length ? <div style={{ overflowX: "auto", marginTop: 14 }}><table className="aca-table"><thead><tr><th>Locale</th><th>Resource</th><th>Field</th><th>Status</th><th>Length</th><th>Notes</th></tr></thead><tbody>
-                {seoVisibleRows.map((row, index) => <tr key={`${row.locale}:${row.resourceType ?? ""}:${row.key}:${index}`}><td>{row.locale}</td><td>{row.resourceType}</td><td>{row.key}</td><td>{row.audit.status}</td><td>{row.audit.length}</td><td>{row.audit.findings.map(issue => issue.message).join(" ") || "No heuristic issues"}</td></tr>)}
-              </tbody></table></div> : <p className="aca-muted-small" style={{ marginTop: 14 }}>No matching SEO translation fields in the currently loaded jobs.</p>}
+              {seoVisibleRows.length ? (
+                <div className="aca-seo-table-wrap" role="region" aria-label="SEO translation audit results" tabIndex={0}>
+                  <table className="aca-seo-table">
+                    <thead>
+                      <tr><th scope="col">Locale</th><th scope="col">Resource</th><th scope="col">Field</th><th scope="col">Status</th><th scope="col">Length</th><th scope="col">Notes</th></tr>
+                    </thead>
+                    <tbody>
+                      {seoVisibleRows.map((row, index) => (
+                        <tr key={`${row.locale}:${row.resourceType ?? ""}:${row.key}:${index}`}>
+                          <td><span className="aca-seo-locale">{row.locale}</span></td>
+                          <td><span className="aca-seo-resource">{row.resourceType}</span></td>
+                          <td><span className="aca-seo-field">{row.key}</span></td>
+                          <td><span className={`aca-seo-status aca-seo-status--${row.audit.status === "PASS" ? "pass" : row.audit.status === "ERROR" ? "error" : "review"}`}>{row.audit.status}</span></td>
+                          <td className="aca-seo-length">{row.audit.length}</td>
+                          <td className="aca-seo-notes">{row.audit.findings.map(issue => issue.message).join(" ") || "No heuristic issues"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <p className="aca-muted-small" style={{ marginTop: 14 }}>No matching SEO translation fields in the currently loaded jobs.</p>}
               {seoAudit.rows.length > 50 ? <p className="aca-muted-small">Showing the first 50 matching fields only.</p> : null}
             </Card>
             <Card title="SEO Draft Checker" subtitle="Evaluate a proposed translation before approval. Nothing is saved or published.">
@@ -4078,6 +4096,70 @@ const responsiveCss = `
   .aca-field { display: grid; gap: 7px; min-width: 0; }
   .aca-field > span { color: ${ACA.ink}; font-size: 12px; font-weight: 800; }
   .aca-field-action { display: flex; align-items: end; }
+
+  /* Shared button treatment: Jobs, International SEO, Operations and Markets. */
+  .aca-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    max-width: 100%;
+    padding: 9px 14px;
+    border: 1px solid ${ACA.line};
+    border-radius: 10px;
+    background: ${ACA.white};
+    color: ${ACA.blue};
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(20, 51, 100, 0.04);
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .aca-btn:hover:not(:disabled) { background: ${ACA.blueSoft}; border-color: #AFC1E5; box-shadow: 0 3px 10px rgba(20, 51, 100, 0.1); }
+  .aca-btn:focus-visible { outline: 3px solid ${ACA.orange}; outline-offset: 2px; }
+  .aca-btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+
+  /* International SEO: responsive, readable audit table. */
+  .aca-seo-table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    margin-top: 14px;
+    border: 1px solid ${ACA.line};
+    border-radius: 13px;
+    background: ${ACA.white};
+  }
+  .aca-seo-table-wrap:focus-visible { outline: 3px solid ${ACA.orange}; outline-offset: 2px; }
+  .aca-seo-table { width: 100%; min-width: 560px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+  .aca-seo-table th {
+    padding: 12px 13px;
+    background: ${ACA.cream};
+    color: ${ACA.textSoft};
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid ${ACA.line};
+  }
+  .aca-seo-table td { padding: 13px; vertical-align: middle; border-bottom: 1px solid ${ACA.line}; color: ${ACA.ink}; line-height: 1.45; }
+  .aca-seo-table tbody tr:last-child td { border-bottom: 0; }
+  .aca-seo-table tbody tr:nth-child(even) { background: #FBFAF6; }
+  .aca-seo-table tbody tr:hover { background: ${ACA.blueSoft}; }
+  .aca-seo-locale { display: inline-flex; align-items: center; min-width: 30px; justify-content: center; padding: 5px 8px; border-radius: 8px; color: ${ACA.blue}; background: ${ACA.blueSoft}; font-weight: 800; }
+  .aca-seo-resource { color: ${ACA.textSoft}; font-size: 11px; font-weight: 700; }
+  .aca-seo-field { font-weight: 800; overflow-wrap: anywhere; }
+  .aca-seo-status { display: inline-flex; align-items: center; justify-content: center; padding: 5px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+  .aca-seo-status--pass { background: ${ACA.greenSoft}; color: ${ACA.success}; }
+  .aca-seo-status--review { background: ${ACA.orangeSoft}; color: ${ACA.warning}; }
+  .aca-seo-status--error { background: #FDECEC; color: ${ACA.danger}; }
+  .aca-seo-length { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .aca-seo-notes { color: ${ACA.textSoft}; min-width: 170px; }
+
   .aca-actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
   .aca-glossary-checks { display: flex; gap: 18px; flex-wrap: wrap; color: ${ACA.ink}; font-size: 12px; font-weight: 700; }
   .aca-glossary-checks label { display: inline-flex; gap: 7px; align-items: center; }
