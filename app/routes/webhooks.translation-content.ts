@@ -6,6 +6,8 @@ import {
   authenticate,
 } from '../shopify.server';
 
+import { shouldRetryProcessingWebhookClaim } from '../lib/webhook-delivery-policy';
+
 import {
   callInternalBackendJson,
 } from '../services/internal-backend.server';
@@ -682,13 +684,19 @@ export const action =
       if (
         !claim.process
       ) {
-        return new Response(
-          null,
-          {
-            status:
-              200,
-          },
-        );
+        // A previous delivery might still be running. Acknowledging its
+        // duplicate with HTTP 200 would discard the only Shopify retry if
+        // that original process later crashes. Completed events remain 200.
+        if (shouldRetryProcessingWebhookClaim(claim)) {
+          return new Response(
+            'Original webhook delivery is still processing.',
+            {
+              status: 503,
+              headers: { 'Retry-After': '10' },
+            },
+          );
+        }
+        return new Response(null, { status: 200 });
       }
 
       if (
