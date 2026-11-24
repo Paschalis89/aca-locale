@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, ReactNode } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -12,6 +12,14 @@ import { auditSeoField, summarizeSeoAudit } from "../lib/international-seo";
 import { summarizeLocalization, type ShopifyMarketSnapshot, type ShopifyLocaleSnapshot } from "../lib/market-localization";
 import { normalizeProductId } from "../lib/product-scan-scope";
 import { createAiCoreReadiness } from "../lib/ai-core-readiness";
+import { uiTranslate, type UiLanguage } from "../lib/ui-language";
+
+const UiLanguageContext = createContext<UiLanguage>("it");
+function UiText({ value }: { value: string }) {
+  const language = useContext(UiLanguageContext);
+  return <>{uiTranslate(value, language)}</>;
+}
+
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -333,6 +341,17 @@ const resourceTypes = [
 
 export default function Index() {
   const shopify = useAppBridge();
+  const [language, setLanguage] = useState<UiLanguage>("it");
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("aca-locale-ui-language");
+      if (stored === "it" || stored === "en") setLanguage(stored);
+    } catch { /* Storage may be unavailable in some embedded contexts. */ }
+  }, []);
+  const changeUiLanguage = (next: UiLanguage) => {
+    setLanguage(next);
+    try { window.localStorage.setItem("aca-locale-ui-language", next); } catch { /* No persistent storage. */ }
+  };
 
   const [activeTab, setActiveTab] = useState<AppTab>("overview");
   const [operations, setOperations] = useState<OperationsSnapshot | null>(null);
@@ -1075,7 +1094,7 @@ export default function Index() {
 
   const formatDateTime = (value?: string | null) => {
     if (!value) return "—";
-    return new Date(value).toLocaleString();
+    return new Date(value).toLocaleString(language === "it" ? "it-IT" : "en-US");
   };
 
   const formatUsd = (microusd?: number | null) => formatUsageUsd(microusd);
@@ -1118,7 +1137,7 @@ export default function Index() {
           letterSpacing: 0.3,
         }}
       >
-        {status ?? "UNKNOWN"}
+        {uiTranslate(status ?? "UNKNOWN", language)}
       </span>
     );
   };
@@ -1701,7 +1720,8 @@ export default function Index() {
   );
 
   return (
-    <div className="aca-app-shell">
+    <UiLanguageContext.Provider value={language}>
+    <div className="aca-app-shell" lang={language}>
       <style>{responsiveCss}</style>
 
       <div className="aca-app-topline">
@@ -1721,23 +1741,31 @@ export default function Index() {
           </div>
           <div>
             <div className="aca-eyebrow">ACA Locale</div>
-            <h1 className="aca-title">Translation Operations</h1>
+            <h1 className="aca-title"><UiText value="Translation Operations" /></h1>
             <p className="aca-subtitle">
-              Translation workflow, quality review and Shopify publication in
-              one operational workspace.
+              <UiText value="Translation workflow, quality review and Shopify publication in one operational workspace." />
             </p>
           </div>
         </div>
 
+        <div className="aca-header-tools">
+          <label className="aca-language-picker">
+            <span>{language === "it" ? "Lingua interfaccia" : "Interface language"}</span>
+            <select aria-label={language === "it" ? "Lingua interfaccia" : "Interface language"} value={language} onChange={(event) => changeUiLanguage(event.target.value as UiLanguage)}>
+              <option value="it">🇮🇹 Italiano</option>
+              <option value="en">🇬🇧 English</option>
+            </select>
+          </label>
         <div className="aca-header-stats">
-          <HeaderStat label="Jobs" value={dashboardStats.totalJobs} color={ACA.blue} />
-          <HeaderStat label="Active" value={dashboardStats.activeJobs} color={ACA.orange} />
-          <HeaderStat label="Review" value={dashboardStats.reviewItems} color={ACA.green} />
-          <HeaderStat label="Published" value={dashboardStats.publishedItems} color={ACA.blue} />
+          <HeaderStat label={uiTranslate("Jobs", language)} value={dashboardStats.totalJobs} color={ACA.blue} />
+          <HeaderStat label={uiTranslate("Active", language)} value={dashboardStats.activeJobs} color={ACA.orange} />
+          <HeaderStat label={uiTranslate("Review", language)} value={dashboardStats.reviewItems} color={ACA.green} />
+          <HeaderStat label={uiTranslate("Published", language)} value={dashboardStats.publishedItems} color={ACA.blue} />
+        </div>
         </div>
       </header>
 
-      <nav className="aca-tabs" aria-label="ACA Locale sections">
+      <nav className="aca-tabs" aria-label={uiTranslate("ACA Locale sections", language)}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -1745,8 +1773,8 @@ export default function Index() {
             className={`aca-tab ${activeTab === tab.id ? "aca-tab-active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className="aca-tab-label">{tab.label}</span>
-            <span className="aca-tab-short">{tab.short}</span>
+            <span className="aca-tab-label">{uiTranslate(tab.label, language)}</span>
+            <span className="aca-tab-short">{uiTranslate(tab.short, language)}</span>
             {tab.id === "review" && (reviewPageData?.total ?? reviewQueue.length) > 0 ? (
               <span className="aca-tab-count">{reviewPageData?.total ?? reviewQueue.length}</span>
             ) : null}
@@ -1785,18 +1813,18 @@ export default function Index() {
         {activeTab === "scanner" ? (
           <div className="aca-layout-two">
             <Card
-              title="Store Scan"
+              title={uiTranslate("Store Scan", language)}
               subtitle="Read the latest Shopify translatable content and refresh the local translation projection."
             >
               <div className="aca-form-grid-3">
-                <Field label="Target locale">
+                <Field label={uiTranslate("Target locale", language)}>
                   <input
                     value={scannerLocale}
                     onChange={(event) => setScannerLocale(event.target.value)}
                     style={inputStyle}
                   />
                 </Field>
-                <Field label="Resource type">
+                <Field label={uiTranslate("Resource type", language)}>
                   <select
                     value={scannerResourceType}
                     onChange={(event) => setScannerResourceType(event.target.value)}
@@ -1811,7 +1839,7 @@ export default function Index() {
                 </Field>
                 <div className="aca-field-action">
                   <ActionButton
-                    label="Scan Shopify"
+                    label={uiTranslate("Scan Shopify", language)}
                     actionKey="scan-store"
                     busyAction={busyAction}
                     onClick={scanStore}
@@ -1823,18 +1851,18 @@ export default function Index() {
               <div style={{ marginTop: 14, marginBottom: 14 }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>
                   <input type="checkbox" checked={targetedProductScan} onChange={event => setTargetedProductScan(event.target.checked)} />
-                  Limit scan and new jobs to one product (safe QA mode)
+                  <UiText value="Limit scan and new jobs to one product (safe QA mode)" />
                 </label>
                 {targetedProductScan ? (
-                  <Field label="Shopify Product ID, GID or Admin product URL" >
+                  <Field label={uiTranslate("Shopify Product ID, GID or Admin product URL", language)} >
                     <input value={scannerProductId} onChange={event => setScannerProductId(event.target.value)}
                       placeholder="https://admin.shopify.com/store/your-store/products/123456789" style={inputStyle} />
                   </Field>
                 ) : (
-                  <InfoCallout tone="orange">Full resource-type scan enabled. This may update scanner states for every product. No translation is published by scanning.</InfoCallout>
+                  <InfoCallout tone="orange"><UiText value="Full resource-type scan enabled. This may update scanner states for every product. No translation is published by scanning." /></InfoCallout>
                 )}
                 {targetedProductScan ? (
-                  <InfoCallout tone="blue">Targeted scan reads and updates only the selected PRODUCT. New jobs are also restricted to that Product ID while safe QA mode remains enabled. Product variants and metafields are not included automatically.</InfoCallout>
+                  <InfoCallout tone="blue"><UiText value="Targeted scan reads and updates only the selected PRODUCT. New jobs are also restricted to that Product ID while safe QA mode remains enabled. Product variants and metafields are not included automatically." /></InfoCallout>
                 ) : null}
               </div>
               <InfoCallout tone="blue">
@@ -1843,26 +1871,26 @@ export default function Index() {
             </Card>
 
             <Card
-              title="Scan Result"
+              title={uiTranslate("Scan Result", language)}
               subtitle="Coverage and translation state for the last completed scan."
             >
               {scannerResult?.summary ? (
                 <>
                   <div className="aca-stat-grid-4">
-                    <MiniStat label="Resources" value={String(scannerResult.summary.resources ?? 0)} />
-                    <MiniStat label="Fields" value={String(scannerResult.summary.fields ?? 0)} />
-                    <MiniStat label="Missing" value={String(scannerResult.summary.missing ?? 0)} />
-                    <MiniStat label="Outdated" value={String(scannerResult.summary.outdated ?? 0)} />
+                    <MiniStat label={uiTranslate("Resources", language)} value={String(scannerResult.summary.resources ?? 0)} />
+                    <MiniStat label={uiTranslate("Fields", language)} value={String(scannerResult.summary.fields ?? 0)} />
+                    <MiniStat label={uiTranslate("Missing", language)} value={String(scannerResult.summary.missing ?? 0)} />
+                    <MiniStat label={uiTranslate("Outdated", language)} value={String(scannerResult.summary.outdated ?? 0)} />
                   </div>
                   <div className="aca-stat-grid-3" style={{ marginTop: 12 }}>
-                    <MiniStat label="Translated" value={String(scannerResult.summary.translated ?? 0)} />
-                    <MiniStat label="Empty source" value={String(scannerResult.summary.emptySource ?? 0)} />
-                    <MiniStat label="Coverage" value={`${scannerResult.summary.coverage ?? 0}%`} />
+                    <MiniStat label={uiTranslate("Translated", language)} value={String(scannerResult.summary.translated ?? 0)} />
+                    <MiniStat label={uiTranslate("Empty source", language)} value={String(scannerResult.summary.emptySource ?? 0)} />
+                    <MiniStat label={uiTranslate("Coverage", language)} value={`${scannerResult.summary.coverage ?? 0}%`} />
                   </div>
                 </>
               ) : (
                 <EmptyState
-                  title="No scan yet"
+                  title={uiTranslate("No scan yet", language)}
                   text="Choose a locale and resource type, then run a Shopify scan."
                 />
               )}
@@ -1872,37 +1900,37 @@ export default function Index() {
 
         {activeTab === "seo" ? (
           <div className="aca-layout-two">
-            <Card title="International SEO — Existing Translations" subtitle="Read-only inspection of translated SEO fields present in currently loaded job details. No Shopify writes.">
-              <InfoCallout tone="orange">Partial audit: the Jobs API loads details for up to 15 jobs. Counts below do not cover the full store, Shopify Markets configuration, hreflang, live URLs, or images not represented as translation fields.</InfoCallout>
+            <Card title={uiTranslate("International SEO — Existing Translations", language)} subtitle="Read-only inspection of translated SEO fields present in currently loaded job details. No Shopify writes.">
+              <InfoCallout tone="orange"><UiText value="Partial audit: the Jobs API loads details for up to 15 jobs. Counts below do not cover the full store, Shopify Markets configuration, hreflang, live URLs, or images not represented as translation fields." /></InfoCallout>
               <div className="aca-form-grid-3" style={{ marginTop: 14 }}>
-                <Field label="Target locale">
+                <Field label={uiTranslate("Target locale", language)}>
                   <select value={seoLocale} onChange={event => setSeoLocale(event.target.value)} style={inputStyle}>
-                    <option value="ALL">All loaded locales</option>
+                    <option value="ALL">{uiTranslate("All loaded locales", language)}</option>
                     {Array.from(new Set(jobs.map(job => job.targetLocale))).sort().map(locale => <option key={locale} value={locale}>{locale}</option>)}
                   </select>
                 </Field>
-                <Field label="Issue filter">
+                <Field label={uiTranslate("Issue filter", language)}>
                   <select value={seoFilter} onChange={event => setSeoFilter(event.target.value)} style={inputStyle}>
-                    <option value="ALL">All results</option>
-                    <option value="ERROR">Errors</option>
-                    <option value="REVIEW">Needs review</option>
-                    <option value="PASS">Pass</option>
+                    <option value="ALL">{uiTranslate("All results", language)}</option>
+                    <option value="ERROR">{uiTranslate("Errors", language)}</option>
+                    <option value="REVIEW">{uiTranslate("Needs review", language)}</option>
+                    <option value="PASS">{uiTranslate("Pass", language)}</option>
                   </select>
                 </Field>
                 <div className="aca-field-action"><button type="button" className="aca-btn" onClick={() => void loadJobs(true)} disabled={loadingJobs}>{loadingJobs ? "Refreshing..." : "Refresh loaded jobs"}</button></div>
               </div>
               <div className="aca-stat-grid-4" style={{ marginTop: 14 }}>
-                <MiniStat label="SEO fields evaluated" value={String(seoAudit.evaluated)} />
-                <MiniStat label="Pass" value={String(seoAudit.passing)} />
-                <MiniStat label="Needs review" value={String(seoAudit.review)} />
-                <MiniStat label="Errors" value={String(seoAudit.errors)} />
+                <MiniStat label={uiTranslate("SEO fields evaluated", language)} value={String(seoAudit.evaluated)} />
+                <MiniStat label={uiTranslate("Pass", language)} value={String(seoAudit.passing)} />
+                <MiniStat label={uiTranslate("Needs review", language)} value={String(seoAudit.review)} />
+                <MiniStat label={uiTranslate("Errors", language)} value={String(seoAudit.errors)} />
               </div>
               {jobsError ? <InfoCallout tone="orange">{jobsError}</InfoCallout> : null}
               {seoVisibleRows.length ? (
                 <div className="aca-seo-table-wrap" role="region" aria-label="SEO translation audit results" tabIndex={0}>
                   <table className="aca-seo-table">
                     <thead>
-                      <tr><th scope="col">Locale</th><th scope="col">Resource</th><th scope="col">Field</th><th scope="col">Status</th><th scope="col">Length</th><th scope="col">Notes</th></tr>
+                      <tr><th scope="col"><UiText value="Locale" /></th><th scope="col"><UiText value="Resource" /></th><th scope="col"><UiText value="Field" /></th><th scope="col"><UiText value="Status" /></th><th scope="col"><UiText value="Length" /></th><th scope="col"><UiText value="Notes" /></th></tr>
                     </thead>
                     <tbody>
                       {seoVisibleRows.map((row, index) => (
@@ -1918,57 +1946,57 @@ export default function Index() {
                     </tbody>
                   </table>
                 </div>
-              ) : <p className="aca-muted-small" style={{ marginTop: 14 }}>No matching SEO translation fields in the currently loaded jobs.</p>}
-              {seoAudit.rows.length > 50 ? <p className="aca-muted-small">Showing the first 50 matching fields only.</p> : null}
+              ) : <p className="aca-muted-small" style={{ marginTop: 14 }}><UiText value="No matching SEO translation fields in the currently loaded jobs." /></p>}
+              {seoAudit.rows.length > 50 ? <p className="aca-muted-small"><UiText value="Showing the first 50 matching fields only." /></p> : null}
             </Card>
-            <Card title="SEO Draft Checker" subtitle="Evaluate a proposed translation before approval. Nothing is saved or published.">
+            <Card title={uiTranslate("SEO Draft Checker", language)} subtitle="Evaluate a proposed translation before approval. Nothing is saved or published.">
               <div className="aca-form-grid-3">
-                <Field label="Field">
+                <Field label={uiTranslate("Field", language)}>
                   <select value={seoField} onChange={event => setSeoField(event.target.value)} style={inputStyle}>
-                    <option value="meta_title">SEO title</option>
-                    <option value="meta_description">Meta description</option>
-                    <option value="handle">Localized slug / handle</option>
-                    <option value="image_alt">Image ALT text</option>
+                    <option value="meta_title">{uiTranslate("SEO title", language)}</option>
+                    <option value="meta_description">{uiTranslate("Meta description", language)}</option>
+                    <option value="handle">{uiTranslate("Localized slug / handle", language)}</option>
+                    <option value="image_alt">{uiTranslate("Image ALT text", language)}</option>
                   </select>
                 </Field>
               </div>
-              <Field label="Proposed translation">
-                <textarea value={seoValue} onChange={event => setSeoValue(event.target.value)} rows={5} style={{ ...inputStyle, width: "100%" }} placeholder="Paste a proposed localized SEO text..." />
+              <Field label={uiTranslate("Proposed translation", language)}>
+                <textarea value={seoValue} onChange={event => setSeoValue(event.target.value)} rows={5} style={{ ...inputStyle, width: "100%" }} placeholder={uiTranslate("Paste a proposed localized SEO text...", language)} />
               </Field>
               <div className="aca-stat-grid-3" style={{ marginTop: 14 }}>
-                <MiniStat label="Characters" value={String(seoDraft.length)} />
-                <MiniStat label="Heuristic status" value={seoDraft.status} />
-                <MiniStat label="Findings" value={String(seoDraft.findings.length)} />
+                <MiniStat label={uiTranslate("Characters", language)} value={String(seoDraft.length)} />
+                <MiniStat label={uiTranslate("Heuristic status", language)} value={seoDraft.status} />
+                <MiniStat label={uiTranslate("Findings", language)} value={String(seoDraft.findings.length)} />
               </div>
               {seoDraft.findings.map((issue, index) => <InfoCallout key={`${issue.code}-${index}`} tone={issue.severity === "ERROR" ? "orange" : "blue"}>{issue.message}</InfoCallout>)}
-              <p className="aca-muted-small" style={{ marginTop: 14 }}>Length ranges are editorial heuristics, not Shopify or Google ranking guarantees. This checker does not validate live hreflang tags, canonical URLs, search indexation, Shopify Markets routing, or actual image accessibility.</p>
+              <p className="aca-muted-small" style={{ marginTop: 14 }}><UiText value="Length ranges are editorial heuristics, not Shopify or Google ranking guarantees. This checker does not validate live hreflang tags, canonical URLs, search indexation, Shopify Markets routing, or actual image accessibility." /></p>
             </Card>
           </div>
         ) : null}
 
         {activeTab === "operations" ? (
           <div className="aca-column-stack">
-            <Card title="Operations & Health" subtitle="Read-only, shop-scoped operational snapshot. Host infrastructure is monitored separately by the administrator CLI.">
+            <Card title={uiTranslate("Operations & Health", language)} subtitle="Read-only, shop-scoped operational snapshot. Host infrastructure is monitored separately by the administrator CLI.">
               <div className="aca-actions">
                 <button type="button" className="aca-btn" disabled={operationsLoading} onClick={() => void loadOperations()}>
                   {operationsLoading ? 'Refreshing...' : 'Refresh snapshot'}
                 </button>
               </div>
-              {operationsError ? <InfoCallout tone="orange">Unable to load operations: {operationsError}</InfoCallout> : null}
+              {operationsError ? <InfoCallout tone="orange"><UiText value="Unable to load operations:" /> {operationsError}</InfoCallout> : null}
               {operations ? <>
-                <p style={mutedTextStyle}>Overall status: <strong style={{ color: operations.state === 'DEGRADED' ? ACA.danger : operations.state === 'RECOVERED' ? ACA.warning : ACA.success }}>{operations.state}</strong> · Snapshot: {new Date(operations.snapshotAt).toLocaleString()} · Window: {operations.periodHours}h</p>
+                <p style={mutedTextStyle}><UiText value="Overall status:" /> <strong style={{ color: operations.state === 'DEGRADED' ? ACA.danger : operations.state === 'RECOVERED' ? ACA.warning : ACA.success }}>{operations.state}</strong> <UiText value="· Snapshot:" /> {new Date(operations.snapshotAt).toLocaleString()} <UiText value="· Window:" /> {operations.periodHours}h</p>
                 <div className="aca-stat-grid-4">
-                  <MiniStat label="Failed jobs" value={String(operations.shop.jobsFailed)} />
-                  <MiniStat label="Stale running" value={String(operations.shop.jobsStaleRunning)} />
-                  <MiniStat label="Due retries" value={String(operations.shop.jobsDueRetry)} />
-                  <MiniStat label="Failed items" value={String(operations.shop.itemsFailed)} />
-                  <MiniStat label="Failed webhooks" value={String(operations.shop.webhooksFailed)} />
-                  <MiniStat label="Stale webhooks" value={String(operations.shop.webhooksStaleProcessing)} />
-                  <MiniStat label="Provider errors (24h)" value={String(operations.errors24h)} />
-                  <MiniStat label="Providers observed" value={String(operations.providers.length)} />
+                  <MiniStat label={uiTranslate("Failed jobs", language)} value={String(operations.shop.jobsFailed)} />
+                  <MiniStat label={uiTranslate("Stale running", language)} value={String(operations.shop.jobsStaleRunning)} />
+                  <MiniStat label={uiTranslate("Due retries", language)} value={String(operations.shop.jobsDueRetry)} />
+                  <MiniStat label={uiTranslate("Failed items", language)} value={String(operations.shop.itemsFailed)} />
+                  <MiniStat label={uiTranslate("Failed webhooks", language)} value={String(operations.shop.webhooksFailed)} />
+                  <MiniStat label={uiTranslate("Stale webhooks", language)} value={String(operations.shop.webhooksStaleProcessing)} />
+                  <MiniStat label={uiTranslate("Provider errors (24h)", language)} value={String(operations.errors24h)} />
+                  <MiniStat label={uiTranslate("Providers observed", language)} value={String(operations.providers.length)} />
                 </div>
                 <div style={{ marginTop: 18 }}>
-                  <strong>Provider activity (last 24 hours)</strong>
+                  <strong><UiText value="Provider activity (last 24 hours)" /></strong>
                   {operations.providers.length ? (
                     <div className="aca-ops-provider-grid">
                       {operations.providers.map(provider => (
@@ -1978,20 +2006,20 @@ export default function Index() {
                             <span className={`aca-ops-provider-state aca-ops-provider-state--${provider.state.toLowerCase()}`}>{provider.state}</span>
                           </div>
                           <div className="aca-ops-provider-counts">
-                            <span><strong>{provider.successes24h}</strong> successful</span>
+                            <span><strong>{provider.successes24h}</strong> <UiText value="successful" /></span>
                             <span><strong>{provider.errors24h}</strong> failed</span>
                           </div>
                           <div className="aca-ops-provider-dates">
-                            {provider.lastSuccessAt ? <span>Last success: {new Date(provider.lastSuccessAt).toLocaleString()}</span> : null}
-                            {provider.lastErrorAt ? <span>Last error: {new Date(provider.lastErrorAt).toLocaleString()}</span> : null}
+                            {provider.lastSuccessAt ? <span><UiText value="Last success:" /> {new Date(provider.lastSuccessAt).toLocaleString()}</span> : null}
+                            {provider.lastErrorAt ? <span><UiText value="Last error:" /> {new Date(provider.lastErrorAt).toLocaleString()}</span> : null}
                           </div>
                         </div>
                       ))}
                     </div>
-                  ) : <p style={mutedTextStyle}>No provider activity recorded within the last 24 hours. Availability is unknown.</p>}
+                  ) : <p style={mutedTextStyle}><UiText value="No provider activity recorded within the last 24 hours. Availability is unknown." /></p>}
                 </div>
-                <p style={mutedTextStyle}>{operations.note} The CLI on the VPS separately reports Docker health, disk and backup freshness.</p>
-              </> : !operationsLoading && !operationsError ? <p style={mutedTextStyle}>Open this tab to retrieve a read-only snapshot.</p> : null}
+                <p style={mutedTextStyle}>{operations.note} <UiText value="The CLI on the VPS separately reports Docker health, disk and backup freshness." /></p>
+              </> : !operationsLoading && !operationsError ? <p style={mutedTextStyle}><UiText value="Open this tab to retrieve a read-only snapshot." /></p> : null}
             </Card>
           </div>
         ) : null}
@@ -1999,7 +2027,7 @@ export default function Index() {
         {activeTab === "jobs" ? (
           <div className="aca-layout-jobs">
             <div className="aca-column-stack">
-              <Card title="Translation Automation Monitor" subtitle="Read-only 30-day Shopify change and automatic job recovery snapshot. No jobs or retries are triggered.">
+              <Card title={uiTranslate("Translation Automation Monitor", language)} subtitle="Read-only 30-day Shopify change and automatic job recovery snapshot. No jobs or retries are triggered.">
                 <div className="aca-actions">
                   <button type="button" className="aca-btn" onClick={() => void loadAutomationMonitor()} disabled={automationMonitorLoading}>
                     {automationMonitorLoading ? 'Refreshing...' : 'Refresh automation status'}
@@ -2008,32 +2036,32 @@ export default function Index() {
                 {automationMonitorError ? <p style={{ color: ACA.danger }}>{automationMonitorError}</p> : null}
                 {automationMonitor ? <>
                   <div className="aca-stat-grid-4" style={{ marginTop: 12 }}>
-                    <MiniStat label="Change events (30d)" value={String(automationMonitor.events.total)} />
-                    <MiniStat label="Failed events" value={String(automationMonitor.events.FAILED)} />
-                    <MiniStat label="Automatic jobs" value={String(automationMonitor.automaticJobs.total)} />
-                    <MiniStat label="Jobs with retry scheduled" value={String(automationMonitor.pendingRetries)} />
+                    <MiniStat label={uiTranslate("Change events (30d)", language)} value={String(automationMonitor.events.total)} />
+                    <MiniStat label={uiTranslate("Failed events", language)} value={String(automationMonitor.events.FAILED)} />
+                    <MiniStat label={uiTranslate("Automatic jobs", language)} value={String(automationMonitor.automaticJobs.total)} />
+                    <MiniStat label={uiTranslate("Jobs with retry scheduled", language)} value={String(automationMonitor.pendingRetries)} />
                   </div>
-                  <p style={mutedTextStyle}>Webhook events: {automationMonitor.events.COMPLETED} completed, {automationMonitor.events.PROCESSING} processing, {automationMonitor.events.FAILED} failed.</p>
-                  <p style={mutedTextStyle}>Automation stages: {Object.entries(automationMonitor.automaticJobs.stages).map(([stage, count]) => `${stage}: ${count}`).join(' · ') || 'No automatic jobs in the last 30 days'}.</p>
+                  <p style={mutedTextStyle}><UiText value="Webhook events:" /> {automationMonitor.events.COMPLETED} <UiText value="completed," /> {automationMonitor.events.PROCESSING} <UiText value="processing," /> {automationMonitor.events.FAILED} <UiText value="failed." /></p>
+                  <p style={mutedTextStyle}><UiText value="Automation stages:" /> {Object.entries(automationMonitor.automaticJobs.stages).map(([stage, count]) => `${stage}: ${count}`).join(' · ') || 'No automatic jobs in the last 30 days'}.</p>
                   {automationMonitor.recentFailures.length > 0 ? <div>
-                    <strong>Recent failed changes (max 10)</strong>
+                    <strong><UiText value="Recent failed changes (max 10)" /></strong>
                     {automationMonitor.recentFailures.map(event => <p key={event.id} style={mutedTextStyle}>
-                      {event.resourceType} · {event.topic} · {event.attempts} attempts · {new Date(event.createdAt).toLocaleString()}
+                      {event.resourceType} · {event.topic} · {event.attempts} <UiText value="attempts ·" /> {new Date(event.createdAt).toLocaleString()}
                     </p>)}
                   </div> : null}
                   <p style={mutedTextStyle}>{automationMonitor.note}</p>
-                </> : !automationMonitorLoading ? <p style={mutedTextStyle}>Open this tab to load a shop-scoped snapshot.</p> : null}
+                </> : !automationMonitorLoading ? <p style={mutedTextStyle}><UiText value="Open this tab to load a shop-scoped snapshot." /></p> : null}
               </Card>
               <Card title="Create Job" subtitle="Create and enqueue a background translation job.">
                 <div className="aca-form-grid-3">
-                  <Field label="Target locale">
+                  <Field label={uiTranslate("Target locale", language)}>
                     <input
                       value={targetLocale}
                       onChange={(event) => setTargetLocale(event.target.value)}
                       style={inputStyle}
                     />
                   </Field>
-                  <Field label="Resource type">
+                  <Field label={uiTranslate("Resource type", language)}>
                     <select
                       value={resourceType}
                       onChange={(event) => setResourceType(event.target.value)}
@@ -2046,7 +2074,7 @@ export default function Index() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Max items">
+                  <Field label={uiTranslate("Max items", language)}>
                     <input
                       type="number"
                       min={1}
@@ -2066,7 +2094,7 @@ export default function Index() {
                     primary
                   />
                   <ActionButton
-                    label="Refresh"
+                    label={uiTranslate("Refresh", language)}
                     actionKey="refresh-jobs"
                     busyAction={busyAction}
                     onClick={() =>
@@ -2083,12 +2111,12 @@ export default function Index() {
                 </div>
               </Card>
 
-              <Card title="Jobs" subtitle="Search and filter translation job history.">
+              <Card title={uiTranslate("Jobs", language)} subtitle="Search and filter translation job history.">
                 <div className="aca-filter-row">
                   <input
                     value={jobSearch}
                     onChange={(event) => setJobSearch(event.target.value)}
-                    placeholder="Search job, locale, provider…"
+                    placeholder={uiTranslate("Search job, locale, provider…", language)}
                     style={inputStyle}
                   />
                   <select
@@ -2096,22 +2124,22 @@ export default function Index() {
                     onChange={(event) => setJobStatusFilter(event.target.value)}
                     style={inputStyle}
                   >
-                    <option value="ALL">All statuses</option>
-                    <option value="QUEUED">QUEUED</option>
-                    <option value="RUNNING">RUNNING</option>
-                    <option value="COMPLETED">COMPLETED</option>
-                    <option value="PARTIAL">PARTIAL</option>
-                    <option value="FAILED">FAILED</option>
-                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="ALL">{uiTranslate("All statuses", language)}</option>
+                    <option value="QUEUED">{uiTranslate("QUEUED", language)}</option>
+                    <option value="RUNNING">{uiTranslate("RUNNING", language)}</option>
+                    <option value="COMPLETED">{uiTranslate("COMPLETED", language)}</option>
+                    <option value="PARTIAL">{uiTranslate("PARTIAL", language)}</option>
+                    <option value="FAILED">{uiTranslate("FAILED", language)}</option>
+                    <option value="CANCELLED">{uiTranslate("CANCELLED", language)}</option>
                   </select>
                 </div>
 
                 {loadingJobs ? (
-                  <p style={mutedTextStyle}>Loading jobs…</p>
+                  <p style={mutedTextStyle}><UiText value="Loading jobs…" /></p>
                 ) : jobsError ? (
                   <p style={{ ...mutedTextStyle, color: ACA.danger }}>{jobsError}</p>
                 ) : filteredJobs.length === 0 ? (
-                  <EmptyState title="No jobs found" text="Create a job or change your filters." />
+                  <EmptyState title={uiTranslate("No jobs found", language)} text="Create a job or change your filters." />
                 ) : (
                   <div className="aca-job-list">
                     {filteredJobs.map((job) => (
@@ -2134,22 +2162,22 @@ export default function Index() {
             </div>
 
             <Card
-              title="Job Detail"
+              title={uiTranslate("Job Detail", language)}
               subtitle="Lifecycle, progress, providers and item-level status."
             >
               {selectedJob ? (
                 <>
                   <div className="aca-stat-grid-4">
-                    <MiniStat label="Status" valueNode={statusBadge(selectedJob.status)} />
+                    <MiniStat label={uiTranslate("Status", language)} valueNode={statusBadge(selectedJob.status)} />
                     <MiniStat
-                      label="Translation"
+                      label={uiTranslate("Translation", language)}
                       value={`${selectedJob.provider ?? "—"}${selectedJob.model ? ` · ${selectedJob.model}` : ""}`}
                     />
                     <MiniStat
-                      label="AI review"
+                      label={uiTranslate("AI review", language)}
                       value={`${selectedJob.reviewProvider ?? "—"}${selectedJob.reviewModel ? ` · ${selectedJob.reviewModel}` : ""}`}
                     />
-                    <MiniStat label="Progress" value={`${progress}%`} />
+                    <MiniStat label={uiTranslate("Progress", language)} value={`${progress}%`} />
                   </div>
 
                   <ProgressBar
@@ -2158,15 +2186,15 @@ export default function Index() {
                   />
 
                   <div className="aca-stat-grid-3">
-                    <MiniStat label="Started" value={formatDateTime(selectedJob.startedAt)} />
-                    <MiniStat label="Completed" value={formatDateTime(selectedJob.completedAt)} />
-                    <MiniStat label="Error" value={selectedJob.errorMessage ?? "None"} />
+                    <MiniStat label={uiTranslate("Started", language)} value={formatDateTime(selectedJob.startedAt)} />
+                    <MiniStat label={uiTranslate("Completed", language)} value={formatDateTime(selectedJob.completedAt)} />
+                    <MiniStat label={uiTranslate("Error", language)} value={selectedJob.errorMessage ?? "None"} />
                   </div>
 
                   <div className="aca-actions" style={{ marginTop: 18 }}>
                     {selectedJob.status === "QUEUED" ? (
                       <ActionButton
-                        label="Execute now"
+                        label={uiTranslate("Execute now", language)}
                         actionKey="execute-job"
                         busyAction={busyAction}
                         onClick={executeJob}
@@ -2174,7 +2202,7 @@ export default function Index() {
                     ) : null}
                     {canReviewJob ? (
                       <ActionButton
-                        label="Run AI Review"
+                        label={uiTranslate("Run AI Review", language)}
                         actionKey="review-job"
                         busyAction={busyAction}
                         onClick={reviewJob}
@@ -2183,7 +2211,7 @@ export default function Index() {
                     ) : null}
                     {canRetryJob ? (
                       <ActionButton
-                        label="Retry Failed"
+                        label={uiTranslate("Retry Failed", language)}
                         actionKey="retry-failed-job"
                         busyAction={busyAction}
                         onClick={retryFailedJob}
@@ -2191,7 +2219,7 @@ export default function Index() {
                     ) : null}
                     {canResumeJob ? (
                       <ActionButton
-                        label="Resume"
+                        label={uiTranslate("Resume", language)}
                         actionKey="resume-job"
                         busyAction={busyAction}
                         onClick={resumeJob}
@@ -2199,7 +2227,7 @@ export default function Index() {
                     ) : null}
                     {canCancelJob ? (
                       <ActionButton
-                        label="Cancel"
+                        label={uiTranslate("Cancel", language)}
                         actionKey="cancel-job"
                         busyAction={busyAction}
                         onClick={cancelJob}
@@ -2209,16 +2237,16 @@ export default function Index() {
                   </div>
 
                   <div style={{ marginTop: 24 }}>
-                    <h3 style={sectionHeadingStyle}>Items</h3>
+                    <h3 style={sectionHeadingStyle}><UiText value="Items" /></h3>
                     <div className="aca-item-table-wrap">
                       <table style={tableStyle}>
                         <thead>
                           <tr>
-                            <th style={tableHeadCellStyle}>Field</th>
-                            <th style={tableHeadCellStyle}>Resource</th>
-                            <th style={tableHeadCellStyle}>Status</th>
-                            <th style={tableHeadCellStyle}>Provider</th>
-                            <th style={tableHeadCellStyle}>AI score</th>
+                            <th style={tableHeadCellStyle}><UiText value="Field" /></th>
+                            <th style={tableHeadCellStyle}><UiText value="Resource" /></th>
+                            <th style={tableHeadCellStyle}><UiText value="Status" /></th>
+                            <th style={tableHeadCellStyle}><UiText value="Provider" /></th>
+                            <th style={tableHeadCellStyle}><UiText value="AI score" /></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2244,7 +2272,7 @@ export default function Index() {
                   </div>
                 </>
               ) : (
-                <EmptyState title="Select a job" text="Choose a job from the list to inspect its lifecycle and items." />
+                <EmptyState title={uiTranslate("Select a job", language)} text="Choose a job from the list to inspect its lifecycle and items." />
               )}
             </Card>
           </div>
@@ -2252,43 +2280,43 @@ export default function Index() {
 
         {activeTab === "review" ? (
           <div className="aca-layout-review">
-            <Card title="Review Queue & History" subtitle="All statuses shows items awaiting review. Select Approved, Published or Rejected to view history. Filters are scoped to this shop; approvals never publish automatically.">
+            <Card title={uiTranslate("Review Queue & History", language)} subtitle="All statuses shows items awaiting review. Select Approved, Published or Rejected to view history. Filters are scoped to this shop; approvals never publish automatically.">
               <div className="aca-review-filters">
-                <input aria-label="Search review queue" placeholder="Search field, source text or product ID"
+                <input aria-label={uiTranslate("Search review queue", language)} placeholder={uiTranslate("Search field, source text or product ID", language)}
                   value={reviewSearch} onChange={(event) => { setReviewSearch(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle} />
-                <select aria-label="Review target language" value={reviewLocale} onChange={(event) => { setReviewLocale(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
-                  <option value="ALL">All languages</option>
+                <select aria-label={uiTranslate("Review target language", language)} value={reviewLocale} onChange={(event) => { setReviewLocale(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
+                  <option value="ALL">{uiTranslate("All languages", language)}</option>
                   {Array.from(new Set([...reviewLocales, ...jobs.map((job) => job.targetLocale)])).sort().map((locale) => <option key={locale} value={locale}>{locale.toUpperCase()}</option>)}
                 </select>
-                <select aria-label="Review resource type" value={reviewType} onChange={(event) => { setReviewType(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
-                  <option value="ALL">All resource types</option>
+                <select aria-label={uiTranslate("Review resource type", language)} value={reviewType} onChange={(event) => { setReviewType(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
+                  <option value="ALL">{uiTranslate("All resource types", language)}</option>
                   {Array.from(new Set([...reviewTypes, ...resourceTypes])).sort().map((type) => <option key={type} value={type}>{type}</option>)}
                 </select>
-                <select aria-label="Review status" value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
-                  <option value="ALL">All statuses</option>
-                  <option value="VALIDATED">Validated</option>
-                  <option value="NEEDS_REVIEW">Needs review</option>
-                  <option value="APPROVED">Approved (history)</option>
-                  <option value="PUBLISHED">Published (history)</option>
-                  <option value="REJECTED">Rejected (history)</option>
+                <select aria-label={uiTranslate("Review status", language)} value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle}>
+                  <option value="ALL">{uiTranslate("All statuses", language)}</option>
+                  <option value="VALIDATED">{uiTranslate("Validated", language)}</option>
+                  <option value="NEEDS_REVIEW">{uiTranslate("Needs review", language)}</option>
+                  <option value="APPROVED">{uiTranslate("Approved (history)", language)}</option>
+                  <option value="PUBLISHED">{uiTranslate("Published (history)", language)}</option>
+                  <option value="REJECTED">{uiTranslate("Rejected (history)", language)}</option>
                 </select>
               </div>
               <div className="aca-actions" style={{ margin: "12px 0" }}>
-                <span className="aca-muted-small">{filteredReviewQueue.length} on page · {reviewPageData?.total ?? "—"} total · {selectedReviewIds.length} selected</span>
+                <span className="aca-muted-small">{filteredReviewQueue.length} <UiText value="on page ·" /> {reviewPageData?.total ?? "—"} <UiText value="total ·" /> {selectedReviewIds.length} <UiText value="selected" /></span>
                 <button type="button" className="aca-mini-action" disabled={busyAction !== null} onClick={() => {
                   const visibleIds = filteredReviewQueue.filter(({ item }) => (item.status === "VALIDATED" || item.status === "NEEDS_REVIEW") && Boolean(item.translatedValue?.trim()) && qualitySnapshot(item).state !== "BLOCKED").map(({ item }) => item.id);
                   setSelectedReviewIds((current) => Array.from(new Set([...current, ...visibleIds])));
-                }}>Select filtered</button>
-                <button type="button" className="aca-mini-action" onClick={() => setSelectedReviewIds([])}>Clear selection</button>
+                }}><UiText value="Select filtered" /></button>
+                <button type="button" className="aca-mini-action" onClick={() => setSelectedReviewIds([])}><UiText value="Clear selection" /></button>
                 <button type="button" className="aca-mini-action" disabled={busyAction !== null || selectedReviewIds.length === 0}
                   onClick={() => void bulkApproveSelected()}>
                   {busyAction === "bulk-approve" ? "Approving…" : "Approve selected (no publish)"}
                 </button>
               </div>
-              {reviewPageLoading ? <p className="aca-muted-small">Loading review queue…</p> : null}
+              {reviewPageLoading ? <p className="aca-muted-small"><UiText value="Loading review queue…" /></p> : null}
               {reviewPageError ? <p role="alert" style={{ color: ACA.danger }}>{reviewPageError}</p> : null}
               {!reviewPageLoading && !reviewPageError && filteredReviewQueue.length === 0 ? (
-                <EmptyState title="No translations match the selected filters" text="All statuses shows actionable review items. Select Published or another history status to inspect completed work." />
+                <EmptyState title={uiTranslate("No translations match the selected filters", language)} text="All statuses shows actionable review items. Select Published or another history status to inspect completed work." />
               ) : (
                 <div className="aca-review-list">
                   {filteredReviewQueue.map(({ job, item }) => (
@@ -2314,16 +2342,16 @@ export default function Index() {
                           {item.field?.resource?.resourceType ?? "—"} · {job.sourceLocale} → {job.targetLocale}
                         </div>
                         <div className="aca-muted-small" title={item.field?.resource?.shopifyResourceId ?? "Resource ID unavailable"} style={{ overflowWrap: "anywhere" }}>
-                          Resource: {item.field?.resource?.shopifyResourceId ?? "Unavailable"}
+                          <UiText value="Resource:" /> {item.field?.resource?.shopifyResourceId ?? "Unavailable"}
                         </div>
                         <div className="aca-muted-small" title={job.id} style={{ overflowWrap: "anywhere" }}>
-                          Job: {job.id}
+                          <UiText value="Job:" /> {job.id}
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         {statusBadge(item.status)}
                         <div className="aca-muted-small" style={{ marginTop: 6 }}>
-                          Technical QA {qualitySnapshot(item).score === null ? "not checked" : `${qualitySnapshot(item).score}/100 · ${qualitySnapshot(item).state}`} · AI {item.aiReviewScore ?? "—"}
+                          <UiText value="Technical QA" /> {qualitySnapshot(item).score === null ? "not checked" : `${qualitySnapshot(item).score}/100 · ${qualitySnapshot(item).state}`} <UiText value="· AI" /> {item.aiReviewScore ?? "—"}
                         </div>
                       </div>
                     </button>
@@ -2333,47 +2361,47 @@ export default function Index() {
               )}
               <div className="aca-actions" style={{ marginTop: 12 }}>
                 <button type="button" className="aca-mini-action" disabled={reviewPageNumber <= 1 || reviewPageLoading}
-                  onClick={() => { setSelectedReviewIds([]); setReviewPageNumber((n) => Math.max(1, n - 1)); }}>Previous</button>
-                <span className="aca-muted-small">Page {reviewPageNumber} / {reviewPageData?.pages ?? 1}</span>
+                  onClick={() => { setSelectedReviewIds([]); setReviewPageNumber((n) => Math.max(1, n - 1)); }}><UiText value="Previous" /></button>
+                <span className="aca-muted-small"><UiText value="Page" /> {reviewPageNumber} / {reviewPageData?.pages ?? 1}</span>
                 <button type="button" className="aca-mini-action" disabled={reviewPageNumber >= (reviewPageData?.pages ?? 1) || reviewPageLoading}
-                  onClick={() => { setSelectedReviewIds([]); setReviewPageNumber((n) => n + 1); }}>Next</button>
-                <button type="button" className="aca-mini-action" onClick={() => setReviewRefreshKey((n) => n + 1)}>Refresh</button>
+                  onClick={() => { setSelectedReviewIds([]); setReviewPageNumber((n) => n + 1); }}><UiText value="Next" /></button>
+                <button type="button" className="aca-mini-action" onClick={() => setReviewRefreshKey((n) => n + 1)}><UiText value="Refresh" /></button>
               </div>
             </Card>
 
             <Card
-              title="Human Review"
+              title={uiTranslate("Human Review", language)}
               subtitle="Compare source and generated text, edit the final value and publish after approval."
             >
               {selectedItem && selectedJob ? (
                 <div className="aca-column-stack">
                   <div style={{ border: "1px solid #d4d9e1", borderRadius: 10, padding: 12 }}>
-                    <strong>Shopify resource identity</strong>
+                    <strong><UiText value="Shopify resource identity" /></strong>
                     <div className="aca-muted-small" style={{ overflowWrap: "anywhere", marginTop: 6 }}>
-                      Resource: {selectedItem.field?.resource?.resourceType ?? "UNKNOWN"} / {selectedItem.field?.resource?.shopifyResourceId ?? "Unavailable"}
+                      <UiText value="Resource:" /> {selectedItem.field?.resource?.resourceType ?? "UNKNOWN"} / {selectedItem.field?.resource?.shopifyResourceId ?? "Unavailable"}
                     </div>
                     <div className="aca-muted-small" style={{ overflowWrap: "anywhere", marginTop: 4 }}>
-                      Job: {selectedJob.id} · Item: {selectedItem.id} · Target locale: {selectedJob.targetLocale}
+                      <UiText value="Job:" /> {selectedJob.id} <UiText value="· Item:" /> {selectedItem.id} <UiText value="· Target locale:" /> {selectedJob.targetLocale}
                     </div>
                   </div>
                   <div className="aca-stat-grid-4">
-                    <MiniStat label="Status" valueNode={statusBadge(selectedItem.status)} />
-                    <MiniStat label="Field" value={selectedItem.field?.key ?? "—"} />
-                    <MiniStat label="Type" value={selectedItem.field?.type ?? "—"} />
-                    <MiniStat label="AI score" value={selectedItem.aiReviewScore?.toString() ?? "—"} />
+                    <MiniStat label={uiTranslate("Status", language)} valueNode={statusBadge(selectedItem.status)} />
+                    <MiniStat label={uiTranslate("Field", language)} value={selectedItem.field?.key ?? "—"} />
+                    <MiniStat label={uiTranslate("Type", language)} value={selectedItem.field?.type ?? "—"} />
+                    <MiniStat label={uiTranslate("AI score", language)} value={selectedItem.aiReviewScore?.toString() ?? "—"} />
                   </div>
 
                   <div className="aca-column-stack" style={{ border: "1px solid #d4d9e1", borderRadius: 10, padding: 14 }}>
-                    <h3 style={sectionHeadingStyle}>Translation Quality Studio</h3>
-                    <p className="aca-muted-small">Deterministic technical checks from the generated translation. This is not a linguistic quality rating. Edited approval text is validated again on the server.</p>
+                    <h3 style={sectionHeadingStyle}><UiText value="Translation Quality Studio" /></h3>
+                    <p className="aca-muted-small"><UiText value="Deterministic technical checks from the generated translation. This is not a linguistic quality rating. Edited approval text is validated again on the server." /></p>
                     <div className="aca-stat-grid-4">
-                      <MiniStat label="Technical score" value={qualitySnapshot(selectedItem).score === null ? "Not checked" : `${qualitySnapshot(selectedItem).score}/100`} />
-                      <MiniStat label="Gate" value={qualitySnapshot(selectedItem).state} />
-                      <MiniStat label="Critical issues" value={String(qualitySnapshot(selectedItem).errors)} />
-                      <MiniStat label="Warnings" value={String(qualitySnapshot(selectedItem).warnings)} />
+                      <MiniStat label={uiTranslate("Technical score", language)} value={qualitySnapshot(selectedItem).score === null ? "Not checked" : `${qualitySnapshot(selectedItem).score}/100`} />
+                      <MiniStat label={uiTranslate("Gate", language)} value={qualitySnapshot(selectedItem).state} />
+                      <MiniStat label={uiTranslate("Critical issues", language)} value={String(qualitySnapshot(selectedItem).errors)} />
+                      <MiniStat label={uiTranslate("Warnings", language)} value={String(qualitySnapshot(selectedItem).warnings)} />
                     </div>
-                    {qualitySnapshot(selectedItem).state === "BLOCKED" ? <InfoCallout tone="orange">Critical deterministic issues detected. Server approval validation must pass before publication. Regenerate or correct the translation.</InfoCallout> : null}
-                    {qualitySnapshot(selectedItem).state === "NOT_CHECKED" ? <InfoCallout tone="orange">No saved deterministic validation snapshot. A score cannot be computed. Server validation remains authoritative.</InfoCallout> : null}
+                    {qualitySnapshot(selectedItem).state === "BLOCKED" ? <InfoCallout tone="orange"><UiText value="Critical deterministic issues detected. Server approval validation must pass before publication. Regenerate or correct the translation." /></InfoCallout> : null}
+                    {qualitySnapshot(selectedItem).state === "NOT_CHECKED" ? <InfoCallout tone="orange"><UiText value="No saved deterministic validation snapshot. A score cannot be computed. Server validation remains authoritative." /></InfoCallout> : null}
                     {qualitySnapshot(selectedItem).issues.length > 0 ? (
                       <div style={{ display: "grid", gap: 8 }}>
                         {qualitySnapshot(selectedItem).issues.map((issue, index) => (
@@ -2382,13 +2410,13 @@ export default function Index() {
                             <div className="aca-muted-small">{issue.message}</div>
                           </div>
                         ))}
-                        {qualitySnapshot(selectedItem).moreIssues > 0 ? <p className="aca-muted-small">Additional stored issues: {qualitySnapshot(selectedItem).moreIssues}</p> : null}
+                        {qualitySnapshot(selectedItem).moreIssues > 0 ? <p className="aca-muted-small"><UiText value="Additional stored issues:" /> {qualitySnapshot(selectedItem).moreIssues}</p> : null}
                       </div>
                     ) : null}
                   </div>
 
                   {selectedJob.items && selectedJob.items.length > 1 ? (
-                    <Field label="Translation item">
+                    <Field label={uiTranslate("Translation item", language)}>
                       <select
                         value={selectedItemId}
                         onChange={(event) => setSelectedItemId(event.target.value)}
@@ -2404,19 +2432,19 @@ export default function Index() {
                   ) : null}
 
                   <div className="aca-two-column">
-                    <ReadOnlyBlock label="Source value" value={selectedItem.sourceValue} />
-                    <ReadOnlyBlock label="Generated translation" value={selectedItem.translatedValue ?? "—"} />
+                    <ReadOnlyBlock label={uiTranslate("Source value", language)} value={selectedItem.sourceValue} />
+                    <ReadOnlyBlock label={uiTranslate("Generated translation", language)} value={selectedItem.translatedValue ?? "—"} />
                   </div>
 
                   {selectedItem.aiReviewSuggestedTranslation ? (
                     <ReadOnlyBlock
-                      label="AI suggested translation"
+                      label={uiTranslate("AI suggested translation", language)}
                       value={selectedItem.aiReviewSuggestedTranslation}
                       accent="green"
                     />
                   ) : null}
 
-                  <Field label="Approved value">
+                  <Field label={uiTranslate("Approved value", language)}>
                     <textarea
                       value={approvedValue}
                       onChange={(event) => setApprovedValue(event.target.value)}
@@ -2425,14 +2453,14 @@ export default function Index() {
                   </Field>
 
                   <div className="aca-two-column">
-                    <Field label="Approval note">
+                    <Field label={uiTranslate("Approval note", language)}>
                       <textarea
                         value={approveNote}
                         onChange={(event) => setApproveNote(event.target.value)}
                         style={{ ...inputStyle, minHeight: 90, resize: "vertical" }}
                       />
                     </Field>
-                    <Field label="Rejection note">
+                    <Field label={uiTranslate("Rejection note", language)}>
                       <textarea
                         value={rejectNote}
                         onChange={(event) => setRejectNote(event.target.value)}
@@ -2444,7 +2472,7 @@ export default function Index() {
                   <div className="aca-actions">
                     {canApproveItem ? (
                       <ActionButton
-                        label="Approve"
+                        label={uiTranslate("Approve", language)}
                         actionKey="approve-item"
                         busyAction={busyAction}
                         onClick={approveItem}
@@ -2453,7 +2481,7 @@ export default function Index() {
                     ) : null}
                     {canApproveItem ? (
                       <ActionButton
-                        label="Reject"
+                        label={uiTranslate("Reject", language)}
                         actionKey="reject-item"
                         busyAction={busyAction}
                         onClick={rejectItem}
@@ -2462,7 +2490,7 @@ export default function Index() {
                     ) : null}
                     {canRegenerateItem ? (
                       <ActionButton
-                        label="Regenerate"
+                        label={uiTranslate("Regenerate", language)}
                         actionKey="regenerate-item"
                         busyAction={busyAction}
                         onClick={regenerateItem}
@@ -2470,7 +2498,7 @@ export default function Index() {
                     ) : null}
                     {canPublishItem ? (
                       <ActionButton
-                        label="Publish to Shopify"
+                        label={uiTranslate("Publish to Shopify", language)}
                         actionKey="publish-item"
                         busyAction={busyAction}
                         onClick={publishItem}
@@ -2479,9 +2507,9 @@ export default function Index() {
                     ) : null}
                     {selectedItem.status === "PUBLISHED" ? (
                       <>
-                        <span className="aca-published-note">Published to Shopify</span>
+                        <span className="aca-published-note"><UiText value="Published to Shopify" /></span>
                         <ActionButton
-                          label="Verify on Shopify"
+                          label={uiTranslate("Verify on Shopify", language)}
                           actionKey="verify-publication"
                           busyAction={busyAction}
                           onClick={() => verifyPublishedItem()}
@@ -2492,18 +2520,18 @@ export default function Index() {
                   {selectedItem.status === "PUBLISHED" &&
                     publicationVerificationItemId === selectedItem.id && publicationVerification ? (
                     <div role="status" style={{ marginTop: 12, padding: 12, border: "1px solid #d9d6c8", borderRadius: 8 }}>
-                      <strong>Shopify read-back: {publicationVerification.status}</strong>
-                      {publicationVerification.verifiedAt ? <p>Checked: {publicationVerification.verifiedAt}</p> : null}
+                      <strong><UiText value="Shopify read-back:" /> {publicationVerification.status}</strong>
+                      {publicationVerification.verifiedAt ? <p><UiText value="Checked:" /> {publicationVerification.verifiedAt}</p> : null}
                       {publicationVerification.reason ? <p>{publicationVerification.reason}</p> : null}
                       {publicationVerification.status === "MISMATCH" ?
-                        <p>Shopify value differs from the approved translation or is outdated. Do not republish without reviewing the source.</p> : null}
+                        <p><UiText value="Shopify value differs from the approved translation or is outdated. Do not republish without reviewing the source." /></p> : null}
                       {publicationVerification.status === "VERIFIED" ?
-                        <p>Exact approved value confirmed in Shopify for this field and locale.</p> : null}
+                        <p><UiText value="Exact approved value confirmed in Shopify for this field and locale." /></p> : null}
                     </div>
                   ) : null}
                 </div>
               ) : (
-                <EmptyState title="Select an item" text="Choose a translation from the review queue or a job detail." />
+                <EmptyState title={uiTranslate("Select an item", language)} text="Choose a translation from the review queue or a job detail." />
               )}
             </Card>
           </div>
@@ -2511,45 +2539,45 @@ export default function Index() {
 
         {activeTab === "markets" ? (
           <div className="aca-column-stack">
-            <Card title="Markets & Localization" subtitle="Live read-only Shopify Markets and published locales. Country-level translation coverage is not inferred from job history.">
+            <Card title={uiTranslate("Markets & Localization", language)} subtitle="Live read-only Shopify Markets and published locales. Country-level translation coverage is not inferred from job history.">
               <div className="aca-actions">
                 <button type="button" className="aca-btn" disabled={marketsLoading} onClick={() => void loadMarketSnapshot()}>
                   {marketsLoading ? "Loading Shopify Markets..." : "Refresh Shopify Markets (read only)"}
                 </button>
               </div>
               <div style={{ marginTop: 12, padding: 14, border: "1px solid #d9d6c8", borderRadius: 8 }}>
-                <strong>Shopify language and market synchronization</strong>
-                <p className="aca-muted-small">Shopify is the source of truth. Synchronize ACA Locale after changing store languages or market configuration. The button is an action, not a persistent toggle.</p>
+                <strong><UiText value="Shopify language and market synchronization" /></strong>
+                <p className="aca-muted-small"><UiText value="Shopify is the source of truth. Synchronize ACA Locale after changing store languages or market configuration. The button is an action, not a persistent toggle." /></p>
                 <div className="aca-actions">
-                  <ActionButton label="Sync Shopify configuration" actionKey="sync-shopify" busyAction={busyAction} onClick={syncShopifyConfiguration} primary />
+                  <ActionButton label={uiTranslate("Sync Shopify configuration", language)} actionKey="sync-shopify" busyAction={busyAction} onClick={syncShopifyConfiguration} primary />
                 </div>
                 <div role="status" style={{ marginTop: 8 }}>
                   {shopifySyncAt ? `Last successful configuration sync in this session: ${new Date(shopifySyncAt).toLocaleString()}` : "No configuration synchronization performed in this session."}
-                  {syncResult ? <p className="aca-muted-small">Configuration sync completed. Live language and market information refreshed separately from Shopify.</p> : null}
+                  {syncResult ? <p className="aca-muted-small"><UiText value="Configuration sync completed. Live language and market information refreshed separately from Shopify." /></p> : null}
                 </div>
               </div>
               <div style={{ marginTop: 12 }}>
                 <InfoCallout tone="orange">
-                  Market configuration comes from Shopify Admin; ACA job counts are matched by language only and are NOT market-specific publication or storefront translation coverage. No Shopify writes are performed.
+                  <UiText value="Market configuration comes from Shopify Admin; ACA job counts are matched by language only and are NOT market-specific publication or storefront translation coverage. No Shopify writes are performed." />
                 </InfoCallout>
               </div>
-              {marketsError ? <div style={{ marginTop: 12 }}><InfoCallout tone="orange">Shopify Markets lookup failed: {marketsError}</InfoCallout></div> : null}
-              {marketSnapshotAt ? <p className="aca-muted-small">Snapshot: {new Date(marketSnapshotAt).toLocaleString()} · Live API data, not cached sync</p> : null}
+              {marketsError ? <div style={{ marginTop: 12 }}><InfoCallout tone="orange"><UiText value="Shopify Markets lookup failed:" /> {marketsError}</InfoCallout></div> : null}
+              {marketSnapshotAt ? <p className="aca-muted-small"><UiText value="Snapshot:" /> {new Date(marketSnapshotAt).toLocaleString()} <UiText value="· Live API data, not cached sync" /></p> : null}
               {marketLocalization ? (
                 <div className="aca-column-stack" style={{ marginTop: 16 }}>
                   <div className="aca-stats-grid">
-                    <MiniStat label="Markets returned" value={String(marketLocalization.marketCount)} />
-                    <MiniStat label="Markets with web presence" value={String(marketLocalization.marketsWithWebPresence)} />
-                    <MiniStat label="Published Shopify locales" value={String(marketLocalization.publishedLocaleCount)} />
-                    <MiniStat label="Jobs not attributable from web-presence locale data" value={String(marketLocalization.jobsWithoutVerifiableMarketMapping)} />
+                    <MiniStat label={uiTranslate("Markets returned", language)} value={String(marketLocalization.marketCount)} />
+                    <MiniStat label={uiTranslate("Markets with web presence", language)} value={String(marketLocalization.marketsWithWebPresence)} />
+                    <MiniStat label={uiTranslate("Published Shopify locales", language)} value={String(marketLocalization.publishedLocaleCount)} />
+                    <MiniStat label={uiTranslate("Jobs not attributable from web-presence locale data", language)} value={String(marketLocalization.jobsWithoutVerifiableMarketMapping)} />
                   </div>
                   {marketLocalization.marketsWithoutDedicatedWebPresence > 0 ? (
-                    <InfoCallout tone="blue">{marketLocalization.marketsWithoutDedicatedWebPresence} market(s) have no dedicated web presence returned. Shopify may serve them on the primary domain via country selection. Country conditions below are not language coverage, and unmatched ACA jobs do not indicate missing translations.</InfoCallout>
+                    <InfoCallout tone="blue">{marketLocalization.marketsWithoutDedicatedWebPresence} <UiText value="market(s) have no dedicated web presence returned. Shopify may serve them on the primary domain via country selection. Country conditions below are not language coverage, and unmatched ACA jobs do not indicate missing translations." /></InfoCallout>
                   ) : null}
-                  {marketLocalization.marketCount === 0 ? <EmptyState title="No Markets returned" text="Check Markets setup and API permissions in Shopify Admin." /> : (
-                    <div className="aca-markets-table-wrap" role="region" aria-label="Shopify Markets comparison" tabIndex={0}>
+                  {marketLocalization.marketCount === 0 ? <EmptyState title={uiTranslate("No Markets returned", language)} text="Check Markets setup and API permissions in Shopify Admin." /> : (
+                    <div className="aca-markets-table-wrap" role="region" aria-label={uiTranslate("Shopify Markets comparison", language)} tabIndex={0}>
                       <table className="aca-markets-table">
-                        <thead><tr><th scope="col">Shopify Market</th><th scope="col">Status</th><th scope="col">Country conditions (Shopify)</th><th scope="col">Web presence locales</th><th scope="col">Published locales</th><th scope="col">Unpublished locales</th><th scope="col">ACA jobs (locale match only)</th><th scope="col">Shopify URLs</th></tr></thead>
+                        <thead><tr><th scope="col"><UiText value="Shopify Market" /></th><th scope="col"><UiText value="Status" /></th><th scope="col"><UiText value="Country conditions (Shopify)" /></th><th scope="col"><UiText value="Web presence locales" /></th><th scope="col"><UiText value="Published locales" /></th><th scope="col"><UiText value="Unpublished locales" /></th><th scope="col"><UiText value="ACA jobs (locale match only)" /></th><th scope="col"><UiText value="Shopify URLs" /></th></tr></thead>
                         <tbody>
                           {marketLocalization.rows.map(row => (
                             <tr key={row.id}>
@@ -2558,7 +2586,7 @@ export default function Index() {
                               <td className="aca-market-countries">
                                 {row.countryCodes.length > 12 ? (
                                   <details className="aca-market-country-details">
-                                    <summary>{row.countryCodes.slice(0, 8).join(", ")} <span className="aca-market-country-more">+{row.countryCodes.length - 8} more · Show all</span></summary>
+                                    <summary>{row.countryCodes.slice(0, 8).join(", ")} <span className="aca-market-country-more">+{row.countryCodes.length - 8} <UiText value="more · Show all" /></span></summary>
                                     <div className="aca-market-country-full">{row.countryCodes.join(", ")}{row.regionsTruncated ? " (partial: more regions)" : ""}</div>
                                   </details>
                                 ) : row.countryCodes.length ? `${row.countryCodes.join(", ")}${row.regionsTruncated ? " (partial: more regions)" : ""}` : row.regionNames.length ? `${row.regionNames.slice(0, 8).join(", ")}${row.regionsTruncated ? " (partial: more regions)" : ""}` : "Not returned"}
@@ -2566,7 +2594,7 @@ export default function Index() {
                               <td>{row.locales.join(", ") || "Not available"}</td>
                               <td>{row.publishedLocales.join(", ") || "—"}</td>
                               <td>{row.unpublishedLocales.join(", ") || "—"}</td>
-                              <td><strong className="aca-market-jobs-count">{row.jobCount}</strong> matching <span className="aca-market-muted">· {row.completedJobCount} completed</span></td>
+                              <td><strong className="aca-market-jobs-count">{row.jobCount}</strong> <UiText value="matching" /> <span className="aca-market-muted">· {row.completedJobCount} <UiText value="completed" /></span></td>
                               <td className="aca-market-urls">{row.rootUrls.length ? row.rootUrls.map(url => <div key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></div>) : "Not returned"}</td>
                             </tr>
                           ))}
@@ -2574,60 +2602,60 @@ export default function Index() {
                       </table>
                     </div>
                   )}
-                  <p className="aca-muted-small">Country conditions describe the market audience, not which translations are published. A market may have no dedicated web presence and still be available via the primary domain. Shopify Markets may share the same locale: job counts can overlap across markets. A completed job does not imply approved or published translations. To verify true localization coverage, use the Store Scan for each locale and inspect the storefront.</p>
-                  <h3 style={sectionHeadingStyle}>Published languages from Shopify</h3>
+                  <p className="aca-muted-small"><UiText value="Country conditions describe the market audience, not which translations are published. A market may have no dedicated web presence and still be available via the primary domain. Shopify Markets may share the same locale: job counts can overlap across markets. A completed job does not imply approved or published translations. To verify true localization coverage, use the Store Scan for each locale and inspect the storefront." /></p>
+                  <h3 style={sectionHeadingStyle}><UiText value="Published languages from Shopify" /></h3>
                   {liveLocales?.length ? (
-                    <div className="aca-market-locales-wrap" role="region" aria-label="Shopify language publication status" tabIndex={0}>
+                    <div className="aca-market-locales-wrap" role="region" aria-label={uiTranslate("Shopify language publication status", language)} tabIndex={0}>
                       <table className="aca-market-locales-table">
-                        <thead><tr><th scope="col">Locale</th><th scope="col">Name</th><th scope="col">Published</th><th scope="col">Primary</th></tr></thead>
+                        <thead><tr><th scope="col"><UiText value="Locale" /></th><th scope="col"><UiText value="Name" /></th><th scope="col"><UiText value="Published" /></th><th scope="col"><UiText value="Primary" /></th></tr></thead>
                         <tbody>{liveLocales.map(item => (
                           <tr key={item.locale}>
                             <td><span className="aca-seo-locale">{item.locale}</span></td>
                             <td>{item.name || item.locale || "Unknown"}</td>
                             <td><span className={`aca-market-status ${item.published ? "aca-market-status--active" : "aca-market-status--inactive"}`}>{item.published ? "Published" : "Not published"}</span></td>
-                            <td>{item.primary ? <span className="aca-market-primary-badge">Primary</span> : <span className="aca-market-muted">—</span>}</td>
+                            <td>{item.primary ? <span className="aca-market-primary-badge"><UiText value="Primary" /></span> : <span className="aca-market-muted">—</span>}</td>
                           </tr>
                         ))}</tbody>
                       </table>
                     </div>
-                  ) : <p className="aca-muted-small">No locales returned.</p>}
+                  ) : <p className="aca-muted-small"><UiText value="No locales returned." /></p>}
                 </div>
-              ) : !marketsLoading && !marketsError ? <EmptyState title="No live market snapshot" text="Refresh Shopify Markets to inspect market locales without changing store configuration." /> : null}
+              ) : !marketsLoading && !marketsError ? <EmptyState title={uiTranslate("No live market snapshot", language)} text="Refresh Shopify Markets to inspect market locales without changing store configuration." /> : null}
             </Card>
           </div>
         ) : null}
 
         {activeTab === "ai-core" ? (
           <div className="aca-layout-two">
-            <Card title="ACA AI Core — Integration Readiness" subtitle="Preview-only integration contract. ACA Locale continues using its current translation adapters.">
+            <Card title={uiTranslate("ACA AI Core — Integration Readiness", language)} subtitle="Preview-only integration contract. ACA Locale continues using its current translation adapters.">
               <div className="aca-column-stack">
-                <InfoCallout tone="blue">ACA AI Core is NOT connected. This view makes no network request to an AI Core gateway, does not invoke a model, and does not save routing changes. Translation, review and fallback remain on the existing ACA Locale backend.</InfoCallout>
+                <InfoCallout tone="blue"><UiText value="ACA AI Core is NOT connected. This view makes no network request to an AI Core gateway, does not invoke a model, and does not save routing changes. Translation, review and fallback remain on the existing ACA Locale backend." /></InfoCallout>
                 <div className="aca-stat-grid-3">
-                  <MiniStat label="Core connection" value="NOT CONNECTED" />
-                  <MiniStat label="Routing mode" value="LOCAL ONLY" />
-                  <MiniStat label="Core executions" value="DISABLED" />
+                  <MiniStat label={uiTranslate("Core connection", language)} value="NOT CONNECTED" />
+                  <MiniStat label={uiTranslate("Routing mode", language)} value="LOCAL ONLY" />
+                  <MiniStat label={uiTranslate("Core executions", language)} value="DISABLED" />
                 </div>
-                <h3 style={{ color: ACA.blue }}>Routing contract preview</h3>
-                <table className="aca-pricing-table"><thead><tr><th>Stage</th><th>Role</th><th>Provider</th><th>Model</th></tr></thead><tbody>
+                <h3 style={{ color: ACA.blue }}><UiText value="Routing contract preview" /></h3>
+                <table className="aca-pricing-table"><thead><tr><th><UiText value="Stage" /></th><th><UiText value="Role" /></th><th><UiText value="Provider" /></th><th><UiText value="Model" /></th></tr></thead><tbody>
                   {aiCoreReadiness.routes.map((route, idx) => <tr key={`${route.stage}:${route.role}:${idx}`}><td>{route.stage}</td><td>{route.role}</td><td>{route.provider}</td><td>{route.model || "Not required / unspecified"}</td></tr>)}
                 </tbody></table>
-                <p className="aca-muted-small">This is a deterministic preview of the current Settings form. Unsaved model choices may appear here; they do not change saved job configuration.</p>
-                <p className="aca-muted-small">The future gateway will require server-side authentication, tenant isolation, auditable usage and bounded failover before any traffic is redirected.</p>
+                <p className="aca-muted-small"><UiText value="This is a deterministic preview of the current Settings form. Unsaved model choices may appear here; they do not change saved job configuration." /></p>
+                <p className="aca-muted-small"><UiText value="The future gateway will require server-side authentication, tenant isolation, auditable usage and bounded failover before any traffic is redirected." /></p>
               </div>
             </Card>
-            <Card title="Readiness Checks & Contract" subtitle="An exportable, credential-free draft for the future ACA AI Core integration.">
+            <Card title={uiTranslate("Readiness Checks & Contract", language)} subtitle="An exportable, credential-free draft for the future ACA AI Core integration.">
               <div className="aca-column-stack">
                 <div className="aca-actions">
-                  <button type="button" className="aca-mini-action" onClick={() => { setActiveTab("settings"); }}>Open provider settings</button>
-                  <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}>Inspect AI usage</button>
+                  <button type="button" className="aca-mini-action" onClick={() => { setActiveTab("settings"); }}><UiText value="Open provider settings" /></button>
+                  <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}><UiText value="Inspect AI usage" /></button>
                 </div>
                 {aiCoreReadiness.findings.length ? aiCoreReadiness.findings.map((finding, idx) => (
                   <InfoCallout key={`${finding.code}:${idx}`} tone={finding.level === "WARNING" ? "orange" : "blue"}>{finding.level}: {finding.detail}</InfoCallout>
-                )) : <InfoCallout tone="blue">Configured routes have no detected issues in the available snapshots. This does not establish that ACA AI Core is connected or safe to enable.</InfoCallout>}
+                )) : <InfoCallout tone="blue"><UiText value="Configured routes have no detected issues in the available snapshots. This does not establish that ACA AI Core is connected or safe to enable." /></InfoCallout>}
                 <Field label="Routing contract JSON — read-only (copy manually)">
                   <textarea aria-label="ACA AI Core preview contract JSON" readOnly rows={13} spellCheck={false} value={JSON.stringify(aiCoreReadiness.contract, null, 2)} style={{ ...inputStyle, width: "100%", fontFamily: "monospace" }} />
                 </Field>
-                <p className="aca-muted-small">No secrets, prompts or Shopify shop identifiers are included. There is no gateway endpoint or live connection in this release.</p>
+                <p className="aca-muted-small"><UiText value="No secrets, prompts or Shopify shop identifiers are included. There is no gateway endpoint or live connection in this release." /></p>
               </div>
             </Card>
           </div>
@@ -2641,7 +2669,7 @@ export default function Index() {
                 subtitle="Define protected terminology and preferred translations without hardcoding ACA-specific rules into the app."
               >
                 <div className="aca-column-stack">
-                  <Field label="Source term">
+                  <Field label={uiTranslate("Source term", language)}>
                     <input
                       value={glossaryDraft.sourceTerm}
                       onChange={(event) =>
@@ -2650,13 +2678,13 @@ export default function Index() {
                           sourceTerm: event.target.value,
                         }))
                       }
-                      placeholder="e.g. Vietri sul Mare"
+                      placeholder={uiTranslate("e.g. Vietri sul Mare", language)}
                       style={inputStyle}
                     />
                   </Field>
 
                   <div className="aca-form-grid-2">
-                    <Field label="Rule type">
+                    <Field label={uiTranslate("Rule type", language)}>
                       <select
                         value={glossaryDraft.ruleType}
                         onChange={(event) =>
@@ -2671,13 +2699,13 @@ export default function Index() {
                         }
                         style={inputStyle}
                       >
-                        <option value="DO_NOT_TRANSLATE">Do not translate</option>
-                        <option value="PREFERRED_TRANSLATION">Preferred translation</option>
-                        <option value="FORBIDDEN_TRANSLATION">Forbidden translation</option>
+                        <option value="DO_NOT_TRANSLATE">{uiTranslate("Do not translate", language)}</option>
+                        <option value="PREFERRED_TRANSLATION">{uiTranslate("Preferred translation", language)}</option>
+                        <option value="FORBIDDEN_TRANSLATION">{uiTranslate("Forbidden translation", language)}</option>
                       </select>
                     </Field>
 
-                    <Field label="Target locale">
+                    <Field label={uiTranslate("Target locale", language)}>
                       <input
                         value={glossaryDraft.targetLocale}
                         onChange={(event) =>
@@ -2720,7 +2748,7 @@ export default function Index() {
                     />
                   </Field>
 
-                  <Field label="Notes">
+                  <Field label={uiTranslate("Notes", language)}>
                     <textarea
                       value={glossaryDraft.notes}
                       onChange={(event) =>
@@ -2730,7 +2758,7 @@ export default function Index() {
                         }))
                       }
                       style={{ ...inputStyle, minHeight: 88, resize: "vertical" }}
-                      placeholder="Brand, artisan terminology, cultural note…"
+                      placeholder={uiTranslate("Brand, artisan terminology, cultural note…", language)}
                     />
                   </Field>
 
@@ -2746,7 +2774,7 @@ export default function Index() {
                           }))
                         }
                       />
-                      Case sensitive
+                      <UiText value="Case sensitive" />
                     </label>
                     <label>
                       <input
@@ -2759,7 +2787,7 @@ export default function Index() {
                           }))
                         }
                       />
-                      Enabled
+                      <UiText value="Enabled" />
                     </label>
                   </div>
 
@@ -2782,7 +2810,7 @@ export default function Index() {
                           color: ACA.ink,
                         }}
                       >
-                        Cancel
+                        <UiText value="Cancel" />
                       </button>
                     ) : null}
                   </div>
@@ -2790,7 +2818,7 @@ export default function Index() {
               </Card>
 
               <Card
-                title="CSV Import / Export"
+                title={uiTranslate("CSV Import / Export", language)}
                 subtitle="Share terminology with marketing or maintain larger glossaries in a spreadsheet."
               >
                 <div className="aca-actions">
@@ -2814,12 +2842,12 @@ export default function Index() {
                       color: ACA.ink,
                     }}
                   >
-                    Export CSV
+                    <UiText value="Export CSV" />
                   </button>
                 </div>
                 <div style={{ marginTop: 14 }}>
                   <InfoCallout tone="blue">
-                    CSV columns: source_term, target_locale, target_term, rule_type, case_sensitive, enabled, notes. Use * for all target locales.
+                    <UiText value="CSV columns: source_term, target_locale, target_term, rule_type, case_sensitive, enabled, notes. Use * for all target locales." />
                   </InfoCallout>
                 </div>
               </Card>
@@ -2837,7 +2865,7 @@ export default function Index() {
                 <input
                   value={glossarySearch}
                   onChange={(event) => setGlossarySearch(event.target.value)}
-                  placeholder="Search source term, translation, note…"
+                  placeholder={uiTranslate("Search source term, translation, note…", language)}
                   style={inputStyle}
                 />
                 <select
@@ -2845,7 +2873,7 @@ export default function Index() {
                   onChange={(event) => setGlossaryLocaleFilter(event.target.value)}
                   style={inputStyle}
                 >
-                  <option value="ALL">All locales</option>
+                  <option value="ALL">{uiTranslate("All locales", language)}</option>
                   {glossaryLocales.map((locale) => (
                     <option key={locale} value={locale}>
                       {locale === "*" ? "* · All locales" : locale}
@@ -2856,7 +2884,7 @@ export default function Index() {
 
               <div className="aca-actions" style={{ marginBottom: 14 }}>
                 <ActionButton
-                  label="Refresh"
+                  label={uiTranslate("Refresh", language)}
                   actionKey="refresh-glossary"
                   busyAction={busyAction}
                   onClick={() =>
@@ -2870,12 +2898,12 @@ export default function Index() {
               </div>
 
               {loadingGlossary ? (
-                <p style={mutedTextStyle}>Loading glossary…</p>
+                <p style={mutedTextStyle}><UiText value="Loading glossary…" /></p>
               ) : glossaryError ? (
                 <p style={{ ...mutedTextStyle, color: ACA.danger }}>{glossaryError}</p>
               ) : filteredGlossaryEntries.length === 0 ? (
                 <EmptyState
-                  title="No glossary terms found"
+                  title={uiTranslate("No glossary terms found", language)}
                   text="Add a protected term, preferred translation or forbidden translation."
                 />
               ) : (
@@ -2883,12 +2911,12 @@ export default function Index() {
                   <table style={tableStyle}>
                     <thead>
                       <tr>
-                        <th style={tableHeadCellStyle}>Source</th>
-                        <th style={tableHeadCellStyle}>Locale</th>
-                        <th style={tableHeadCellStyle}>Target / Forbidden</th>
-                        <th style={tableHeadCellStyle}>Rule</th>
-                        <th style={tableHeadCellStyle}>State</th>
-                        <th style={tableHeadCellStyle}>Actions</th>
+                        <th style={tableHeadCellStyle}><UiText value="Source" /></th>
+                        <th style={tableHeadCellStyle}><UiText value="Locale" /></th>
+                        <th style={tableHeadCellStyle}><UiText value="Target / Forbidden" /></th>
+                        <th style={tableHeadCellStyle}><UiText value="Rule" /></th>
+                        <th style={tableHeadCellStyle}><UiText value="State" /></th>
+                        <th style={tableHeadCellStyle}><UiText value="Actions" /></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2911,7 +2939,7 @@ export default function Index() {
                           <td style={tableBodyCellStyle}>
                             <GlossaryRuleBadge rule={entry.ruleType} />
                             {entry.caseSensitive ? (
-                              <div className="aca-muted-small">Case sensitive</div>
+                              <div className="aca-muted-small"><UiText value="Case sensitive" /></div>
                             ) : null}
                           </td>
                           <td style={tableBodyCellStyle}>
@@ -2926,7 +2954,7 @@ export default function Index() {
                                 type="button"
                                 onClick={() => editGlossaryEntry(entry)}
                               >
-                                Edit
+                                <UiText value="Edit" />
                               </button>
                               <button
                                 type="button"
@@ -2939,7 +2967,7 @@ export default function Index() {
                                 className="aca-danger-link"
                                 onClick={() => void deleteGlossaryEntry(entry)}
                               >
-                                Delete
+                                <UiText value="Delete" />
                               </button>
                             </div>
                           </td>
@@ -2955,12 +2983,12 @@ export default function Index() {
 
         {activeTab === "usage" ? (
           <Card
-            title="Usage & Cost Monitoring"
+            title={uiTranslate("Usage & Cost Monitoring", language)}
             subtitle="30-day translation and AI review consumption."
           >
             <div className="aca-actions" style={{ marginBottom: 18 }}>
               <ActionButton
-                label="Refresh Usage"
+                label={uiTranslate("Refresh Usage", language)}
                 actionKey="refresh-usage"
                 busyAction={busyAction}
                 onClick={() => void runAction("refresh-usage", loadUsage, "Usage refreshed.")}
@@ -2968,30 +2996,30 @@ export default function Index() {
             </div>
 
             {loadingUsage ? (
-              <p style={mutedTextStyle}>Loading usage summary…</p>
+              <p style={mutedTextStyle}><UiText value="Loading usage summary…" /></p>
             ) : usageError ? (
               <p style={{ ...mutedTextStyle, color: ACA.danger }}>{usageError}</p>
             ) : usageSummary ? (
               <>
                 <div className="aca-stat-grid-4">
-                  <MiniStat label="Estimated cost (30 days)" value={formatUsd(usageSummary.totals?.estimatedCostMicrousd)} />
-                  <MiniStat label="Billed characters" value={(usageSummary.totals?.billedCharacters ?? 0).toLocaleString()} />
-                  <MiniStat label="LLM input tokens" value={(usageSummary.totals?.inputTokens ?? 0).toLocaleString()} />
-                  <MiniStat label="LLM output tokens" value={(usageSummary.totals?.outputTokens ?? 0).toLocaleString()} />
+                  <MiniStat label={uiTranslate("Estimated cost (30 days)", language)} value={formatUsd(usageSummary.totals?.estimatedCostMicrousd)} />
+                  <MiniStat label={uiTranslate("Billed characters", language)} value={(usageSummary.totals?.billedCharacters ?? 0).toLocaleString()} />
+                  <MiniStat label={uiTranslate("LLM input tokens", language)} value={(usageSummary.totals?.inputTokens ?? 0).toLocaleString()} />
+                  <MiniStat label={uiTranslate("LLM output tokens", language)} value={(usageSummary.totals?.outputTokens ?? 0).toLocaleString()} />
                 </div>
                 <div className="aca-stat-grid-4" style={{ marginTop: 10 }}>
-                  <MiniStat label="Provider calls" value={String(usageSummary.totals?.events ?? 0)} />
-                  <MiniStat label="Successful" value={String(usageSummary.totals?.successfulEvents ?? 0)} />
-                  <MiniStat label="Failed" value={String(usageSummary.totals?.failedEvents ?? 0)} />
+                  <MiniStat label={uiTranslate("Provider calls", language)} value={String(usageSummary.totals?.events ?? 0)} />
+                  <MiniStat label={uiTranslate("Successful", language)} value={String(usageSummary.totals?.successfulEvents ?? 0)} />
+                  <MiniStat label={uiTranslate("Failed", language)} value={String(usageSummary.totals?.failedEvents ?? 0)} />
                   <MiniStat label="Unpriced calls" value={String(usageSummary.totals?.unpricedEvents ?? 0)} />
                 </div>
-                <h3 style={{ marginTop: 24, color: ACA.blue }}>Usage by stage</h3>
+                <h3 style={{ marginTop: 24, color: ACA.blue }}><UiText value="Usage by stage" /></h3>
                 <div className="aca-item-table-wrap">
                   <table style={tableStyle}>
                     <thead><tr>
-                      <th style={tableHeadCellStyle}>Stage</th><th style={tableHeadCellStyle}>Events</th>
-                      <th style={tableHeadCellStyle}>Characters</th><th style={tableHeadCellStyle}>Input tokens</th>
-                      <th style={tableHeadCellStyle}>Output tokens</th><th style={tableHeadCellStyle}>Estimated cost</th>
+                      <th style={tableHeadCellStyle}><UiText value="Stage" /></th><th style={tableHeadCellStyle}><UiText value="Events" /></th>
+                      <th style={tableHeadCellStyle}><UiText value="Characters" /></th><th style={tableHeadCellStyle}><UiText value="Input tokens" /></th>
+                      <th style={tableHeadCellStyle}><UiText value="Output tokens" /></th><th style={tableHeadCellStyle}><UiText value="Estimated cost" /></th>
                     </tr></thead>
                     <tbody>{(usageSummary.byStage ?? []).map((row) => (
                       <tr key={row.stage}>
@@ -3005,14 +3033,14 @@ export default function Index() {
                     ))}</tbody>
                   </table>
                 </div>
-                <h3 style={{ marginTop: 24, color: ACA.blue }}>Usage by provider and model</h3>
+                <h3 style={{ marginTop: 24, color: ACA.blue }}><UiText value="Usage by provider and model" /></h3>
                 <div className="aca-item-table-wrap">
                   <table style={tableStyle}>
                     <thead><tr>
-                      <th style={tableHeadCellStyle}>Provider</th><th style={tableHeadCellStyle}>Model</th>
-                      <th style={tableHeadCellStyle}>Events</th><th style={tableHeadCellStyle}>Characters</th>
-                      <th style={tableHeadCellStyle}>Input tokens</th><th style={tableHeadCellStyle}>Output tokens</th>
-                      <th style={tableHeadCellStyle}>Estimated cost</th>
+                      <th style={tableHeadCellStyle}><UiText value="Provider" /></th><th style={tableHeadCellStyle}><UiText value="Model" /></th>
+                      <th style={tableHeadCellStyle}><UiText value="Events" /></th><th style={tableHeadCellStyle}><UiText value="Characters" /></th>
+                      <th style={tableHeadCellStyle}><UiText value="Input tokens" /></th><th style={tableHeadCellStyle}><UiText value="Output tokens" /></th>
+                      <th style={tableHeadCellStyle}><UiText value="Estimated cost" /></th>
                     </tr></thead>
                     <tbody>{(usageSummary.byProvider ?? []).map((row) => (
                       <tr key={`${row.provider}-${row.model ?? "none"}`}>
@@ -3034,21 +3062,21 @@ export default function Index() {
                 </InfoCallout>
               </>
             ) : (
-              <EmptyState title="No usage data" text="Usage events appear after translations or AI reviews are executed." />
+              <EmptyState title={uiTranslate("No usage data", language)} text="Usage events appear after translations or AI reviews are executed." />
             )}
           </Card>
         ) : null}
 
         {activeTab === "settings" ? (
           <div className="aca-layout-two">
-            <Card title="Usage Pricing (USD)" subtitle="Versioned rates per 1,000,000 billable units; applies only to future provider events.">
+            <Card title={uiTranslate("Usage Pricing (USD)", language)} subtitle="Versioned rates per 1,000,000 billable units; applies only to future provider events.">
               <div className="aca-column-stack">
-                <p className="aca-muted-small">Source: {pricingSource} · Version {pricingVersion}. Enter the contractual USD rates for your own providers. No prices are imported automatically.</p>
+                <p className="aca-muted-small"><UiText value="Source:" /> {pricingSource} <UiText value="· Version" /> {pricingVersion}<UiText value=". Enter the contractual USD rates for your own providers. No prices are imported automatically." /></p>
                 <div className="aca-actions">
                   <button type="button" className="aca-mini-action" onClick={switchPricingEditor}>
                     {pricingAdvanced ? "Use guided editor" : "Advanced: edit JSON"}
                   </button>
-                  {!pricingAdvanced ? <button type="button" className="aca-mini-action" onClick={() => { setPricingRows((current) => [...current, { provider: "DEEPL", model: "*", charactersPerMillionUsd: "", inputPerMillionUsd: "", outputPerMillionUsd: "" }]); setPricingDirty(true); setPricingPreview(null); }}>+ Add provider / model</button> : null}
+                  {!pricingAdvanced ? <button type="button" className="aca-mini-action" onClick={() => { setPricingRows((current) => [...current, { provider: "DEEPL", model: "*", charactersPerMillionUsd: "", inputPerMillionUsd: "", outputPerMillionUsd: "" }]); setPricingDirty(true); setPricingPreview(null); }}><UiText value="+ Add provider / model" /></button> : null}
                 </div>
                 {pricingAdvanced ? (
                   <Field label="Pricing JSON: PROVIDER:model or PROVIDER:*">
@@ -3059,7 +3087,7 @@ export default function Index() {
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="aca-pricing-table">
-                      <thead><tr><th>Provider</th><th>Model (* = all)</th><th>Characters / 1M</th><th>Input tokens / 1M</th><th>Output tokens / 1M</th><th>Action</th></tr></thead>
+                      <thead><tr><th><UiText value="Provider" /></th><th><UiText value="Model (* = all)" /></th><th><UiText value="Characters / 1M" /></th><th><UiText value="Input tokens / 1M" /></th><th><UiText value="Output tokens / 1M" /></th><th><UiText value="Action" /></th></tr></thead>
                       <tbody>
                         {pricingRows.map((row, index) => (
                           <tr key={index}>
@@ -3071,138 +3099,138 @@ export default function Index() {
                               <td key={key}><input aria-label={`${key} row ${index + 1}`} type="number" min="0" max="100000" step="any" value={row[key]}
                                 onChange={(event) => editPricingRow(index, { [key]: event.target.value })} style={{ ...inputStyle, minWidth: 100 }} placeholder="—" /></td>
                             ))}
-                            <td><button type="button" className="aca-mini-action" aria-label={`Remove pricing row ${index + 1}`} onClick={() => { setPricingRows((current) => current.filter((_, i) => i !== index)); setPricingDirty(true); setPricingPreview(null); }}>Remove</button></td>
+                            <td><button type="button" className="aca-mini-action" aria-label={`Remove pricing row ${index + 1}`} onClick={() => { setPricingRows((current) => current.filter((_, i) => i !== index)); setPricingDirty(true); setPricingPreview(null); }}><UiText value="Remove" /></button></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {!pricingRows.length ? <p className="aca-muted-small">No rates configured. Add a provider and model to start. Empty rate fields are not charged at zero.</p> : null}
+                    {!pricingRows.length ? <p className="aca-muted-small"><UiText value="No rates configured. Add a provider and model to start. Empty rate fields are not charged at zero." /></p> : null}
                   </div>
                 )}
-                <p className="aca-muted-small">Use * only when the same price applies to all models of a provider. Blank fields mean that rate is not configured. A numerical 0 is an explicit zero-dollar rate.</p>
+                <p className="aca-muted-small"><UiText value="Use * only when the same price applies to all models of a provider. Blank fields mean that rate is not configured. A numerical 0 is an explicit zero-dollar rate." /></p>
                 {pricingError ? <p role="alert" style={{ color: ACA.danger }}>{pricingError}</p> : null}
                 <div className="aca-actions">
                   <ActionButton label="Preview historical usage (no save)" actionKey="preview-usage-pricing" busyAction={busyAction} onClick={() => void previewPricing()} />
                   <ActionButton label="Save new pricing version" actionKey="save-usage-pricing" busyAction={busyAction} onClick={() => void savePricing()} />
-                  <button className="aca-mini-action" type="button" onClick={() => void loadPricing()}>Discard edits / Refresh</button>
-                  {pricingDirty ? <span className="aca-muted-small">Unsaved changes</span> : null}
+                  <button className="aca-mini-action" type="button" onClick={() => void loadPricing()}><UiText value="Discard edits / Refresh" /></button>
+                  {pricingDirty ? <span className="aca-muted-small"><UiText value="Unsaved changes" /></span> : null}
                 </div>
                 {pricingPreview ? (
                   <div role="status" style={{ border: `1px solid ${ACA.line}`, padding: 12, borderRadius: 8 }}>
-                    <strong>30-day cost simulation — not saved</strong>
-                    <p className="aca-muted-small">Previewed {pricingPreview.sampledEvents} of {pricingPreview.totalEvents} events. Priced: {pricingPreview.costedEvents}; unpriced: {pricingPreview.unpricedEvents}; usage unknown: {pricingPreview.unknownUsageEvents}.</p>
-                    <p style={{ fontWeight: 700 }}>Simulated USD ${pricingPreview.estimatedCostUsd.toFixed(6)} {pricingPreview.complete ? "(complete for observed events)" : "(INCOMPLETE — not an invoice)"}</p>
-                    <h4 style={{ marginTop: 12, color: ACA.blue }}>Cost intelligence — simulated rates only</h4>
+                    <strong><UiText value="30-day cost simulation — not saved" /></strong>
+                    <p className="aca-muted-small"><UiText value="Previewed" /> {pricingPreview.sampledEvents} <UiText value="of" /> {pricingPreview.totalEvents} <UiText value="events. Priced:" /> {pricingPreview.costedEvents}<UiText value="; unpriced:" /> {pricingPreview.unpricedEvents}<UiText value="; usage unknown:" /> {pricingPreview.unknownUsageEvents}.</p>
+                    <p style={{ fontWeight: 700 }}><UiText value="Simulated USD $" />{pricingPreview.estimatedCostUsd.toFixed(6)} {pricingPreview.complete ? "(complete for observed events)" : "(INCOMPLETE — not an invoice)"}</p>
+                    <h4 style={{ marginTop: 12, color: ACA.blue }}><UiText value="Cost intelligence — simulated rates only" /></h4>
                     <div className="aca-actions">
-                      <span className="aca-muted-small">Priced coverage: {pricingPreview.costCoveragePercent?.toFixed(2) ?? "—"}% of recorded events</span>
-                      <span className="aca-muted-small">30-day cost lower bound: ${pricingPreview.lowerBound30DayUsd?.toFixed(6) ?? pricingPreview.estimatedCostUsd.toFixed(6)}</span>
+                      <span className="aca-muted-small"><UiText value="Priced coverage:" /> {pricingPreview.costCoveragePercent?.toFixed(2) ?? "—"}<UiText value="% of recorded events" /></span>
+                      <span className="aca-muted-small"><UiText value="30-day cost lower bound: $" />{pricingPreview.lowerBound30DayUsd?.toFixed(6) ?? pricingPreview.estimatedCostUsd.toFixed(6)}</span>
                     </div>
                     <p className="aca-muted-small">{pricingPreview.projected30DayUsd === null || pricingPreview.projected30DayUsd === undefined
                       ? "Forecast unavailable: some events have missing prices, unknown usage or truncated history. The known amount is only a lower bound."
                       : `Observed 30-day run-rate: $${pricingPreview.projected30DayUsd.toFixed(6)}; illustrative current-month run-rate: $${pricingPreview.projectedMonthUsd?.toFixed(6) ?? "—"}. Assumes the last 30 days repeat daily; not an invoice forecast.`}</p>
                     {aiBudget?.monthlyBudgetUsd ? (
-                      <p className="aca-muted-small">Simulated share of the ${aiBudget.monthlyBudgetUsd.toFixed(2)} USD advisory monthly budget: {(pricingPreview.estimatedCostUsd / aiBudget.monthlyBudgetUsd * 100).toFixed(2)}% {pricingPreview.complete ? "(observed 30-day comparison)" : "(minimum only — incomplete)"}. This does not change budget alerts.</p>
+                      <p className="aca-muted-small"><UiText value="Simulated share of the $" />{aiBudget.monthlyBudgetUsd.toFixed(2)} <UiText value="USD advisory monthly budget:" /> {(pricingPreview.estimatedCostUsd / aiBudget.monthlyBudgetUsd * 100).toFixed(2)}% {pricingPreview.complete ? "(observed 30-day comparison)" : "(minimum only — incomplete)"}<UiText value=". This does not change budget alerts." /></p>
                     ) : null}
                     {(pricingPreview.missingRateKeys?.length ?? 0) > 0 ? (
-                      <div><strong>Missing pricing entries</strong><p className="aca-muted-small">Configure contractual rates for these observed provider/model pairs. No automatic prices are imported.</p>
+                      <div><strong><UiText value="Missing pricing entries" /></strong><p className="aca-muted-small"><UiText value="Configure contractual rates for these observed provider/model pairs. No automatic prices are imported." /></p>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{pricingPreview.missingRateKeys?.map((key) => <span key={key} style={{ border: `1px solid ${ACA.line}`, borderRadius: 6, padding: "4px 8px", fontSize: 12 }}>{key}</span>)}</div>
-                        {pricingPreview.missingRateKeysTruncated ? <p className="aca-muted-small">Additional missing keys are not shown.</p> : null}
+                        {pricingPreview.missingRateKeysTruncated ? <p className="aca-muted-small"><UiText value="Additional missing keys are not shown." /></p> : null}
                       </div>
                     ) : null}
                     {(pricingPreview.byProviderModel?.length ?? 0) > 0 ? (
-                      <div style={{ overflowX: "auto", marginTop: 12 }}><table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Model</th><th>Stage</th><th>Events</th><th>Priced</th><th>Unpriced</th><th>Unknown usage</th><th>Known USD</th></tr></thead>
+                      <div style={{ overflowX: "auto", marginTop: 12 }}><table className="aca-pricing-table"><thead><tr><th><UiText value="Provider" /></th><th><UiText value="Model" /></th><th><UiText value="Stage" /></th><th><UiText value="Events" /></th><th><UiText value="Priced" /></th><th><UiText value="Unpriced" /></th><th><UiText value="Unknown usage" /></th><th><UiText value="Known USD" /></th></tr></thead>
                         <tbody>{pricingPreview.byProviderModel?.map((g, index) => <tr key={`${g.provider}:${g.model}:${g.stage}:${index}`}><td>{g.provider}</td><td>{g.model ?? "—"}</td><td>{g.stage}</td><td>{g.events}</td><td>{g.priced}</td><td>{g.unpriced}</td><td>{g.unknownUsage}</td><td>${g.estimatedCostUsd.toFixed(6)}</td></tr>)}</tbody></table>
-                        {pricingPreview.groupsTruncated ? <p role="alert">Only the first 50 provider/model groups are displayed.</p> : null}
+                        {pricingPreview.groupsTruncated ? <p role="alert"><UiText value="Only the first 50 provider/model groups are displayed." /></p> : null}
                       </div>
                     ) : null}
-                    {pricingPreview.truncated ? <p role="alert">More than 10,000 events in the period: this preview covers only the most recent 10,000.</p> : null}
-                    <p className="aca-muted-small">These rates are only simulated against recorded usage. Historical event costs and provider invoices are unchanged.</p>
+                    {pricingPreview.truncated ? <p role="alert"><UiText value="More than 10,000 events in the period: this preview covers only the most recent 10,000." /></p> : null}
+                    <p className="aca-muted-small"><UiText value="These rates are only simulated against recorded usage. Historical event costs and provider invoices are unchanged." /></p>
                   </div>
                 ) : null}
-                <p className="aca-muted-small">Historical cost snapshots remain unchanged. Recent revisions: {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
+                <p className="aca-muted-small"><UiText value="Historical cost snapshots remain unchanged. Recent revisions:" /> {pricingHistory.length ? pricingHistory.map((h) => `v${h.version}`).join(", ") : "none"}.</p>
               </div>
             </Card>
-            <Card title="AI Budget & Reliability" subtitle="Monthly UTC advisory budget and observed provider failures. No automatic restrictions on jobs.">
+            <Card title={uiTranslate("AI Budget & Reliability", language)} subtitle="Monthly UTC advisory budget and observed provider failures. No automatic restrictions on jobs.">
               <div className="aca-column-stack">
-                <p className="aca-muted-small">Budget month: {aiBudget?.month ?? "loading"} (UTC) · Version {aiBudget?.version ?? 0}. USD. Enter 0 to disable budget alerts.</p>
+                <p className="aca-muted-small"><UiText value="Budget month:" /> {aiBudget?.month ?? "loading"} <UiText value="(UTC) · Version" /> {aiBudget?.version ?? 0}<UiText value=". USD. Enter 0 to disable budget alerts." /></p>
                 <div className="aca-actions" style={{ alignItems: "end" }}>
-                  <Field label="Monthly AI budget (USD)">
-                    <input aria-label="Monthly AI advisory budget USD" type="number" min="0" max="1000000" step="0.01" value={aiBudgetInput}
+                  <Field label={uiTranslate("Monthly AI budget (USD)", language)}>
+                    <input aria-label={uiTranslate("Monthly AI advisory budget USD", language)} type="number" min="0" max="1000000" step="0.01" value={aiBudgetInput}
                       onChange={(event) => setAiBudgetInput(event.target.value)} style={{ ...inputStyle, maxWidth: 220 }} />
                   </Field>
-                  <ActionButton label="Save budget" actionKey="save-ai-budget" busyAction={busyAction} onClick={() => void saveAiBudget()} />
-                  <button type="button" className="aca-mini-action" onClick={() => void loadAiBudget()}>Refresh</button>
+                  <ActionButton label={uiTranslate("Save budget", language)} actionKey="save-ai-budget" busyAction={busyAction} onClick={() => void saveAiBudget()} />
+                  <button type="button" className="aca-mini-action" onClick={() => void loadAiBudget()}><UiText value="Refresh" /></button>
                 </div>
                 {aiBudgetError ? <p role="alert" style={{ color: ACA.danger }}>{aiBudgetError}</p> : null}
                 {aiBudget ? <>
                   <div className="aca-stat-grid-3">
-                    <MiniStat label="Known estimated USD" value={`$${aiBudget.estimatedCostUsd.toFixed(6)}`} />
-                    <MiniStat label="Budget used (minimum)" value={aiBudget.percentOfBudget === null ? "Not configured" : `${aiBudget.percentOfBudget}%`} />
-                    <MiniStat label="Provider failures" value={String(aiBudget.failedEvents)} />
+                    <MiniStat label={uiTranslate("Known estimated USD", language)} value={`$${aiBudget.estimatedCostUsd.toFixed(6)}`} />
+                    <MiniStat label={uiTranslate("Budget used (minimum)", language)} value={aiBudget.percentOfBudget === null ? "Not configured" : `${aiBudget.percentOfBudget}%`} />
+                    <MiniStat label={uiTranslate("Provider failures", language)} value={String(aiBudget.failedEvents)} />
                   </div>
                   {aiBudget.threshold !== "NOT_CONFIGURED" && aiBudget.threshold !== "BELOW_50" ? (
-                    <InfoCallout tone="orange">Budget threshold reached: {aiBudget.threshold === "OVER_100" ? "100%+" : aiBudget.threshold === "OVER_80" ? "80%+" : "50%+"} of the monthly limit based on known estimated costs.</InfoCallout>
+                    <InfoCallout tone="orange"><UiText value="Budget threshold reached:" /> {aiBudget.threshold === "OVER_100" ? "100%+" : aiBudget.threshold === "OVER_80" ? "80%+" : "50%+"} <UiText value="of the monthly limit based on known estimated costs." /></InfoCallout>
                   ) : null}
-                  {aiBudget.incomplete ? <InfoCallout tone="orange">Incomplete cost coverage: {aiBudget.unpricedEvents} unpriced events, {aiBudget.unknownUsageEvents} unknown-usage events{aiBudget.truncated ? ", and more than 10,000 events" : ""}. Total spend may be higher than shown; do not treat the percentage as final.</InfoCallout> : null}
-                  <p className="aca-muted-small">{aiBudget.totalEvents} calls this month. Notifications are derived from recorded usage on every refresh; no email alerts and no automatic blocking.</p>
-                  <strong>Operational alerts (current UTC month)</strong>
+                  {aiBudget.incomplete ? <InfoCallout tone="orange"><UiText value="Incomplete cost coverage:" /> {aiBudget.unpricedEvents} <UiText value="unpriced events," /> {aiBudget.unknownUsageEvents} <UiText value="unknown-usage events" />{aiBudget.truncated ? ", and more than 10,000 events" : ""}<UiText value=". Total spend may be higher than shown; do not treat the percentage as final." /></InfoCallout> : null}
+                  <p className="aca-muted-small">{aiBudget.totalEvents} <UiText value="calls this month. Notifications are derived from recorded usage on every refresh; no email alerts and no automatic blocking." /></p>
+                  <strong><UiText value="Operational alerts (current UTC month)" /></strong>
                   {(aiBudget.alerts ?? []).length ? (aiBudget.alerts ?? []).map((alert) => (
                     <div key={alert.code} role="status" style={{ border: "1px solid #e4d8b9", borderRadius: 8, padding: 10, marginBottom: 6 }}>
                       <strong>{alert.severity}: {alert.title}</strong>
                       <p className="aca-muted-small">{alert.detail}</p>
                     </div>
-                  )) : <p className="aca-muted-small">No active operational alerts.</p>}
+                  )) : <p className="aca-muted-small"><UiText value="No active operational alerts." /></p>}
                   <div className="aca-stat-grid-3">
-                    <MiniStat label="Recorded fallback events" value={String(aiBudget.fallbackEvents ?? 0)} />
-                    <MiniStat label="Recent failures available" value={String(aiBudget.recentFailures?.length ?? 0)} />
-                    <MiniStat label="Alerts delivery" value="In-app only" />
+                    <MiniStat label={uiTranslate("Recorded fallback events", language)} value={String(aiBudget.fallbackEvents ?? 0)} />
+                    <MiniStat label={uiTranslate("Recent failures available", language)} value={String(aiBudget.recentFailures?.length ?? 0)} />
+                    <MiniStat label={uiTranslate("Alerts delivery", language)} value="In-app only" />
                   </div>
-                  <strong>Recent provider errors (up to 30, current UTC month)</strong>
-                  <p className="aca-muted-small">Error categories are classified server-side. Raw exception messages, prompts and credentials are never exposed in this table. Existing fallback policy remains unchanged.</p>
+                  <strong><UiText value="Recent provider errors (up to 30, current UTC month)" /></strong>
+                  <p className="aca-muted-small"><UiText value="Error categories are classified server-side. Raw exception messages, prompts and credentials are never exposed in this table. Existing fallback policy remains unchanged." /></p>
                   <div style={{ overflowX: "auto" }}>
-                    <table className="aca-pricing-table"><thead><tr><th>Time (UTC)</th><th>Provider</th><th>Model</th><th>Stage</th><th>Category</th><th>Fallback</th></tr></thead><tbody>
+                    <table className="aca-pricing-table"><thead><tr><th><UiText value="Time (UTC)" /></th><th><UiText value="Provider" /></th><th><UiText value="Model" /></th><th><UiText value="Stage" /></th><th><UiText value="Category" /></th><th><UiText value="Fallback" /></th></tr></thead><tbody>
                       {(aiBudget.recentFailures ?? []).map((entry) => <tr key={entry.id}>
                         <td>{new Date(entry.createdAt).toLocaleString("en-GB", { timeZone: "UTC" })}</td>
                         <td>{entry.provider}</td><td>{entry.model ?? "(none)"}</td><td>{entry.stage}</td><td>{entry.category}</td><td>{entry.fallback ? "Yes" : "No"}</td>
                       </tr>)}
                     </tbody></table>
-                    {!aiBudget.recentFailures?.length ? <p className="aca-muted-small">No recorded provider failures this month.</p> : null}
-                    {aiBudget.failureHistoryTruncated ? <p className="aca-muted-small">Showing the latest 30 failed events.</p> : null}
+                    {!aiBudget.recentFailures?.length ? <p className="aca-muted-small"><UiText value="No recorded provider failures this month." /></p> : null}
+                    {aiBudget.failureHistoryTruncated ? <p className="aca-muted-small"><UiText value="Showing the latest 30 failed events." /></p> : null}
                   </div>
                   <div style={{ overflowX: "auto" }}>
-                    <table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Calls</th><th>Failures</th><th>Unpriced</th><th>Known USD</th></tr></thead>
+                    <table className="aca-pricing-table"><thead><tr><th><UiText value="Provider" /></th><th><UiText value="Calls" /></th><th><UiText value="Failures" /></th><th><UiText value="Unpriced" /></th><th><UiText value="Known USD" /></th></tr></thead>
                       <tbody>{aiBudget.byProvider.map((entry) => <tr key={entry.provider}>
                         <td>{entry.provider}</td><td>{entry.events}</td><td>{entry.failed}</td><td>{entry.unpriced}</td><td>${entry.estimatedCostUsd.toFixed(6)}</td>
                       </tr>)}</tbody>
                     </table>
-                    {!aiBudget.byProvider.length ? <p className="aca-muted-small">No recorded events this month.</p> : null}
+                    {!aiBudget.byProvider.length ? <p className="aca-muted-small"><UiText value="No recorded events this month." /></p> : null}
                   </div>
-                  <strong>Model reliability (up to 30 models)</strong>
+                  <strong><UiText value="Model reliability (up to 30 models)" /></strong>
                   <div style={{ overflowX: "auto" }}>
-                    <table className="aca-pricing-table"><thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Failures</th><th>Known USD</th></tr></thead><tbody>
+                    <table className="aca-pricing-table"><thead><tr><th><UiText value="Provider" /></th><th><UiText value="Model" /></th><th><UiText value="Calls" /></th><th><UiText value="Failures" /></th><th><UiText value="Known USD" /></th></tr></thead><tbody>
                       {aiBudget.byModel.map((entry) => <tr key={`${entry.provider}:${entry.model}`}><td>{entry.provider}</td><td>{entry.model}</td><td>{entry.events}</td><td>{entry.failed}</td><td>${entry.estimatedCostUsd.toFixed(6)}</td></tr>)}
                     </tbody></table>
                   </div>
-                </> : <p className="aca-muted-small">Budget status not loaded.</p>}
+                </> : <p className="aca-muted-small"><UiText value="Budget status not loaded." /></p>}
               </div>
             </Card>
             <Card
-              title="AI Provider Management"
+              title={uiTranslate("AI Provider Management", language)}
               subtitle="Manual credential checks and live model discovery; no AI generations or configuration changes."
             >
               <div className="aca-column-stack">
                 <div className="aca-actions">
-                  <ActionButton label="Check provider connections" actionKey="ai-provider-health" busyAction={busyAction} onClick={() => void checkAiProviderConnections()} />
-                  <ActionButton label="Load model catalog" actionKey="ai-model-catalog" busyAction={busyAction} onClick={() => void browseAiModels()} />
+                  <ActionButton label={uiTranslate("Check provider connections", language)} actionKey="ai-provider-health" busyAction={busyAction} onClick={() => void checkAiProviderConnections()} />
+                  <ActionButton label={uiTranslate("Load model catalog", language)} actionKey="ai-model-catalog" busyAction={busyAction} onClick={() => void browseAiModels()} />
                 </div>
-                <p className="aca-muted-small">Checks contact provider metadata/usage endpoints and may make API requests, but do not generate billable text. Connection success does not guarantee model-specific access or remaining quota. API keys remain on the backend.</p>
-                {aiProviderHealthError ? <InfoCallout tone="orange">Provider check failed: {aiProviderHealthError}</InfoCallout> : null}
+                <p className="aca-muted-small"><UiText value="Checks contact provider metadata/usage endpoints and may make API requests, but do not generate billable text. Connection success does not guarantee model-specific access or remaining quota. API keys remain on the backend." /></p>
+                {aiProviderHealthError ? <InfoCallout tone="orange"><UiText value="Provider check failed:" /> {aiProviderHealthError}</InfoCallout> : null}
                 {aiProviderHealth ? (
                   <div>
-                    <p className="aca-muted-small">Last checked: {aiProviderHealthCheckedAt ? new Date(aiProviderHealthCheckedAt).toLocaleString() : "—"} (manual snapshot)</p>
+                    <p className="aca-muted-small"><UiText value="Last checked:" /> {aiProviderHealthCheckedAt ? new Date(aiProviderHealthCheckedAt).toLocaleString() : "—"} <UiText value="(manual snapshot)" /></p>
                     <div className="aca-table-wrap">
                       <table className="aca-table">
-                        <thead><tr><th>Provider</th><th>Connection</th><th>Latency</th><th>Details</th></tr></thead>
+                        <thead><tr><th><UiText value="Provider" /></th><th><UiText value="Connection" /></th><th><UiText value="Latency" /></th><th><UiText value="Details" /></th></tr></thead>
                         <tbody>{aiProviderHealth.map((provider) => (
                           <tr key={provider.provider}>
                             <td>{provider.provider.toUpperCase()}</td>
@@ -3219,49 +3247,49 @@ export default function Index() {
                     </div>
                   </div>
                 ) : null}
-                {aiModelCatalogError ? <InfoCallout tone="orange">Model catalog unavailable: {aiModelCatalogError}</InfoCallout> : null}
+                {aiModelCatalogError ? <InfoCallout tone="orange"><UiText value="Model catalog unavailable:" /> {aiModelCatalogError}</InfoCallout> : null}
                 {aiModelCatalog ? (
                   <div className="aca-column-stack">
-                    <p className="aca-muted-small">Catalog generated {new Date(aiModelCatalog.generatedAt).toLocaleString()}. Provider catalog is cached for up to five minutes. Only models marked selectable can be chosen.</p>
+                    <p className="aca-muted-small"><UiText value="Catalog generated" /> {new Date(aiModelCatalog.generatedAt).toLocaleString()}<UiText value=". Provider catalog is cached for up to five minutes. Only models marked selectable can be chosen." /></p>
                     <div className="aca-actions">
-                      <select aria-label="Filter AI model provider" style={{ ...inputStyle, maxWidth: 180 }} value={aiCatalogProviderFilter} onChange={(event) => setAiCatalogProviderFilter(event.target.value)}>
-                        <option value="ALL">All providers</option>
+                      <select aria-label={uiTranslate("Filter AI model provider", language)} style={{ ...inputStyle, maxWidth: 180 }} value={aiCatalogProviderFilter} onChange={(event) => setAiCatalogProviderFilter(event.target.value)}>
+                        <option value="ALL">{uiTranslate("All providers", language)}</option>
                         {aiModelCatalog.providers.map((provider) => <option key={provider.provider} value={provider.provider}>{provider.provider.toUpperCase()}</option>)}
                       </select>
-                      <input aria-label="Search AI models" placeholder="Search model ID or name" style={{ ...inputStyle, maxWidth: 270 }} value={aiCatalogSearch} onChange={(event) => setAiCatalogSearch(event.target.value)} />
+                      <input aria-label={uiTranslate("Search AI models", language)} placeholder={uiTranslate("Search model ID or name", language)} style={{ ...inputStyle, maxWidth: 270 }} value={aiCatalogSearch} onChange={(event) => setAiCatalogSearch(event.target.value)} />
                     </div>
                     {aiModelCatalog.providers.filter((provider) => aiCatalogProviderFilter === "ALL" || provider.provider === aiCatalogProviderFilter).map((provider) => {
                       const models = provider.models.filter((model) => model.selectable && `${model.id} ${model.name}`.toLowerCase().includes(aiCatalogSearch.trim().toLowerCase()));
                       return (
                         <div key={provider.provider} style={{ border: `1px solid ${ACA.line}`, borderRadius: 8, padding: 10 }}>
-                          <strong>{provider.provider.toUpperCase()} · {provider.status} · {provider.modelCount} reported</strong>
-                          {provider.status !== "OK" ? <p className="aca-muted-small">Catalog not available for this provider.</p> : null}
-                          {provider.provider === "deepl" ? <p className="aca-muted-small">DeepL requires no model ID.</p> : null}
-                          {models.length === 0 && provider.requiresModel && provider.status === "OK" ? <p className="aca-muted-small">No selectable models match the filter.</p> : null}
+                          <strong>{provider.provider.toUpperCase()} · {provider.status} · {provider.modelCount} <UiText value="reported" /></strong>
+                          {provider.status !== "OK" ? <p className="aca-muted-small"><UiText value="Catalog not available for this provider." /></p> : null}
+                          {provider.provider === "deepl" ? <p className="aca-muted-small"><UiText value="DeepL requires no model ID." /></p> : null}
+                          {models.length === 0 && provider.requiresModel && provider.status === "OK" ? <p className="aca-muted-small"><UiText value="No selectable models match the filter." /></p> : null}
                           {models.slice(0, 25).map((model) => (
                             <div key={model.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${ACA.line}` }}>
                               <div style={{ flex: "1 1 190px", minWidth: 0 }}><strong>{model.name}</strong><div className="aca-muted-small">{model.id}</div></div>
-                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "translation")}>Use for translation</button>
-                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "fallback")}>Use as fallback</button>
-                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "review")}>Use for review</button>
+                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "translation")}><UiText value="Use for translation" /></button>
+                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "fallback")}><UiText value="Use as fallback" /></button>
+                              <button type="button" className="aca-mini-action" onClick={() => chooseAiCatalogModel(provider.provider, model.id, "review")}><UiText value="Use for review" /></button>
                             </div>
                           ))}
-                          {models.length > 25 ? <p className="aca-muted-small">Showing the first 25 matches. Narrow the search to see more.</p> : null}
+                          {models.length > 25 ? <p className="aca-muted-small"><UiText value="Showing the first 25 matches. Narrow the search to see more." /></p> : null}
                         </div>
                       );
                     })}
-                    <InfoCallout tone="blue">Selecting a model only fills the Translation Engine or AI Review form. Press Save Configuration separately to update future jobs. Existing jobs are not changed.</InfoCallout>
+                    <InfoCallout tone="blue"><UiText value="Selecting a model only fills the Translation Engine or AI Review form. Press Save Configuration separately to update future jobs. Existing jobs are not changed." /></InfoCallout>
                   </div>
                 ) : null}
               </div>
             </Card>
 
             <Card
-              title="Translation Engine"
+              title={uiTranslate("Translation Engine", language)}
               subtitle="Choose the primary translation provider and fallback used for future jobs."
             >
               <div className="aca-form-grid-2">
-                <Field label="Translation provider">
+                <Field label={uiTranslate("Translation provider", language)}>
                   <select
                     value={aiConfiguration.translationProvider}
                     onChange={(event) =>
@@ -3278,7 +3306,7 @@ export default function Index() {
                     <option value="GOOGLE">Google</option>
                   </select>
                 </Field>
-                <Field label="Translation model">
+                <Field label={uiTranslate("Translation model", language)}>
                   <input
                     value={aiConfiguration.translationModel}
                     disabled={aiConfiguration.translationProvider === "DEEPL"}
@@ -3292,7 +3320,7 @@ export default function Index() {
                     style={{ ...inputStyle, opacity: aiConfiguration.translationProvider === "DEEPL" ? 0.6 : 1 }}
                   />
                 </Field>
-                <Field label="Fallback provider">
+                <Field label={uiTranslate("Fallback provider", language)}>
                   <select
                     value={aiConfiguration.fallbackProvider}
                     onChange={(event) =>
@@ -3303,14 +3331,14 @@ export default function Index() {
                     }
                     style={inputStyle}
                   >
-                    <option value="">No fallback</option>
+                    <option value="">{uiTranslate("No fallback", language)}</option>
                     <option value="OPENAI">OpenAI</option>
                     <option value="ANTHROPIC">Anthropic</option>
                     <option value="GOOGLE">Google</option>
                     <option value="DEEPL">DeepL</option>
                   </select>
                 </Field>
-                <Field label="Fallback model">
+                <Field label={uiTranslate("Fallback model", language)}>
                   <input
                     value={aiConfiguration.fallbackModel}
                     disabled={!aiConfiguration.fallbackProvider || aiConfiguration.fallbackProvider === "DEEPL"}
@@ -3327,11 +3355,11 @@ export default function Index() {
             </Card>
 
             <Card
-              title="AI Review"
+              title={uiTranslate("AI Review", language)}
               subtitle="Configure the quality reviewer snapshotted when new jobs are created."
             >
               <div className="aca-form-grid-2">
-                <Field label="Review provider">
+                <Field label={uiTranslate("Review provider", language)}>
                   <select
                     value={aiConfiguration.reviewProvider}
                     onChange={(event) =>
@@ -3347,7 +3375,7 @@ export default function Index() {
                     <option value="GOOGLE">Google</option>
                   </select>
                 </Field>
-                <Field label="Review model">
+                <Field label={uiTranslate("Review model", language)}>
                   <input
                     value={aiConfiguration.reviewModel}
                     onChange={(event) =>
@@ -3363,7 +3391,7 @@ export default function Index() {
 
               <div className="aca-actions" style={{ marginTop: 18 }}>
                 <ActionButton
-                  label="Save Configuration"
+                  label={uiTranslate("Save Configuration", language)}
                   actionKey="save-ai-config"
                   busyAction={busyAction}
                   onClick={saveAiConfiguration}
@@ -3373,20 +3401,20 @@ export default function Index() {
 
               <div style={{ marginTop: 18 }}>
                 <InfoCallout tone="blue">
-                  Configuration changes affect only new jobs. Existing jobs keep their snapshotted provider and model history.
+                  <UiText value="Configuration changes affect only new jobs. Existing jobs keep their snapshotted provider and model history." />
                 </InfoCallout>
               </div>
               <div style={{ marginTop: 18 }}>
-                <h3 style={{ color: ACA.blue }}>AI usage & pricing status</h3>
+                <h3 style={{ color: ACA.blue }}><UiText value="AI usage & pricing status" /></h3>
                 <div className="aca-stat-grid-3">
-                  <MiniStat label="Recorded calls (30d)" value={String(usageSummary?.totals?.events ?? 0)} />
+                  <MiniStat label={uiTranslate("Recorded calls (30d)", language)} value={String(usageSummary?.totals?.events ?? 0)} />
                   <MiniStat label="Unpriced calls" value={String(usageSummary?.totals?.unpricedEvents ?? 0)} />
-                  <MiniStat label="Estimated spend" value={formatUsd(usageSummary?.totals?.estimatedCostMicrousd)} />
+                  <MiniStat label={uiTranslate("Estimated spend", language)} value={formatUsd(usageSummary?.totals?.estimatedCostMicrousd)} />
                 </div>
                 <p style={{ ...mutedTextStyle, marginTop: 10 }}>
-                  Provider credentials are managed securely on the backend. Edit versioned usage prices in Settings → Usage Pricing. Historical unpriced events remain unchanged.
+                  <UiText value="Provider credentials are managed securely on the backend. Edit versioned usage prices in Settings → Usage Pricing. Historical unpriced events remain unchanged." />
                 </p>
-                <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}>Inspect usage by provider</button>
+                <button type="button" className="aca-mini-action" onClick={() => setActiveTab("usage")}><UiText value="Inspect usage by provider" /></button>
               </div>
             </Card>
           </div>
@@ -3413,6 +3441,7 @@ export default function Index() {
         </div>
       ) : null}
     </div>
+    </UiLanguageContext.Provider>
   );
 }
 
@@ -3445,6 +3474,7 @@ function OverviewTab({
   onSelectJob: (jobId: string) => void;
   onSelectReview: (jobId: string, itemId: string) => void;
 }) {
+  const language = useContext(UiLanguageContext);
   const active = jobs.filter(
     (job) => job.status === "QUEUED" || job.status === "RUNNING",
   );
@@ -3452,17 +3482,17 @@ function OverviewTab({
   return (
     <div className="aca-overview-grid">
       <div className="aca-column-stack">
-        <Card title="Quick Actions" subtitle="Start from the most common operational tasks.">
+        <Card title={uiTranslate("Quick Actions", language)} subtitle="Start from the most common operational tasks.">
           <div className="aca-quick-grid">
-            <QuickAction title="Scan Store" text="Refresh Shopify translation state before creating jobs." color={ACA.green} onClick={onGoToScanner} />
-            <QuickAction title="Create / Manage Jobs" text="Translate missing or outdated fields in the background." color={ACA.blue} onClick={onGoToJobs} />
-            <QuickAction title="Review Queue" text={`${reviewQueue.length} items currently waiting for a decision.`} color={ACA.orange} onClick={onGoToReview} />
+            <QuickAction title={uiTranslate("Scan Store", language)} text="Refresh Shopify translation state before creating jobs." color={ACA.green} onClick={onGoToScanner} />
+            <QuickAction title={uiTranslate("Create / Manage Jobs", language)} text="Translate missing or outdated fields in the background." color={ACA.blue} onClick={onGoToJobs} />
+            <QuickAction title={uiTranslate("Review Queue", language)} text={`${reviewQueue.length} items currently waiting for a decision.`} color={ACA.orange} onClick={onGoToReview} />
           </div>
         </Card>
 
-        <Card title="Recent Jobs" subtitle="Latest translation activity.">
+        <Card title={uiTranslate("Recent Jobs", language)} subtitle="Latest translation activity.">
           {jobs.length === 0 ? (
-            <EmptyState title="No jobs yet" text="Scan Shopify and create your first translation job." />
+            <EmptyState title={uiTranslate("No jobs yet", language)} text="Scan Shopify and create your first translation job." />
           ) : (
             <div className="aca-overview-job-list">
               {jobs.slice(0, 6).map((job) => (
@@ -3483,16 +3513,16 @@ function OverviewTab({
       </div>
 
       <div className="aca-column-stack">
-        <Card title="Operations" subtitle="Current queue and review workload.">
+        <Card title={uiTranslate("Operations", language)} subtitle="Current queue and review workload.">
           <div className="aca-stat-grid-3">
-            <MiniStat label="Active jobs" value={String(active.length)} />
-            <MiniStat label="Review items" value={String(reviewQueue.length)} />
-            <MiniStat label="Recent jobs" value={String(jobs.length)} />
+            <MiniStat label={uiTranslate("Active jobs", language)} value={String(active.length)} />
+            <MiniStat label={uiTranslate("Review items", language)} value={String(reviewQueue.length)} />
+            <MiniStat label={uiTranslate("Recent jobs", language)} value={String(jobs.length)} />
           </div>
 
           {reviewQueue.length > 0 ? (
             <div style={{ marginTop: 18 }}>
-              <h3 style={sectionHeadingStyle}>Needs attention</h3>
+              <h3 style={sectionHeadingStyle}><UiText value="Needs attention" /></h3>
               <div className="aca-review-list">
                 {reviewQueue.slice(0, 4).map(({ job, item }) => (
                   <button key={item.id} type="button" className="aca-review-row" onClick={() => onSelectReview(job.id, item.id)}>
@@ -3508,26 +3538,26 @@ function OverviewTab({
           ) : null}
         </Card>
 
-        <Card title="30-day Usage" subtitle="Provider consumption and estimated spend.">
+        <Card title={uiTranslate("30-day Usage", language)} subtitle="Provider consumption and estimated spend.">
           {loadingUsage ? (
-            <p style={mutedTextStyle}>Loading usage…</p>
+            <p style={mutedTextStyle}><UiText value="Loading usage…" /></p>
           ) : usageError ? (
             <p style={{ ...mutedTextStyle, color: ACA.danger }}>{usageError}</p>
           ) : usageSummary ? (
             <>
             <div className="aca-stat-grid-3">
-              <MiniStat label="Estimated cost" value={formatUsd(usageSummary.totals?.estimatedCostMicrousd)} />
-              <MiniStat label="Characters" value={String(usageSummary.totals?.billedCharacters ?? 0)} />
-              <MiniStat label="LLM tokens" value={String((usageSummary.totals?.inputTokens ?? 0) + (usageSummary.totals?.outputTokens ?? 0))} />
+              <MiniStat label={uiTranslate("Estimated cost", language)} value={formatUsd(usageSummary.totals?.estimatedCostMicrousd)} />
+              <MiniStat label={uiTranslate("Characters", language)} value={String(usageSummary.totals?.billedCharacters ?? 0)} />
+              <MiniStat label={uiTranslate("LLM tokens", language)} value={String((usageSummary.totals?.inputTokens ?? 0) + (usageSummary.totals?.outputTokens ?? 0))} />
             </div>
             {usageHasUnpricedCosts(usageSummary.totals) ? (
               <p className="aca-muted-small" style={{ marginTop: 10, color: ACA.warning }}>
-                Cost estimate is incomplete: {usageSummary.totals.unpricedEvents} unpriced events. Open Usage for details.
+                <UiText value="Cost estimate is incomplete:" /> {usageSummary.totals.unpricedEvents} <UiText value="unpriced events. Open Usage for details." />
               </p>
             ) : null}
             </>
           ) : (
-            <EmptyState title="No usage data" text="Usage appears after translation or AI review calls." />
+            <EmptyState title={uiTranslate("No usage data", language)} text="Usage appears after translation or AI review calls." />
           )}
         </Card>
       </div>
@@ -3538,7 +3568,7 @@ function OverviewTab({
 function HeaderStat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="aca-header-stat" style={{ borderTopColor: color }}>
-      <div className="aca-header-stat-label">{label}</div>
+      <div className="aca-header-stat-label"><UiText value={label} /></div>
       <div className="aca-header-stat-value" style={{ color }}>{value}</div>
     </div>
   );
@@ -3547,8 +3577,8 @@ function HeaderStat({ label, value, color }: { label: string; value: number; col
 function QuickAction({ title, text, color, onClick }: { title: string; text: string; color: string; onClick: () => void }) {
   return (
     <button type="button" className="aca-quick-action" onClick={onClick} style={{ borderTopColor: color }}>
-      <strong>{title}</strong>
-      <span>{text}</span>
+      <strong><UiText value={title} /></strong>
+      <span><UiText value={text} /></span>
     </button>
   );
 }
@@ -3580,7 +3610,7 @@ function JobListItem({
         <span>{job.sourceLocale} → {job.targetLocale}</span>
         <span>{job.origin === "SHOPIFY_CHANGE" ? "Automatic · Shopify change" : "Manual"}</span>
         <span>{job.provider ?? "—"}{job.model ? ` · ${job.model}` : ""}</span>
-        <span>{job.completedItems}/{job.totalItems} completed · {job.failedItems} failed</span>
+        <span>{job.completedItems}/{job.totalItems} <UiText value="completed ·" /> {job.failedItems} failed</span>
         <span>{formatDateTime(job.createdAt)}</span>
       </div>
     </button>
@@ -3599,8 +3629,8 @@ function Card({
   return (
     <section className="aca-card">
       <div className="aca-card-heading">
-        <h2>{title}</h2>
-        {subtitle ? <p>{subtitle}</p> : null}
+        <h2><UiText value={title} /></h2>
+        {subtitle ? <p><UiText value={subtitle} /></p> : null}
       </div>
       {children}
     </section>
@@ -3610,7 +3640,7 @@ function Card({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="aca-field">
-      <span>{label}</span>
+      <span><UiText value={label} /></span>
       {children}
     </label>
   );
@@ -3627,7 +3657,7 @@ function MiniStat({
 }) {
   return (
     <div className="aca-mini-stat">
-      <div>{label}</div>
+      <div><UiText value={label} /></div>
       <strong>{valueNode ?? value ?? "—"}</strong>
     </div>
   );
@@ -3637,7 +3667,7 @@ function ProgressBar({ value, label }: { value: number; label: string }) {
   return (
     <div style={{ margin: "18px 0" }}>
       <div className="aca-progress-label">
-        <span>{label}</span>
+        <span><UiText value={label} /></span>
         <strong>{value}%</strong>
       </div>
       <div className="aca-progress-track">
@@ -3658,7 +3688,7 @@ function ReadOnlyBlock({
 }) {
   return (
     <div className="aca-field">
-      <span>{label}</span>
+      <span><UiText value={label} /></span>
       <div
         className="aca-readonly"
         style={accent === "green" ? { borderColor: "#A9DDCC", background: ACA.greenSoft } : undefined}
@@ -3672,8 +3702,8 @@ function ReadOnlyBlock({
 function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className="aca-empty">
-      <strong>{title}</strong>
-      <p>{text}</p>
+      <strong><UiText value={title} /></strong>
+      <p><UiText value={text} /></p>
     </div>
   );
 }
@@ -3793,7 +3823,7 @@ function ActionButton({
         opacity: busyAction && !isBusy ? 0.62 : 1,
       }}
     >
-      {isBusy ? `${label}…` : label}
+      <UiText value={isBusy ? `${label}…` : label} />
     </button>
   );
 }
@@ -3938,9 +3968,13 @@ const responsiveCss = `
     margin-bottom: 14px;
   }
 
+  .aca-header-tools { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+  .aca-language-picker { display: flex; flex-direction: column; gap: 5px; font-weight: 700; font-size: 11px; color: ${ACA.blue}; white-space: nowrap; }
+  .aca-language-picker select { min-height: 36px; padding: 7px 10px; border: 1px solid ${ACA.line}; border-radius: 9px; background: #fff; color: ${ACA.ink}; font-size: 12px; }
+  .aca-language-picker select:focus-visible { outline: 3px solid ${ACA.orange}; outline-offset: 2px; }
   .aca-header {
     display: grid;
-    grid-template-columns: minmax(420px, 1.4fr) minmax(480px, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     gap: 24px;
     align-items: center;
     padding: 22px 24px;
@@ -4401,7 +4435,8 @@ const responsiveCss = `
     .aca-logo-wrap { padding: 6px 9px; }
     .aca-logo { width: 120px; }
     .aca-subtitle { display: none; }
-    .aca-header-stats { grid-template-columns: repeat(2, 1fr); }
+    .aca-header-tools { justify-content: flex-start; }
+    .aca-header-stats { grid-template-columns: repeat(2, 1fr); flex: 1 1 250px; }
     .aca-tab-label { display: none; }
     .aca-tab-short { display: inline; }
     .aca-form-grid-3, .aca-form-grid-2, .aca-two-column, .aca-stat-grid-4, .aca-stat-grid-3, .aca-quick-grid { grid-template-columns: 1fr; }
