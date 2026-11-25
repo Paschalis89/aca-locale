@@ -21,7 +21,7 @@ function eventHarness(status: string, updatedAt = new Date()) {
   const shop = { id: 'shop-a', status: 'ACTIVE', sourceLocale: 'it',
     languages: [{ language: { locale: 'en' } }] };
   const event = { id: 'event-a', shopDomain: shopA, webhookId: 'webhook-a',
-    status, resourceType: 'PRODUCT', shopifyResourceId: gid,
+    status, topic: 'PRODUCTS_UPDATE', resourceType: 'PRODUCT', shopifyResourceId: gid,
     action: 'UPSERT', updatedAt, attempts: 1 };
   const prisma = {
     shop: { findUnique: vi.fn(async (query: any) =>

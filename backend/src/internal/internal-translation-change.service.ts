@@ -132,6 +132,7 @@ export class InternalTranslationChangeService {
       new Date();
 
     if (existing) {
+      this.assertClaimMatches(existing, input);
       const staleProcessing =
         existing.status ===
           'PROCESSING' &&
@@ -209,42 +210,55 @@ export class InternalTranslationChangeService {
           )
         : null;
 
-    const event =
-      await this.prisma.translationChangeEvent.create({
+    let event: Awaited<ReturnType<typeof this.prisma.translationChangeEvent.create>>;
+    try {
+      event = await this.prisma.translationChangeEvent.create({
         data: {
-          shopId:
-            shop.id,
-
-          webhookId:
-            input.webhookId,
-
-          topic:
-            input.topic,
-
-          resourceType:
-            input.resourceType,
-
-          shopifyResourceId:
-            input.shopifyResourceId,
-
-          action:
-            input.action,
-
-          status:
-            'PROCESSING',
-
+          shopId: shop.id,
+          webhookId: input.webhookId,
+          topic: input.topic,
+          resourceType: input.resourceType,
+          shopifyResourceId: input.shopifyResourceId,
+          action: input.action,
+          status: 'PROCESSING',
           triggeredAt:
-            triggeredAt &&
-            !Number.isNaN(
-              triggeredAt.getTime(),
-            )
+            triggeredAt && !Number.isNaN(triggeredAt.getTime())
               ? triggeredAt
               : null,
-
-          startedAt:
-            now,
+          startedAt: now,
         },
       });
+    } catch (error) {
+      // Concurrent Shopify delivery: another request inserted the same
+      // (shopId, webhookId) after our initial findUnique(). PostgreSQL
+      // correctly raises P2002. Re-read only that key, validate its
+      // identity, and let the gateway apply its existing duplicate policy.
+      // Do not suppress unrelated unique-constraint or database failures.
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const competingEvent = await this.prisma.translationChangeEvent.findUnique({
+        where: {
+          shopId_webhookId: {
+            shopId: shop.id,
+            webhookId: input.webhookId,
+          },
+        },
+      });
+      if (!competingEvent) {
+        throw error;
+      }
+
+      this.assertClaimMatches(competingEvent, input);
+      return {
+        eventId: competingEvent.id,
+        process: false,
+        duplicate: true,
+        status: competingEvent.status,
+        targetLocales,
+      };
+    }
 
     return {
       eventId:
@@ -534,6 +548,37 @@ export class InternalTranslationChangeService {
           input.errorMessage,
       },
     });
+  }
+
+  /** Reject webhook-ID reuse for a different resource, topic or action. */
+  private assertClaimMatches(
+    event: {
+      resourceType: string;
+      shopifyResourceId: string;
+      action: string;
+      topic: string;
+    },
+    input: ClaimShopifyContentChangeDto,
+  ) {
+    if (
+      event.resourceType !== input.resourceType ||
+      event.shopifyResourceId !== input.shopifyResourceId ||
+      event.action !== input.action ||
+      event.topic !== input.topic
+    ) {
+      throw new BadRequestException(
+        'Webhook ID does not match the original Shopify content change event.',
+      );
+    }
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'P2002'
+    );
   }
 
   private async findEvent(
