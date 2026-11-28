@@ -3427,7 +3427,7 @@ export default function Index() {
           className="aca-debug-toggle"
           onClick={() => setShowDebug((value) => !value)}
         >
-          {showDebug ? "Hide developer response" : "Show developer response"}
+          {uiTranslate(showDebug ? "Hide developer response" : "Show developer response", language)}
         </button>
       </div>
 
@@ -3436,7 +3436,7 @@ export default function Index() {
           <pre style={debugStyle}>
             {lastResult
               ? JSON.stringify(lastResult, null, 2)
-              : "No request executed yet."}
+              : uiTranslate("No request executed yet.", language)}
           </pre>
         </div>
       ) : null}
@@ -3482,17 +3482,17 @@ function OverviewTab({
   return (
     <div className="aca-overview-grid">
       <div className="aca-column-stack">
-        <Card title={uiTranslate("Quick Actions", language)} subtitle="Start from the most common operational tasks.">
+        <Card title={uiTranslate("Quick Actions", language)} subtitle={uiTranslate("Start from the most common operational tasks.", language)}>
           <div className="aca-quick-grid">
             <QuickAction title={uiTranslate("Scan Store", language)} text="Refresh Shopify translation state before creating jobs." color={ACA.green} onClick={onGoToScanner} />
             <QuickAction title={uiTranslate("Create / Manage Jobs", language)} text="Translate missing or outdated fields in the background." color={ACA.blue} onClick={onGoToJobs} />
-            <QuickAction title={uiTranslate("Review Queue", language)} text={`${reviewQueue.length} items currently waiting for a decision.`} color={ACA.orange} onClick={onGoToReview} />
+            <QuickAction title={uiTranslate("Review Queue", language)} text={`${reviewQueue.length} ${uiTranslate("items currently waiting for a decision.", language)}`} color={ACA.orange} onClick={onGoToReview} />
           </div>
         </Card>
 
-        <Card title={uiTranslate("Recent Jobs", language)} subtitle="Latest translation activity.">
+        <Card title={uiTranslate("Recent Jobs", language)} subtitle={uiTranslate("Latest translation activity.", language)}>
           {jobs.length === 0 ? (
-            <EmptyState title={uiTranslate("No jobs yet", language)} text="Scan Shopify and create your first translation job." />
+            <EmptyState title={uiTranslate("No jobs yet", language)} text={uiTranslate("Scan Shopify and create your first translation job.", language)} />
           ) : (
             <div className="aca-overview-job-list">
               {jobs.slice(0, 6).map((job) => (
@@ -3513,7 +3513,7 @@ function OverviewTab({
       </div>
 
       <div className="aca-column-stack">
-        <Card title={uiTranslate("Operations", language)} subtitle="Current queue and review workload.">
+        <Card title={uiTranslate("Operations", language)} subtitle={uiTranslate("Current queue and review workload.", language)}>
           <div className="aca-stat-grid-3">
             <MiniStat label={uiTranslate("Active jobs", language)} value={String(active.length)} />
             <MiniStat label={uiTranslate("Review items", language)} value={String(reviewQueue.length)} />
@@ -3538,7 +3538,7 @@ function OverviewTab({
           ) : null}
         </Card>
 
-        <Card title={uiTranslate("30-day Usage", language)} subtitle="Provider consumption and estimated spend.">
+        <Card title={uiTranslate("30-day Usage", language)} subtitle={uiTranslate("Provider consumption and estimated spend.", language)}>
           {loadingUsage ? (
             <p style={mutedTextStyle}><UiText value="Loading usage…" /></p>
           ) : usageError ? (
@@ -3557,7 +3557,7 @@ function OverviewTab({
             ) : null}
             </>
           ) : (
-            <EmptyState title={uiTranslate("No usage data", language)} text="Usage appears after translation or AI review calls." />
+            <EmptyState title={uiTranslate("No usage data", language)} text={uiTranslate("Usage appears after translation or AI review calls.", language)} />
           )}
         </Card>
       </div>

@@ -436,7 +436,11 @@ const IT: Record<string, string> = {
   "Cost estimate is incomplete:": "Stima costi incompleta:",
   "unpriced events. Open Usage for details.": "eventi senza prezzo. Apri Consumi per i dettagli.",
   "completed ·": "completati ·",
-  "Start from the most common operational tasks.": "Inizia dalle attività operative più comuni."
+  "Start from the most common operational tasks.": "Inizia dalle attività operative più comuni.",
+  "items currently waiting for a decision.": "elementi in attesa di revisione.",
+  "Current queue and review workload.": "Stato della coda e delle revisioni.",
+  "Provider consumption and estimated spend.": "Consumi dei provider e spesa stimata.",
+  "Usage appears after translation or AI review calls.": "I dati sui consumi compaiono dopo le chiamate di traduzione o revisione IA."
 };
 
 /** UI-only translation. Never translate product, provider or merchant data. */
