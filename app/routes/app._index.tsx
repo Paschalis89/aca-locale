@@ -1399,7 +1399,7 @@ export default function Index() {
   const scanStore = async () => {
     const productId = targetedProductScan ? normalizeProductId(scannerProductId) : null;
     if (targetedProductScan && (!productId || scannerResourceType !== "PRODUCT")) {
-      shopify.toast.show("Enter a valid Product ID and select PRODUCT.", { isError: true });
+      shopify.toast.show(uiTranslate("Enter a valid Product ID and select PRODUCT.", language), { isError: true });
       return;
     }
     await runAction(
@@ -1434,7 +1434,7 @@ export default function Index() {
           setTargetLocale(scannerLocale);
         }
       },
-      "Shopify scan completed.",
+      uiTranslate("Shopify scan completed.", language),
     );
   };
 
@@ -1814,7 +1814,7 @@ export default function Index() {
           <div className="aca-layout-two">
             <Card
               title={uiTranslate("Store Scan", language)}
-              subtitle="Read the latest Shopify translatable content and refresh the local translation projection."
+              subtitle={uiTranslate("Read the latest Shopify translatable content and refresh the local translation projection.", language)}
             >
               <div className="aca-form-grid-3">
                 <Field label={uiTranslate("Target locale", language)}>
@@ -1866,13 +1866,13 @@ export default function Index() {
                 ) : null}
               </div>
               <InfoCallout tone="blue">
-                {targetedProductScan ? "Only the specified product is refreshed; other products remain unchanged." : "A complete scan updates MISSING, TRANSLATED, OUTDATED and EMPTY_SOURCE states for all resources of the selected type."}
+                {uiTranslate(targetedProductScan ? "Only the specified product is refreshed; other products remain unchanged." : "A complete scan updates MISSING, TRANSLATED, OUTDATED and EMPTY_SOURCE states for all resources of the selected type.", language)}
               </InfoCallout>
             </Card>
 
             <Card
               title={uiTranslate("Scan Result", language)}
-              subtitle="Coverage and translation state for the last completed scan."
+              subtitle={uiTranslate("Coverage and translation state for the last completed scan.", language)}
             >
               {scannerResult?.summary ? (
                 <>
@@ -1891,7 +1891,7 @@ export default function Index() {
               ) : (
                 <EmptyState
                   title={uiTranslate("No scan yet", language)}
-                  text="Choose a locale and resource type, then run a Shopify scan."
+                  text={uiTranslate("Choose a locale and resource type, then run a Shopify scan.", language)}
                 />
               )}
             </Card>
