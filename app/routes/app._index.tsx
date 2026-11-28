@@ -379,12 +379,13 @@ export default function Index() {
   const [targetLocale, setTargetLocale] = useState("it");
   const [resourceType, setResourceType] = useState("PRODUCT");
   const [maxItems, setMaxItems] = useState(10);
+  const [jobCreationNotice, setJobCreationNotice] = useState<{ code: string; blocked: number; excludedUri: number } | null>(null);
   const [approvedValue, setApprovedValue] = useState("");
   const [approveNote, setApproveNote] = useState(
-    "Approved in ACA Locale dashboard.",
+    uiTranslate("Approved in ACA Locale dashboard.", "it"),
   );
   const [rejectNote, setRejectNote] = useState(
-    "Translation requires regeneration.",
+    uiTranslate("Translation requires regeneration.", "it"),
   );
 
   const [jobSearch, setJobSearch] = useState("");
@@ -493,7 +494,9 @@ export default function Index() {
     }
 
     if (!response.ok) {
-      throw new Error(data?.message ?? `HTTP ${response.status}`);
+      const failure = new Error(typeof data?.message === "string" ? data.message : `HTTP ${response.status}`) as Error & { responseData?: any };
+      failure.responseData = data;
+      throw failure;
     }
 
     return data;
@@ -1170,24 +1173,38 @@ export default function Index() {
       shopify.toast.show("For a targeted job, select PRODUCT and use the scanned target locale.", { isError: true });
       return;
     }
+    setJobCreationNotice(null);
     await runAction(
       "create-job",
       async () => {
-        const data = await apiCall("/api/backend/translation-jobs", {
-          method: "POST",
-          body: JSON.stringify({
-            targetLocale,
-            resourceTypes: [resourceType],
-            maxItems,
-            ...(productId ? { shopifyProductId: productId } : {}),
-          }),
-        });
-
+        let data: any;
+        try {
+          data = await apiCall("/api/backend/translation-jobs", {
+            method: "POST",
+            body: JSON.stringify({
+              targetLocale,
+              resourceTypes: [resourceType],
+              maxItems,
+              ...(productId ? { shopifyProductId: productId } : {}),
+            }),
+          });
+        } catch (error) {
+          const response = (error as Error & { responseData?: any }).responseData;
+          if (response?.code === "NO_ELIGIBLE_TRANSLATION_FIELDS" || response?.code === "TRANSLATION_FIELDS_ALREADY_ASSIGNED") {
+            setJobCreationNotice({
+              code: response.code,
+              blocked: Number(response.blockedCount) || 0,
+              excludedUri: Number(response.excludedUriCount) || 0,
+            });
+            return;
+          }
+          throw error;
+        }
         await loadJobs(false);
         await loadJobDetail(data.id);
         setActiveTab("jobs");
+        shopify.toast.show(uiTranslate("Translation job created.", language));
       },
-      "Translation job created.",
     );
   };
 
@@ -2027,10 +2044,10 @@ export default function Index() {
         {activeTab === "jobs" ? (
           <div className="aca-layout-jobs">
             <div className="aca-column-stack">
-              <Card title={uiTranslate("Translation Automation Monitor", language)} subtitle="Read-only 30-day Shopify change and automatic job recovery snapshot. No jobs or retries are triggered.">
+              <Card title={uiTranslate("Translation Automation Monitor", language)} subtitle={uiTranslate("Read-only 30-day Shopify change and automatic job recovery snapshot. No jobs or retries are triggered.", language)}>
                 <div className="aca-actions">
                   <button type="button" className="aca-btn" onClick={() => void loadAutomationMonitor()} disabled={automationMonitorLoading}>
-                    {automationMonitorLoading ? 'Refreshing...' : 'Refresh automation status'}
+                    {uiTranslate(automationMonitorLoading ? 'Refreshing...' : 'Refresh automation status', language)}
                   </button>
                 </div>
                 {automationMonitorError ? <p style={{ color: ACA.danger }}>{automationMonitorError}</p> : null}
@@ -2042,7 +2059,7 @@ export default function Index() {
                     <MiniStat label={uiTranslate("Jobs with retry scheduled", language)} value={String(automationMonitor.pendingRetries)} />
                   </div>
                   <p style={mutedTextStyle}><UiText value="Webhook events:" /> {automationMonitor.events.COMPLETED} <UiText value="completed," /> {automationMonitor.events.PROCESSING} <UiText value="processing," /> {automationMonitor.events.FAILED} <UiText value="failed." /></p>
-                  <p style={mutedTextStyle}><UiText value="Automation stages:" /> {Object.entries(automationMonitor.automaticJobs.stages).map(([stage, count]) => `${stage}: ${count}`).join(' · ') || 'No automatic jobs in the last 30 days'}.</p>
+                  <p style={mutedTextStyle}><UiText value="Automation stages:" /> {Object.entries(automationMonitor.automaticJobs.stages).map(([stage, count]) => `${stage}: ${count}`).join(' · ') || uiTranslate('No automatic jobs in the last 30 days.', language)}.</p>
                   {automationMonitor.recentFailures.length > 0 ? <div>
                     <strong><UiText value="Recent failed changes (max 10)" /></strong>
                     {automationMonitor.recentFailures.map(event => <p key={event.id} style={mutedTextStyle}>
@@ -2052,7 +2069,7 @@ export default function Index() {
                   <p style={mutedTextStyle}>{automationMonitor.note}</p>
                 </> : !automationMonitorLoading ? <p style={mutedTextStyle}><UiText value="Open this tab to load a shop-scoped snapshot." /></p> : null}
               </Card>
-              <Card title="Create Job" subtitle="Create and enqueue a background translation job.">
+              <Card title={uiTranslate("Create Job", language)} subtitle={uiTranslate("Create and enqueue a background translation job.", language)}>
                 <div className="aca-form-grid-3">
                   <Field label={uiTranslate("Target locale", language)}>
                     <input
@@ -2087,7 +2104,7 @@ export default function Index() {
                 </div>
                 <div className="aca-actions">
                   <ActionButton
-                    label="Create Job"
+                    label={uiTranslate("Create Job", language)}
                     actionKey="create-job"
                     busyAction={busyAction}
                     onClick={createJob}
@@ -2109,9 +2126,21 @@ export default function Index() {
                     }
                   />
                 </div>
+                {jobCreationNotice ? (
+                  <div role="status" style={{ marginTop: 12, border: "1px solid #d4d9e1", borderRadius: 8, padding: 12 }}>
+                    <strong>{uiTranslate("No new translation job was created", language)}</strong>
+                    <p style={mutedTextStyle}>
+                      {uiTranslate(jobCreationNotice.code === "TRANSLATION_FIELDS_ALREADY_ASSIGNED"
+                        ? "Eligible fields are already assigned to existing translation jobs. Review or publish those items before creating duplicates."
+                        : "No missing or outdated translatable text fields are available for this resource type and language.", language)}
+                    </p>
+                    <p style={mutedTextStyle}>{uiTranslate("Already assigned fields:", language)} {jobCreationNotice.blocked} · {uiTranslate("Excluded URI fields:", language)} {jobCreationNotice.excludedUri}</p>
+                    <p style={mutedTextStyle}>{uiTranslate("Use the Review tab or inspect existing jobs. Changing Max items does not make unavailable fields eligible.", language)}</p>
+                  </div>
+                ) : null}
               </Card>
 
-              <Card title={uiTranslate("Jobs", language)} subtitle="Search and filter translation job history.">
+              <Card title={uiTranslate("Jobs", language)} subtitle={uiTranslate("Search and filter translation job history.", language)}>
                 <div className="aca-filter-row">
                   <input
                     value={jobSearch}
@@ -2139,7 +2168,7 @@ export default function Index() {
                 ) : jobsError ? (
                   <p style={{ ...mutedTextStyle, color: ACA.danger }}>{jobsError}</p>
                 ) : filteredJobs.length === 0 ? (
-                  <EmptyState title={uiTranslate("No jobs found", language)} text="Create a job or change your filters." />
+                  <EmptyState title={uiTranslate("No jobs found", language)} text={uiTranslate("Create a job or change your filters.", language)} />
                 ) : (
                   <div className="aca-job-list">
                     {filteredJobs.map((job) => (
@@ -2163,7 +2192,7 @@ export default function Index() {
 
             <Card
               title={uiTranslate("Job Detail", language)}
-              subtitle="Lifecycle, progress, providers and item-level status."
+              subtitle={uiTranslate("Lifecycle, progress, providers and item-level status.", language)}
             >
               {selectedJob ? (
                 <>
@@ -2182,13 +2211,13 @@ export default function Index() {
 
                   <ProgressBar
                     value={progress}
-                    label={`${selectedJob.completedItems}/${selectedJob.totalItems} completed · ${selectedJob.failedItems} failed`}
+                    label={`${selectedJob.completedItems}/${selectedJob.totalItems} ${uiTranslate("completed", language)} · ${selectedJob.failedItems} ${uiTranslate("failed", language)}`}
                   />
 
                   <div className="aca-stat-grid-3">
                     <MiniStat label={uiTranslate("Started", language)} value={formatDateTime(selectedJob.startedAt)} />
                     <MiniStat label={uiTranslate("Completed", language)} value={formatDateTime(selectedJob.completedAt)} />
-                    <MiniStat label={uiTranslate("Error", language)} value={selectedJob.errorMessage ?? "None"} />
+                    <MiniStat label={uiTranslate("Error", language)} value={selectedJob.errorMessage ?? uiTranslate("None", language)} />
                   </div>
 
                   <div className="aca-actions" style={{ marginTop: 18 }}>
@@ -2272,7 +2301,7 @@ export default function Index() {
                   </div>
                 </>
               ) : (
-                <EmptyState title={uiTranslate("Select a job", language)} text="Choose a job from the list to inspect its lifecycle and items." />
+                <EmptyState title={uiTranslate("Select a job", language)} text={uiTranslate("Choose a job from the list to inspect its lifecycle and items.", language)} />
               )}
             </Card>
           </div>
@@ -2280,7 +2309,7 @@ export default function Index() {
 
         {activeTab === "review" ? (
           <div className="aca-layout-review">
-            <Card title={uiTranslate("Review Queue & History", language)} subtitle="All statuses shows items awaiting review. Select Approved, Published or Rejected to view history. Filters are scoped to this shop; approvals never publish automatically.">
+            <Card title={uiTranslate("Review Queue & History", language)} subtitle={uiTranslate("All statuses shows items awaiting review. Select Approved, Published or Rejected to view history. Filters are scoped to this shop; approvals never publish automatically.", language)}>
               <div className="aca-review-filters">
                 <input aria-label={uiTranslate("Search review queue", language)} placeholder={uiTranslate("Search field, source text or product ID", language)}
                   value={reviewSearch} onChange={(event) => { setReviewSearch(event.target.value); setReviewPageNumber(1); setSelectedReviewIds([]); }} style={inputStyle} />
@@ -2351,7 +2380,7 @@ export default function Index() {
                       <div style={{ textAlign: "right" }}>
                         {statusBadge(item.status)}
                         <div className="aca-muted-small" style={{ marginTop: 6 }}>
-                          <UiText value="Technical QA" /> {qualitySnapshot(item).score === null ? "not checked" : `${qualitySnapshot(item).score}/100 · ${qualitySnapshot(item).state}`} <UiText value="· AI" /> {item.aiReviewScore ?? "—"}
+                          <UiText value="Technical QA" /> {qualitySnapshot(item).score === null ? uiTranslate("not checked", language) : `${qualitySnapshot(item).score}/100 · ${uiTranslate(qualitySnapshot(item).state, language)}`} <UiText value="· AI" /> {item.aiReviewScore ?? "—"}
                         </div>
                       </div>
                     </button>
@@ -2371,7 +2400,7 @@ export default function Index() {
 
             <Card
               title={uiTranslate("Human Review", language)}
-              subtitle="Compare source and generated text, edit the final value and publish after approval."
+              subtitle={uiTranslate("Compare source and generated text, edit the final value and publish after approval.", language)}
             >
               {selectedItem && selectedJob ? (
                 <div className="aca-column-stack">
@@ -2395,8 +2424,8 @@ export default function Index() {
                     <h3 style={sectionHeadingStyle}><UiText value="Translation Quality Studio" /></h3>
                     <p className="aca-muted-small"><UiText value="Deterministic technical checks from the generated translation. This is not a linguistic quality rating. Edited approval text is validated again on the server." /></p>
                     <div className="aca-stat-grid-4">
-                      <MiniStat label={uiTranslate("Technical score", language)} value={qualitySnapshot(selectedItem).score === null ? "Not checked" : `${qualitySnapshot(selectedItem).score}/100`} />
-                      <MiniStat label={uiTranslate("Gate", language)} value={qualitySnapshot(selectedItem).state} />
+                      <MiniStat label={uiTranslate("Technical score", language)} value={qualitySnapshot(selectedItem).score === null ? uiTranslate("Not checked", language) : `${qualitySnapshot(selectedItem).score}/100`} />
+                      <MiniStat label={uiTranslate("Gate", language)} value={uiTranslate(qualitySnapshot(selectedItem).state, language)} />
                       <MiniStat label={uiTranslate("Critical issues", language)} value={String(qualitySnapshot(selectedItem).errors)} />
                       <MiniStat label={uiTranslate("Warnings", language)} value={String(qualitySnapshot(selectedItem).warnings)} />
                     </div>
@@ -2424,7 +2453,7 @@ export default function Index() {
                       >
                         {selectedJob.items.map((item, index) => (
                           <option key={item.id} value={item.id}>
-                            {index + 1}. {item.field?.key ?? "field"} · {item.status}
+                            {index + 1}. {item.field?.key ?? uiTranslate("field", language)} · {uiTranslate(item.status, language)}
                           </option>
                         ))}
                       </select>

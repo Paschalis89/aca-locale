@@ -191,9 +191,36 @@ export class TranslationJobsService {
       );
 
       if (eligibleStates.length === 0) {
-        throw new BadRequestException(
-          'No eligible MISSING or OUTDATED translation fields were found for the requested resource types.',
-        );
+        // Read-only diagnostics for the selected shop/locale/resource scope.
+        // URI fields are intentionally not translated; existing job snapshots
+        // retain their deduplication protection, including VALIDATED/APPROVED.
+        const excludedUriCount = await tx.translationState.count({
+          where: {
+            targetLocale,
+            status: { in: ['MISSING', 'OUTDATED'] },
+            field: {
+              sourceLocale,
+              deletedAt: null,
+              type: 'URI',
+              resource: {
+                shopId: shop.id,
+                resourceType: { in: resourceTypes },
+                ...(shopifyProductId ? { shopifyResourceId: shopifyProductId } : {}),
+                deletedAt: null,
+              },
+            },
+          },
+        });
+        throw new BadRequestException({
+          code: states.length > 0
+            ? 'TRANSLATION_FIELDS_ALREADY_ASSIGNED'
+            : 'NO_ELIGIBLE_TRANSLATION_FIELDS',
+          message: states.length > 0
+            ? 'Eligible translation fields are already assigned to existing jobs.'
+            : 'No eligible MISSING or OUTDATED translatable text fields are available.',
+          blockedCount: states.length,
+          excludedUriCount,
+        });
       }
 
       const provider = shop.aiConfiguration?.translationProvider ?? null;
