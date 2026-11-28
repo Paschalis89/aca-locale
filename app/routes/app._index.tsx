@@ -379,7 +379,7 @@ export default function Index() {
   const [targetLocale, setTargetLocale] = useState("it");
   const [resourceType, setResourceType] = useState("PRODUCT");
   const [maxItems, setMaxItems] = useState(10);
-  const [jobCreationNotice, setJobCreationNotice] = useState<{ code: string; blocked: number; excludedUri: number } | null>(null);
+  const [jobCreationNotice, setJobCreationNotice] = useState<{ code: string; blocked: number | null; excludedUri: number | null } | null>(null);
   const [approvedValue, setApprovedValue] = useState("");
   const [approveNote, setApproveNote] = useState(
     uiTranslate("Approved in ACA Locale dashboard.", "it"),
@@ -1189,12 +1189,29 @@ export default function Index() {
             }),
           });
         } catch (error) {
+          // NestJS can nest structured BadRequestException details inside `message`.
+          // Preserve developer JSON in apiCall(), but show a localized informational
+          // notice instead of a black error toast for this expected no-work case.
           const response = (error as Error & { responseData?: any }).responseData;
-          if (response?.code === "NO_ELIGIBLE_TRANSLATION_FIELDS" || response?.code === "TRANSLATION_FIELDS_ALREADY_ASSIGNED") {
+          const candidates = [response, response?.message, response?.error, response?.response, response?.response?.message];
+          const diagnostic = candidates.find((value) =>
+            value && typeof value === "object" &&
+            (value.code === "NO_ELIGIBLE_TRANSLATION_FIELDS" || value.code === "TRANSLATION_FIELDS_ALREADY_ASSIGNED")
+          );
+          const rawMessage = candidates.filter((value) => typeof value === "string").join(" ") +
+            " " + (error instanceof Error ? error.message : "");
+          const fallbackCode = /Eligible translation fields are already assigned to existing jobs/i.test(rawMessage)
+            ? "TRANSLATION_FIELDS_ALREADY_ASSIGNED"
+            : /No eligible MISSING or OUTDATED translatable text fields are available/i.test(rawMessage)
+              ? "NO_ELIGIBLE_TRANSLATION_FIELDS"
+              : null;
+          if (diagnostic || fallbackCode) {
+            const numericCount = (value: unknown): number | null =>
+              typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
             setJobCreationNotice({
-              code: response.code,
-              blocked: Number(response.blockedCount) || 0,
-              excludedUri: Number(response.excludedUriCount) || 0,
+              code: diagnostic?.code ?? fallbackCode!,
+              blocked: numericCount(diagnostic?.blockedCount),
+              excludedUri: numericCount(diagnostic?.excludedUriCount),
             });
             return;
           }
@@ -2134,7 +2151,13 @@ export default function Index() {
                         ? "Eligible fields are already assigned to existing translation jobs. Review or publish those items before creating duplicates."
                         : "No missing or outdated translatable text fields are available for this resource type and language.", language)}
                     </p>
-                    <p style={mutedTextStyle}>{uiTranslate("Already assigned fields:", language)} {jobCreationNotice.blocked} · {uiTranslate("Excluded URI fields:", language)} {jobCreationNotice.excludedUri}</p>
+                    {(jobCreationNotice.blocked !== null || jobCreationNotice.excludedUri !== null) ? (
+                      <p style={mutedTextStyle}>
+                        {jobCreationNotice.blocked !== null ? `${uiTranslate("Already assigned fields:", language)} ${jobCreationNotice.blocked}` : null}
+                        {jobCreationNotice.blocked !== null && jobCreationNotice.excludedUri !== null ? " · " : null}
+                        {jobCreationNotice.excludedUri !== null ? `${uiTranslate("Excluded URI fields:", language)} ${jobCreationNotice.excludedUri}` : null}
+                      </p>
+                    ) : null}
                     <p style={mutedTextStyle}>{uiTranslate("Use the Review tab or inspect existing jobs. Changing Max items does not make unavailable fields eligible.", language)}</p>
                   </div>
                 ) : null}
